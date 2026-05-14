@@ -29,6 +29,8 @@ Build/test metadata is planned but not yet committed. Once Phase 0 lands, use:
 Prefer wrapper scripts in `scripts/` so CI, benches, and developers use the same
 entry points.
 
+For Python environment, use Zephyr workspace's venv.
+
 ## Coding Style & Naming Conventions
 
 For firmware C, follow Zephyr conventions: 4-space indentation, `snake_case`

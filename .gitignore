@@ -1,0 +1,7 @@
+# Build outputs
+/build/
+
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/

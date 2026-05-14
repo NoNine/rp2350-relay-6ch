@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rp2350-relay-6ch"
+version = "0.0.0"
+description = "Host tooling for the Waveshare RP2350-Relay-6CH controller"
+readme = "docs/prd.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.setuptools]
+package-dir = {"" = "host"}
+
+[tool.setuptools.packages.find]
+where = ["host"]
+
+[tool.pytest.ini_options]
+testpaths = ["host/tests"]
+pythonpath = ["host"]
