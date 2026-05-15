@@ -45,7 +45,7 @@ scripts/test-host.sh
 Run firmware relay tests:
 
 ```sh
-west build -s firmware/tests/relay -b native_sim build/firmware-tests/relay
+west build -s firmware/tests/relay -b native_sim -d build/firmware-tests/relay
 build/firmware-tests/relay/zephyr/zephyr.exe
 ```
 

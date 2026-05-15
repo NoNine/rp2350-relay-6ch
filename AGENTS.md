@@ -20,7 +20,7 @@ RP2350-Relay-6CH.
 
 Build/test metadata is planned but not yet committed. Once Phase 0 lands, use:
 
-- `west build -s firmware -b <rp2350-board> build/firmware`: build firmware.
+- `west build -s firmware -b <rp2350-board> -d build/firmware`: build firmware.
 - `west flash -d build/firmware`: flash the latest firmware build.
 - `pytest host/tests`: run Python host library and CLI tests.
 - `pytest firmware/tests` or Zephyr `twister`: run firmware unit tests,
@@ -53,16 +53,15 @@ transports before requiring hardware. Name tests by behavior, for example
 
 Existing commits use short imperative summaries, such as `Add RP2350 relay
 hardware info` and `Plan PRD implementation phases`. Continue that style.
-Keep commit message lines within 80 columns. In commit bodies, section titles
-such as `Prompt:` or `Conversation context:` should be followed immediately by
-their content, with no blank line after the title.
+Keep commit message lines within 80 columns. In commit bodies, every section
+title should be followed immediately by its content, with no blank line after
+the title. Add one blank line between two sections. Start each item in every
+section with `- `, put each action or request item on its own line, and wrap
+long bullet items with continuation lines indented by two spaces.
 When including prompt or conversation context in a commit body:
 
 - Use a `Prompt:` section for the user request.
 - Use a `Conversation context:` section for relevant actions and decisions.
-- Start each item in both sections with `- `.
-- Put each action or request item on its own line.
-- Wrap long bullet items with continuation lines indented by two spaces.
 
 Pull requests should include a summary, commands run, hardware used, linked
 issues or phase references, and docs updates for changed protocol, GPIO, safety,

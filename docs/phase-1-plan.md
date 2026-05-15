@@ -33,7 +33,8 @@ Run:
 
 ```sh
 scripts/build-firmware.sh
-west build -s firmware/tests/relay -b native_sim build/firmware-tests/relay
+west build -s firmware/tests/relay -b native_sim -d build/firmware-tests/relay
+build/firmware-tests/relay/zephyr/zephyr.exe
 scripts/smoke-hardware.sh
 ```
 
@@ -42,7 +43,8 @@ Expected results:
 - Firmware builds for the configured RP2350 development target.
 - Relay unit tests pass on `native_sim`.
 - Hardware smoke-test script prints the relay validation procedure and exits
-  with success when used as a checklist helper.
+  with success as a checklist helper. It does not switch relays or complete
+  hardware validation by itself.
 
 ## Assumptions
 
