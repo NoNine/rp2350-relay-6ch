@@ -25,6 +25,8 @@ docs/
 ## Phase Rules
 
 - Each phase must leave the repository in a buildable/testable state.
+- Each phase must have its detailed phase plan saved as
+  `docs/phase-{phase-no}-plan.md` before implementation starts.
 - A phase is complete only after its acceptance tests pass and the relevant
   documentation is updated.
 - Later phases may not start until dependencies from earlier phases are

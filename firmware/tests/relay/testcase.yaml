@@ -1,0 +1,8 @@
+tests:
+  rp2350_relay_6ch.relay:
+    platform_allow:
+      - native_sim
+    tags:
+      - gpio
+      - relay
+    harness: ztest
