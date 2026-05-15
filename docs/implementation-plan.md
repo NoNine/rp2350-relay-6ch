@@ -60,6 +60,12 @@ Dependencies:
 - `docs/hardware-info.md`
 - Zephyr workspace available under the developer environment.
 
+### Assumptions
+
+- Use Raspberry Pi Pico 2 W (`rpi_pico2/rp2350a/m33/w`) as the temporary
+  development board target until a custom RP2350-Relay-6CH board definition or
+  overlay is available.
+
 ## Phase 1: Board Bring-Up And Relay GPIO Control
 
 Purpose: implement safe direct control for the six relay outputs before adding

@@ -7,6 +7,9 @@ needed for repeatable implementation. The development board target is
 `rpi_pico2/rp2350a/m33/w` for Raspberry Pi Pico 2 W until a custom
 RP2350-Relay-6CH board definition is available.
 
+Assumption: Pico 2 W is the temporary development board until the custom board
+definition or overlay lands.
+
 No relay GPIO behavior is implemented in this phase. Relay safety, GPIO
 configuration, and hardware smoke testing begin in Phase 1.
 
