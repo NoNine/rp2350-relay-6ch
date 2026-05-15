@@ -56,6 +56,13 @@ hardware info` and `Plan PRD implementation phases`. Continue that style.
 Keep commit message lines within 80 columns. In commit bodies, section titles
 such as `Prompt:` or `Conversation context:` should be followed immediately by
 their content, with no blank line after the title.
+When including prompt or conversation context in a commit body:
+
+- Use a `Prompt:` section for the user request.
+- Use a `Conversation context:` section for relevant actions and decisions.
+- Start each item in both sections with `- `.
+- Put each action or request item on its own line.
+- Wrap long bullet items with continuation lines indented by two spaces.
 
 Pull requests should include a summary, commands run, hardware used, linked
 issues or phase references, and docs updates for changed protocol, GPIO, safety,
