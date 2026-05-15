@@ -53,6 +53,9 @@ transports before requiring hardware. Name tests by behavior, for example
 
 Existing commits use short imperative summaries, such as `Add RP2350 relay
 hardware info` and `Plan PRD implementation phases`. Continue that style.
+Keep commit message lines within 80 columns. In commit bodies, section titles
+such as `Prompt:` or `Conversation context:` should be followed immediately by
+their content, with no blank line after the title.
 
 Pull requests should include a summary, commands run, hardware used, linked
 issues or phase references, and docs updates for changed protocol, GPIO, safety,
