@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-ZEPHYR_WORKSPACE="${ZEPHYR_WORKSPACE:-/home/ubuntu/zephyrproject}"
+ZEPHYR_WORKSPACE="${ZEPHYR_WORKSPACE:-${HOME}/zephyrproject}"
 VENV_DIR="${ZEPHYR_VENV:-${ZEPHYR_WORKSPACE}/.venv}"
 BOARD="${BOARD:-rpi_pico2/rp2350a/m33/w}"
 BUILD_DIR="${BUILD_DIR:-${ROOT_DIR}/build/firmware}"

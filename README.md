@@ -3,10 +3,10 @@
 Zephyr firmware and Python host tooling for the Waveshare RP2350-Relay-6CH
 controller.
 
-This repository is currently at Phase 0: project baseline and build harness.
-The firmware builds as a minimal Zephyr application, the Python package imports,
-and wrapper scripts provide repeatable local entry points. Relay GPIO control,
-USB RPC, CLI tooling, and firmware update support are planned but not
+This repository is currently at Phase 1: board bring-up and relay GPIO control.
+The firmware builds as a Zephyr application with safe direct relay control, the
+Python package imports, and wrapper scripts provide repeatable local entry
+points. USB RPC, CLI tooling, and firmware update support are planned but not
 implemented yet.
 
 ## Current Status
@@ -20,14 +20,20 @@ implemented yet.
 
 ## Quick Start
 
-The expected Zephyr workspace is `/home/ubuntu/zephyrproject`. Scripts use the
-workspace virtual environment at `/home/ubuntu/zephyrproject/.venv` when it is
-present.
+Use an initialized Zephyr workspace on your machine. The wrapper scripts default
+to `$HOME/zephyrproject` and use `<zephyr-workspace>/.venv` when it is present.
+Set `ZEPHYR_WORKSPACE` or `ZEPHYR_VENV` if your paths differ.
 
 Build the baseline firmware:
 
 ```sh
 scripts/build-firmware.sh
+```
+
+Flash the latest firmware build:
+
+```sh
+west flash -d build/firmware
 ```
 
 Run host-side tests:
@@ -36,14 +42,72 @@ Run host-side tests:
 scripts/test-host.sh
 ```
 
+Run firmware relay tests:
+
+```sh
+west build -s firmware/tests/relay -b native_sim build/firmware-tests/relay
+build/firmware-tests/relay/zephyr/zephyr.exe
+```
+
 Run the current hardware smoke-test entry point:
 
 ```sh
 scripts/smoke-hardware.sh
 ```
 
-In Phase 0, the smoke-test script exits non-zero with a message explaining that
-relay hardware smoke tests begin in Phase 1.
+In Phase 1, the smoke-test script prints the manual relay validation procedure
+and teardown reminder. It does not switch relays itself.
+
+## Adopting This Project in Your Environment
+
+This project targets the Waveshare RP2350-Relay-6CH. The firmware controls six
+active-high relay outputs on GPIO26 through GPIO31 and keeps all relays off on
+boot, reset, firmware restart, and test setup/teardown. Host tooling is
+currently limited to the importable Python package and test harness; USB RPC and
+CLI workflows are planned for later phases.
+
+Prerequisites:
+
+- Zephyr workspace with the Zephyr SDK/toolchain available.
+- Python 3.12 or newer in the Zephyr workspace virtual environment.
+- Waveshare RP2350-Relay-6CH hardware, USB connection, and suitable power.
+- A serial console or debug connection for Zephyr shell relay commands.
+- Safe relay-side wiring; do not connect hazardous loads during bring-up.
+
+Clone and enter the repository:
+
+```sh
+git clone git@github.com:NoNine/rp2350-relay-6ch.git
+cd rp2350-relay-6ch
+```
+
+Use the Zephyr workspace virtual environment before running the Quick Start
+commands:
+
+```sh
+source <zephyr-workspace>/.venv/bin/activate
+pip install -e .
+```
+
+Configuration checklist:
+
+- Confirm the Zephyr board name. The current default is
+  `rpi_pico2/rp2350a/m33/w` until a dedicated RP2350-Relay-6CH board definition
+  is added.
+- Confirm relay GPIO mapping before hardware tests: `CH1` through `CH6` map to
+  GPIO26 through GPIO31.
+- Confirm the Zephyr shell serial device path for manual relay commands.
+- Confirm power wiring and keep relay loads disconnected during first bring-up.
+- Keep MCU `GND` and isolated relay/RS485 `SGND` assumptions documented.
+
+Porting to another environment:
+
+- Add or adapt Zephyr board overlays under `firmware/boards/` when hardware
+  differs from the current development target.
+- Update relay GPIO mappings only if the new hardware differs.
+- Preserve default-off relay behavior on boot, reset, firmware restart, and
+  test teardown.
+- Run firmware tests and relay smoke tests before connecting relay loads.
 
 ## Repository Layout
 
@@ -61,6 +125,7 @@ docs/       Requirements, hardware notes, phase plans, protocol, and tests
 - [Hardware information](docs/hardware-info.md)
 - [Implementation plan](docs/implementation-plan.md)
 - [Phase 0 plan](docs/phase-0-plan.md)
+- [Phase 1 plan](docs/phase-1-plan.md)
 
 ## Safety Notes
 
