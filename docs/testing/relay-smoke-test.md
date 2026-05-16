@@ -8,8 +8,16 @@ hardware.
 - Power the board from the documented external DC input or a bench supply set
   to the expected input range.
 - Keep relay contacts disconnected from hazardous loads during bring-up.
-- Connect the Zephyr shell console for manual relay commands.
+- Connect a 3.3 V USB-UART adapter to the UART0 shell on the Pico-compatible
+  header:
+  - adapter RX to board `TXD0` / GPIO0
+  - adapter TX to board `RXD0` / GPIO1
+  - adapter GND to board MCU-side `GND`, not isolated relay/RS485 `SGND`
+- Open the adapter serial port at 115200 8N1 with no flow control, then press
+  Enter to reach the Zephyr shell prompt.
 - Confirm the firmware logs relay initialization without GPIO errors.
+- Leave the USB-C device port available for flashing and future host-control
+  protocol work. Do not depend on USB CDC for the Phase 1 relay shell.
 
 ## Procedure
 

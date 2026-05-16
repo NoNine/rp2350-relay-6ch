@@ -46,6 +46,11 @@ Expected results:
   with success as a checklist helper. It does not switch relays or complete
   hardware validation by itself.
 
+Recorded verification:
+
+- See `docs/testing/phase-1-verification.md` for the 2026-05-16 hardware smoke
+  test result.
+
 ## Assumptions
 
 - Relay outputs are active high unless hardware testing proves otherwise.

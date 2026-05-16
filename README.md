@@ -71,7 +71,9 @@ Prerequisites:
 - Zephyr workspace with the Zephyr SDK/toolchain available.
 - Python 3.12 or newer in the Zephyr workspace virtual environment.
 - Waveshare RP2350-Relay-6CH hardware, USB connection, and suitable power.
-- A serial console or debug connection for Zephyr shell relay commands.
+- A 3.3 V USB-UART adapter connected to UART0 for Zephyr shell relay commands:
+  adapter RX to `TXD0` / GPIO0, adapter TX to `RXD0` / GPIO1, and adapter GND
+  to MCU-side `GND`.
 - Safe relay-side wiring; do not connect hazardous loads during bring-up.
 
 Clone and enter the repository:
@@ -96,7 +98,7 @@ Configuration checklist:
   is added.
 - Confirm relay GPIO mapping before hardware tests: `CH1` through `CH6` map to
   GPIO26 through GPIO31.
-- Confirm the Zephyr shell serial device path for manual relay commands.
+- Confirm the operator PC serial device path for the UART0 USB-UART adapter.
 - Confirm power wiring and keep relay loads disconnected during first bring-up.
 - Keep MCU `GND` and isolated relay/RS485 `SGND` assumptions documented.
 
@@ -126,11 +128,14 @@ docs/       Requirements, hardware notes, phase plans, protocol, and tests
 - [Implementation plan](docs/implementation-plan.md)
 - [Phase 0 plan](docs/phase-0-plan.md)
 - [Phase 1 plan](docs/phase-1-plan.md)
+- [Phase 1 verification](docs/testing/phase-1-verification.md)
 
 ## Safety Notes
 
 - Do not repurpose GPIO26, GPIO27, GPIO28, GPIO29, GPIO30, or GPIO31; they are
   relay outputs on the target hardware.
 - Keep relay outputs off by default and force them off during test teardown.
+- Use UART0 for the manual Zephyr shell. Keep USB CDC available for the future
+  host control protocol, and keep UART1 available for the isolated RS485 path.
 - Treat MCU `GND` and isolated relay/RS485 `SGND` as separate domains in design
   notes, firmware assumptions, and tests.
