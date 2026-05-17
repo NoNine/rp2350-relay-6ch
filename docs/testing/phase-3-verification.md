@@ -2,12 +2,14 @@
 
 Date: 2026-05-17
 Hardware: Not used
-Firmware commit: Not committed
+Firmware commit: 6d49176
 Interfaces: `native_sim`, build wrapper, smoke checklist script
 Result: PASS
 
 ## Commands Run
 
+- `source ${ZEPHYR_WORKSPACE:-$HOME/zephyrproject}/.venv/bin/activate`
+- `export ZEPHYR_BASE=${ZEPHYR_WORKSPACE:-$HOME/zephyrproject}/zephyr`
 - `west build -s firmware/tests/relay_mgmt -b native_sim -d build/firmware-tests/relay-mgmt`
 - `build/firmware-tests/relay-mgmt/zephyr/zephyr.exe`
 - `scripts/build-firmware.sh`
@@ -33,6 +35,8 @@ Result: PASS
 
 ## Notes
 
-- Hardware was not used for automated verification in this run.
+- Hardware was not used for verification in this run.
+- Manual boot, reset, power-cycle, relay switching, and pulse checks were
+  skipped because no board was attached.
 - The smoke checklist remains manual and does not switch relays itself.
 - No automated test left a relay on; test teardown forced all relays off.

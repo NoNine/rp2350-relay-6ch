@@ -30,13 +30,13 @@ configuration, and hardware smoke testing begin in Phase 1.
 
 ## Environment
 
-The expected Zephyr workspace is `/home/ubuntu/zephyrproject`. Scripts use the
-workspace virtual environment at `/home/ubuntu/zephyrproject/.venv` when it is
-present.
+The expected Zephyr workspace defaults to `$HOME/zephyrproject`. Scripts use
+the workspace virtual environment at
+`${ZEPHYR_WORKSPACE:-$HOME/zephyrproject}/.venv` when it is present.
 
 The firmware build script sets `ZEPHYR_BASE` to
-`/home/ubuntu/zephyrproject/zephyr` when `ZEPHYR_BASE` is unset and that path
-exists.
+`${ZEPHYR_WORKSPACE:-$HOME/zephyrproject}/zephyr` when `ZEPHYR_BASE` is unset
+and that path exists.
 
 Useful overrides:
 

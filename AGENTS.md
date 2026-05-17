@@ -5,6 +5,11 @@
 This is a Zephyr firmware and Python host tooling project for the Waveshare
 RP2350-Relay-6CH.
 
+Before adding or refining repository rules, search existing guidance first and
+update the single most authoritative location. Avoid duplicating the same rule
+across `AGENTS.md`, phase plans, and implementation docs unless a short
+cross-reference is clearer than repeating the full text.
+
 - `docs/` holds requirements, hardware notes, protocol specs, and test
   procedures. Update it when behavior or hardware assumptions change.
 - `firmware/` is the Zephyr application area. Put application C sources in
@@ -18,7 +23,7 @@ RP2350-Relay-6CH.
 
 ## Build, Test, and Development Commands
 
-Build/test metadata is planned but not yet committed. Once Phase 0 lands, use:
+Use:
 
 - `west build -s firmware -b <rp2350-board> -d build/firmware`: build firmware.
 - `west flash -d build/firmware`: flash the latest firmware build.
@@ -29,7 +34,9 @@ Build/test metadata is planned but not yet committed. Once Phase 0 lands, use:
 Prefer wrapper scripts in `scripts/` so CI, benches, and developers use the same
 entry points.
 
-For Python environment, use Zephyr workspace's venv.
+Use the Zephyr workspace virtual environment for Python and Zephyr tooling.
+Default to `${ZEPHYR_WORKSPACE:-$HOME/zephyrproject}/.venv`; set
+`ZEPHYR_VENV` only when a different venv is required.
 
 ## Coding Style & Naming Conventions
 
@@ -53,7 +60,10 @@ Every completed phase must have a verification report at
 `docs/testing/phase-{phase-no}-verification.md`, following the format of
 `docs/testing/phase-1-verification.md`. Include date, commit, commands run,
 hardware used or `Not used`, result, test outcomes, and safety notes. Record
-skipped hardware checks or blockers explicitly.
+skipped hardware checks or blockers explicitly. Do not create or update a phase
+verification report automatically during implementation. Write or update the
+report only when explicitly requested. When writing one, include only
+verification commands that actually ran, and never record speculative results.
 
 ## Commit & Pull Request Guidelines
 
@@ -67,6 +77,8 @@ long bullet items with continuation lines indented by two spaces.
 When including prompt or conversation context in a commit body:
 
 - Use a `Prompt:` section for the user request.
+- Preserve the user's original prompt wording as closely as practical in the
+  `Prompt:` section instead of replacing it with a broad summary.
 - Use a `Conversation context:` section for relevant actions and decisions.
 
 Before running `git commit`, verify the commit message manually:
