@@ -3,11 +3,12 @@
 Zephyr firmware and Python host tooling for the Waveshare RP2350-Relay-6CH
 controller.
 
-This repository is currently implementing Phase 5: Python RPC library for the
-custom Zephyr MCUmgr/SMP relay management group. The firmware builds as a
-Zephyr application with safe direct relay control, pulse handling, protocol
-handlers, and USB CDC SMP transport. CLI tooling and firmware update support
-are planned but not implemented yet.
+This repository is currently implementing Phase 6: CLI utility for the custom
+Zephyr MCUmgr/SMP relay management group. The firmware builds as a Zephyr
+application with safe direct relay control, pulse handling, protocol handlers,
+and USB CDC SMP transport. Host tooling includes an importable Python RPC
+library and a library-backed CLI utility. Firmware update support is planned
+but not implemented yet.
 
 ## Current Status
 
@@ -55,16 +56,18 @@ Run the current hardware smoke-test entry point:
 scripts/smoke-hardware.sh
 ```
 
-In Phase 1, the smoke-test script prints the manual relay validation procedure
-and teardown reminder. It does not switch relays itself.
+Run the Phase 6 CLI hardware smoke command:
+
+```sh
+tools/rp2350_relay_cli.py --port <serial-port> smoke
+```
 
 ## Adopting This Project in Your Environment
 
 This project targets the Waveshare RP2350-Relay-6CH. The firmware controls six
 active-high relay outputs on GPIO26 through GPIO31 and keeps all relays off on
 boot, reset, firmware restart, and test setup/teardown. Host tooling includes
-an importable Python RPC library and test harness. CLI workflows are planned for
-later phases.
+an importable Python RPC library, CLI utility, and test harness.
 
 Prerequisites:
 
@@ -134,7 +137,9 @@ docs/       Requirements, hardware notes, phase plans, protocol, and tests
 - [Phase 3 verification](docs/testing/phase-3-verification.md)
 - [Phase 4 plan](docs/phase-4-plan.md)
 - [Phase 5 plan](docs/phase-5-plan.md)
+- [Phase 6 plan](docs/phase-6-plan.md)
 - [Host library](docs/host-library.md)
+- [CLI utility](docs/cli.md)
 - [USB RPC smoke test](docs/testing/usb-rpc-smoke-test.md)
 
 ## Safety Notes
