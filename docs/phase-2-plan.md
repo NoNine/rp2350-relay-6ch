@@ -55,6 +55,11 @@ Expected results:
   all-off teardown step.
 - No automated or manual test leaves a relay on as a side effect.
 
+Recorded verification:
+
+- Save Phase 2 verification results in
+  `docs/testing/phase-2-verification.md` before marking the phase complete.
+
 ## Dependencies
 
 - Phase 1 complete and verified.

@@ -49,6 +49,12 @@ bounds, busy pulses, and all-off teardown. Host tests should use simulated
 transports before requiring hardware. Name tests by behavior, for example
 `test_pulse_rejects_busy_relay`.
 
+Every completed phase must have a verification report at
+`docs/testing/phase-{phase-no}-verification.md`, following the format of
+`docs/testing/phase-1-verification.md`. Include date, commit, commands run,
+hardware used or `Not used`, result, test outcomes, and safety notes. Record
+skipped hardware checks or blockers explicitly.
+
 ## Commit & Pull Request Guidelines
 
 Existing commits use short imperative summaries, such as `Add RP2350 relay

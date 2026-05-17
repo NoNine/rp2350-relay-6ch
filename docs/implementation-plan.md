@@ -27,10 +27,12 @@ docs/
 - Each phase must leave the repository in a buildable/testable state.
 - Each phase must have its detailed phase plan saved as
   `docs/phase-{phase-no}-plan.md` before implementation starts.
-- A phase is complete only after its acceptance tests pass and the relevant
-  documentation is updated.
+- A phase is complete only after its acceptance tests pass, the relevant
+  documentation is updated, and
+  `docs/testing/phase-{phase-no}-verification.md` records the verification
+  result.
 - Later phases may not start until dependencies from earlier phases are
-  verified.
+  verified and their phase verification reports exist.
 - Relay outputs must fail safe: all six channels default off on boot, reset,
   firmware restart, and test setup/teardown.
 - Temporary debug paths are allowed only inside the current phase and must be
