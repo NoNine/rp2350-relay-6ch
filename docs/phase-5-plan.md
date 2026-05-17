@@ -39,7 +39,7 @@ unchanged from the Phase 3 and Phase 4 protocol surface.
 
 ## Acceptance Checks
 
-Run:
+Automated host checks:
 
 ```sh
 scripts/test-host.sh
@@ -54,11 +54,22 @@ Expected results:
   structured device errors.
 - The package remains importable through `rp2350_relay_6ch`.
 
-Hardware validation:
+Manual hardware smoke check:
 
-- Use `RelayClient.connect("<port>")` from the operator PC to run the same relay
-  actions exercised by the Phase 4 smoke test.
-- End hardware validation with `off_all()`.
+```sh
+${ZEPHYR_VENV:-${ZEPHYR_WORKSPACE:-$HOME/zephyrproject}/.venv}/bin/python \
+  tools/host_library_hardware_smoke.py --port <serial-port>
+```
+
+Expected hardware results:
+
+- The smoke helper uses the Python host library, not the Phase 4 ad hoc smoke
+  client.
+- `info`, `status`, `get`, `set`, `set_all`, `pulse`, and `off_all` complete
+  through `RelayClient`.
+- Invalid channel and invalid pulse requests reach firmware and return
+  structured relay group errors with group `64` and rc `2`.
+- The smoke helper ends with `off_all()` and leaves all relay states off.
 
 ## Dependencies
 
