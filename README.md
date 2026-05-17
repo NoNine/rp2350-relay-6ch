@@ -3,11 +3,10 @@
 Zephyr firmware and Python host tooling for the Waveshare RP2350-Relay-6CH
 controller.
 
-This repository is currently at Phase 1: board bring-up and relay GPIO control.
-The firmware builds as a Zephyr application with safe direct relay control, the
-Python package imports, and wrapper scripts provide repeatable local entry
-points. USB RPC, CLI tooling, and firmware update support are planned but not
-implemented yet.
+This repository is currently implementing Phase 3: a custom Zephyr MCUmgr/SMP
+relay management group. The firmware builds as a Zephyr application with safe
+direct relay control, pulse handling, and protocol handlers. USB CDC transport,
+CLI tooling, and firmware update support are planned but not implemented yet.
 
 ## Current Status
 
@@ -129,6 +128,8 @@ docs/       Requirements, hardware notes, phase plans, protocol, and tests
 - [Phase 0 plan](docs/phase-0-plan.md)
 - [Phase 1 plan](docs/phase-1-plan.md)
 - [Phase 1 verification](docs/testing/phase-1-verification.md)
+- [Phase 2 verification](docs/testing/phase-2-verification.md)
+- [Phase 3 plan](docs/phase-3-plan.md)
 
 ## Safety Notes
 

@@ -6,5 +6,5 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(rp2350_relay_6ch)
 
 target_include_directories(app PRIVATE include)
-target_sources(app PRIVATE src/main.c src/relay.c)
+target_sources(app PRIVATE src/main.c src/relay.c src/relay_mgmt.c)
 target_sources_ifdef(CONFIG_SHELL app PRIVATE src/relay_shell.c)
