@@ -103,6 +103,14 @@ class CborReader:
         self.offset += count
         return chunk
 
+    def next_is_break(self) -> bool:
+        return self.offset < len(self.data) and self.data[self.offset] == 0xFF
+
+    def read_break(self) -> None:
+        if not self.next_is_break():
+            raise ValueError("missing CBOR break")
+        self.offset += 1
+
     def read_len(self, additional: int) -> int:
         if additional < 24:
             return additional
@@ -112,7 +120,29 @@ class CborReader:
             return struct.unpack(">H", self.read(2))[0]
         if additional == 26:
             return struct.unpack(">I", self.read(4))[0]
+        if additional == 27:
+            return struct.unpack(">Q", self.read(8))[0]
         raise ValueError(f"unsupported CBOR additional info: {additional}")
+
+    def read_indefinite_text(self) -> str:
+        chunks = bytearray()
+
+        while not self.next_is_break():
+            initial = self.read(1)[0]
+            major = initial >> 5
+            additional = initial & 0x1F
+            if major != 3 or additional == 31:
+                raise ValueError("invalid indefinite CBOR text chunk")
+            chunks += self.read(self.read_len(additional))
+
+        self.read_break()
+        return chunks.decode("utf-8")
+
+    def read_map_entry(self, result: dict[str, Any]) -> None:
+        key = self.read_value()
+        if not isinstance(key, str):
+            raise ValueError("CBOR map key is not text")
+        result[key] = self.read_value()
 
     def read_value(self) -> Any:
         initial = self.read(1)[0]
@@ -122,16 +152,21 @@ class CborReader:
         if major == 0:
             return self.read_len(additional)
         if major == 3:
+            if additional == 31:
+                return self.read_indefinite_text()
             length = self.read_len(additional)
             return self.read(length).decode("utf-8")
         if major == 5:
-            length = self.read_len(additional)
             result: dict[str, Any] = {}
+            if additional == 31:
+                while not self.next_is_break():
+                    self.read_map_entry(result)
+                self.read_break()
+                return result
+
+            length = self.read_len(additional)
             for _ in range(length):
-                key = self.read_value()
-                if not isinstance(key, str):
-                    raise ValueError("CBOR map key is not text")
-                result[key] = self.read_value()
+                self.read_map_entry(result)
             return result
         if major == 7 and additional in (20, 21):
             return additional == 21
