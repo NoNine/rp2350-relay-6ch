@@ -63,6 +63,16 @@ When including prompt or conversation context in a commit body:
 - Use a `Prompt:` section for the user request.
 - Use a `Conversation context:` section for relevant actions and decisions.
 
+Before running `git commit`, verify the commit message manually:
+
+- Summary is short, imperative, and within 80 columns.
+- Body lines are within 80 columns.
+- Section titles such as `Prompt:` and `Conversation context:` are followed
+  immediately by content, with no blank line after the title.
+- There is one blank line between sections.
+- Every item starts with `- `.
+- Wrapped bullet continuation lines are indented by two spaces.
+
 Pull requests should include a summary, commands run, hardware used, linked
 issues or phase references, and docs updates for changed protocol, GPIO, safety,
 or test behavior. Never leave a relay on as a test side effect.

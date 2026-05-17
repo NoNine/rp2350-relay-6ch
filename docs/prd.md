@@ -219,6 +219,11 @@ Minimum health checks before confirmation:
 
 ## 8. Phased Implementation Plan
 
+This PRD defines the product scope and high-level delivery order. The detailed
+phase gates, dependencies, and deliverables are maintained in
+[implementation-plan.md](implementation-plan.md), which is the authoritative
+implementation phase breakdown.
+
 ### Phase 1: Board Bring-Up And Relay Control
 
 - Create the Zephyr application structure and board configuration.
@@ -234,9 +239,23 @@ Acceptance criteria:
   shell/debug path.
 - Relays default off after reset.
 
-### Phase 2: USB CDC RPC And Relay Command Set
+### Phase 2: Pulse Handling And Relay Safety Semantics
 
-- Enable USB CDC transport.
+- Define supported pulse duration bounds.
+- Implement pulse command internals before exposing host RPC.
+- Reject invalid channels, invalid durations, and overlapping pulse requests.
+- Keep relay state queryable during and after pulses.
+- Add teardown-safe test helpers that force all relays off.
+
+Acceptance criteria:
+
+- Unit tests cover valid pulses, duration bounds, invalid channels, busy
+  relays, and final off state.
+- Hardware smoke tests verify short pulses leave every relay off.
+- No test leaves a relay on after failure.
+
+### Phase 3: Custom SMP Relay Management Group
+
 - Enable MCUmgr/SMP and CBOR payload handling.
 - Add the custom relay management group.
 - Implement device info, get, set, set-all, pulse, off-all, status, and reboot
@@ -245,11 +264,23 @@ Acceptance criteria:
 
 Acceptance criteria:
 
-- A host can control all relays over USB CDC.
 - Invalid commands and invalid arguments return structured errors.
-- Packet sequence and timeout behavior can be tested.
+- Protocol tests cover valid payloads, malformed CBOR, unknown commands,
+  invalid relay indexes, invalid durations, and busy pulse behavior.
 
-### Phase 3: Python RPC Library
+### Phase 4: USB CDC SMP Transport
+
+- Enable USB device support and CDC ACM transport.
+- Bind SMP transport to CDC ACM.
+- Keep relay startup safe while USB and RPC initialize.
+- Add manual smoke-test notes for the CDC serial connection.
+
+Acceptance criteria:
+
+- A host can control all relays over USB CDC.
+- Invalid RPC requests return structured errors without crashing firmware.
+
+### Phase 5: Python RPC Library
 
 - Implement serial transport connection handling.
 - Implement SMP packet encoding/decoding and CBOR payload handling.
@@ -262,11 +293,11 @@ Acceptance criteria:
   timeouts, retries, and relay commands.
 - Library API can control real hardware through USB CDC.
 
-### Phase 4: CLI Utility
+### Phase 6: CLI Utility
 
 - Implement the CLI on top of the Python RPC library.
 - Add human-readable and machine-readable output modes.
-- Add commands for relay control, status, reboot, and update workflow.
+- Add commands for relay control, status, and reboot.
 - Add CLI-level tests for argument validation and error exit codes.
 
 Acceptance criteria:
@@ -274,18 +305,31 @@ Acceptance criteria:
 - CLI can run hardware smoke tests for all six relays.
 - CLI is suitable for scripted debug and manufacturing checks.
 
-### Phase 5: A/B Firmware Upgrade And Rollback
+### Phase 7: Firmware Upgrade Foundation
 
 - Add MCUboot bootloader integration.
 - Define flash partition layout for A/B slots.
 - Enable Zephyr DFU/image management support.
-- Implement host firmware upload workflow over USB CDC RPC.
-- Implement test-image, reboot, health-check, confirm, and rollback behavior.
+- Extend device info/status with boot slot and image state.
+- Add minimum boot health checks.
 
 Acceptance criteria:
 
-- Valid signed image uploads to inactive slot and can be test-booted.
-- Healthy image confirms itself.
+- MCUboot image builds and signs successfully.
+- Device boots a signed application image.
+- Relay defaults remain off with MCUboot enabled.
+
+### Phase 8: Host Firmware Upload And Rollback Workflow
+
+- Add Python and CLI wrappers for standard MCUmgr image upload and image state.
+- Implement test-image, reboot, health-check, confirm, and rollback behavior.
+- Document interrupted upload, invalid image rejection, test boot,
+  confirmation, and rollback.
+
+Acceptance criteria:
+
+- Valid signed image uploads to the inactive slot and can be test-booted.
+- Healthy image confirms itself after checks pass.
 - Unhealthy or unconfirmed image rolls back to the previous confirmed image.
 - Interrupted upload does not brick or replace the running image.
 
