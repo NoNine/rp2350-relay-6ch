@@ -150,6 +150,41 @@ static int cmd_relay_off(const struct shell *sh, size_t argc, char **argv)
 	return 0;
 }
 
+static int cmd_relay_pulse(const struct shell *sh, size_t argc, char **argv)
+{
+	uint8_t channel;
+	char *end;
+	unsigned long duration_ms;
+	int ret;
+
+	ARG_UNUSED(argc);
+
+	ret = parse_channel(sh, argv[1], &channel);
+	if (ret < 0) {
+		return ret;
+	}
+
+	duration_ms = strtoul(argv[2], &end, 10);
+	if (*argv[2] == '\0' || *end != '\0' ||
+	    duration_ms < RP2350_RELAY_6CH_PULSE_MIN_MS ||
+	    duration_ms > RP2350_RELAY_6CH_PULSE_MAX_MS) {
+		shell_error(sh, "duration must be %u-%u ms",
+			    RP2350_RELAY_6CH_PULSE_MIN_MS,
+			    RP2350_RELAY_6CH_PULSE_MAX_MS);
+		return -EINVAL;
+	}
+
+	ret = relay_pulse(channel, (uint32_t)duration_ms);
+	if (ret < 0) {
+		shell_error(sh, "relay pulse failed: %d", ret);
+		return ret;
+	}
+
+	shell_print(sh, "CH%u pulsing for %lu ms",
+		    (unsigned int)channel + 1U, duration_ms);
+	return 0;
+}
+
 SHELL_STATIC_SUBCMD_SET_CREATE(
 	relay_cmds,
 	SHELL_CMD_ARG(get, NULL, "Get all relays or one channel: get [channel]",
@@ -159,6 +194,9 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 	SHELL_CMD_ARG(all, NULL, "Set all relays: all <on|off>",
 		      cmd_relay_all, 2, 0),
 	SHELL_CMD_ARG(off, NULL, "Turn all relays off", cmd_relay_off, 1, 0),
+	SHELL_CMD_ARG(pulse, NULL,
+		      "Pulse one relay: pulse <channel> <duration-ms>",
+		      cmd_relay_pulse, 3, 0),
 	SHELL_SUBCMD_SET_END);
 
 SHELL_CMD_REGISTER(relay, &relay_cmds, "Relay bring-up commands", NULL);

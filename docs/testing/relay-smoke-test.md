@@ -1,6 +1,6 @@
 # Relay Smoke Test
 
-Use this procedure after flashing Phase 1 firmware to RP2350-Relay-6CH
+Use this procedure after flashing Phase 2 firmware to RP2350-Relay-6CH
 hardware.
 
 ## Setup
@@ -17,7 +17,7 @@ hardware.
   Enter to reach the Zephyr shell prompt.
 - Confirm the firmware logs relay initialization without GPIO errors.
 - Leave the USB-C device port available for flashing and future host-control
-  protocol work. Do not depend on USB CDC for the Phase 1 relay shell.
+  protocol work. Do not depend on USB CDC for the relay shell.
 
 ## Procedure
 
@@ -43,8 +43,17 @@ hardware.
    ```
 
 6. Confirm all relays switch on together, then all relays return off.
-7. Reset or power-cycle the board again.
-8. Confirm all relay indicator LEDs and relay contacts are off after reset.
+7. For each channel from `1` through `6`, run:
+
+   ```sh
+   relay pulse <channel> 100
+   relay get <channel>
+   ```
+
+8. Confirm only the selected relay switches on briefly and returns off.
+9. Run `relay get` and confirm all relays are off.
+10. Reset or power-cycle the board again.
+11. Confirm all relay indicator LEDs and relay contacts are off after reset.
 
 ## Teardown
 
@@ -61,6 +70,8 @@ relay energized.
 ## Pass Criteria
 
 - `CH1` through `CH6` each switch independently.
+- `relay pulse <channel> 100` briefly energizes only the selected relay and
+  returns it off.
 - `relay off` de-energizes all six relays.
 - Reset and power-cycle both return all relays to off.
 - No relay GPIO polarity differs from the documented active-high assumption.
