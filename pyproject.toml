@@ -8,7 +8,10 @@ version = "0.0.0"
 description = "Host tooling for the Waveshare RP2350-Relay-6CH controller"
 readme = "docs/prd.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "pyserial>=3.5",
+    "smp>=4.0.2,<5.0",
+]
 
 [tool.setuptools]
 package-dir = {"" = "host"}
