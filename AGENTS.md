@@ -56,6 +56,10 @@ bounds, busy pulses, and all-off teardown. Host tests should use simulated
 transports before requiring hardware. Name tests by behavior, for example
 `test_pulse_rejects_busy_relay`.
 
+When hardware is attached to a separate Windows operator PC, run the hardware
+portion of each phase's manual checks from that PC and use the assigned Windows
+serial port, for example `COM7`.
+
 Every completed phase must have a verification report at
 `docs/testing/phase-{phase-no}-verification.md`, following the format of
 `docs/testing/phase-1-verification.md`. Include date, commit, commands run,
@@ -77,8 +81,6 @@ long bullet items with continuation lines indented by two spaces.
 When including prompt or conversation context in a commit body:
 
 - Use a `Prompt:` section for the user request.
-- Preserve the user's original prompt wording as closely as practical in the
-  `Prompt:` section instead of replacing it with a broad summary.
 - Use a `Conversation context:` section for relevant actions and decisions.
 
 Before running `git commit`, verify the commit message manually:
