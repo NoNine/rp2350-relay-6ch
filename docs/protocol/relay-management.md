@@ -2,13 +2,14 @@
 
 ## Status
 
-Phase 3 defines the relay management protocol as a Zephyr MCUmgr/SMP
-application-specific management group. SMP provides the packet envelope,
-operation, group ID, command ID, sequence number, and response matching. Relay
-payloads are CBOR maps encoded and decoded with Zephyr zcbor helpers.
+The relay management protocol is a Zephyr MCUmgr/SMP application-specific
+management group. SMP provides the packet envelope, operation, group ID,
+command ID, sequence number, and response matching. Relay payloads are CBOR maps
+encoded and decoded with Zephyr zcbor helpers.
 
-USB CDC transport is Phase 4 scope. Phase 3 tests exercise the management group
-handlers on `native_sim` without adding a host transport.
+Phase 4 exposes the group over USB CDC ACM using Zephyr's SMP UART transport.
+Firmware tests continue to exercise the management group handlers on
+`native_sim` without requiring USB hardware.
 
 ## SMP Group
 
@@ -142,6 +143,9 @@ Response:
 | --- | --- | --- |
 | `state` | uint | Current relay state mask. |
 | `pulsing` | uint | Current pulse-active relay mask. |
+| `transport` | text | Transport name, currently `usb_cdc_acm_smp`. |
+| `usb_cdc_acm` | bool | Whether USB CDC ACM serial support is compiled in. |
+| `smp_uart` | bool | Whether Zephyr's SMP UART transport is compiled in. |
 | `uptime_ms` | uint | Zephyr uptime in milliseconds. |
 | `received` | uint | Commands received, including this status command. |
 | `succeeded` | uint | Commands completed before this status response is encoded. |

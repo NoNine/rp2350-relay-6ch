@@ -3,10 +3,11 @@
 Zephyr firmware and Python host tooling for the Waveshare RP2350-Relay-6CH
 controller.
 
-This repository is currently implementing Phase 3: a custom Zephyr MCUmgr/SMP
-relay management group. The firmware builds as a Zephyr application with safe
-direct relay control, pulse handling, and protocol handlers. USB CDC transport,
-CLI tooling, and firmware update support are planned but not implemented yet.
+This repository is currently implementing Phase 4: USB CDC ACM transport for
+the custom Zephyr MCUmgr/SMP relay management group. The firmware builds as a
+Zephyr application with safe direct relay control, pulse handling, protocol
+handlers, and USB CDC SMP transport. CLI tooling and firmware update support
+are planned but not implemented yet.
 
 ## Current Status
 
@@ -62,8 +63,8 @@ and teardown reminder. It does not switch relays itself.
 This project targets the Waveshare RP2350-Relay-6CH. The firmware controls six
 active-high relay outputs on GPIO26 through GPIO31 and keeps all relays off on
 boot, reset, firmware restart, and test setup/teardown. Host tooling is
-currently limited to the importable Python package and test harness; USB RPC and
-CLI workflows are planned for later phases.
+currently limited to the importable Python package and test harness; the project
+Python RPC library and CLI workflows are planned for later phases.
 
 Prerequisites:
 
@@ -130,13 +131,16 @@ docs/       Requirements, hardware notes, phase plans, protocol, and tests
 - [Phase 1 verification](docs/testing/phase-1-verification.md)
 - [Phase 2 verification](docs/testing/phase-2-verification.md)
 - [Phase 3 plan](docs/phase-3-plan.md)
+- [Phase 3 verification](docs/testing/phase-3-verification.md)
+- [Phase 4 plan](docs/phase-4-plan.md)
+- [USB RPC smoke test](docs/testing/usb-rpc-smoke-test.md)
 
 ## Safety Notes
 
 - Do not repurpose GPIO26, GPIO27, GPIO28, GPIO29, GPIO30, or GPIO31; they are
   relay outputs on the target hardware.
 - Keep relay outputs off by default and force them off during test teardown.
-- Use UART0 for the manual Zephyr shell. Keep USB CDC available for the future
-  host control protocol, and keep UART1 available for the isolated RS485 path.
+- Use UART0 for the manual Zephyr shell. Keep USB CDC dedicated to host control
+  protocol traffic, and keep UART1 available for the isolated RS485 path.
 - Treat MCU `GND` and isolated relay/RS485 `SGND` as separate domains in design
   notes, firmware assumptions, and tests.

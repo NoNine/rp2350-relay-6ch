@@ -113,6 +113,16 @@ static bool encode_state(zcbor_state_t *zse)
 	       zcbor_uint32_put(zse, pulse_mask);
 }
 
+static bool encode_transport_status(zcbor_state_t *zse)
+{
+	return zcbor_tstr_put_lit(zse, "transport") &&
+	       zcbor_tstr_put_lit(zse, "usb_cdc_acm_smp") &&
+	       zcbor_tstr_put_lit(zse, "usb_cdc_acm") &&
+	       zcbor_bool_put(zse, IS_ENABLED(CONFIG_CDC_ACM_SERIAL_INITIALIZE_AT_BOOT)) &&
+	       zcbor_tstr_put_lit(zse, "smp_uart") &&
+	       zcbor_bool_put(zse, IS_ENABLED(CONFIG_MCUMGR_TRANSPORT_UART));
+}
+
 static int encode_state_or_error(zcbor_state_t *zse)
 {
 	if (!encode_state(zse)) {
@@ -362,6 +372,7 @@ static int status_handler(struct smp_streamer *ctxt)
 	}
 
 	ok = encode_state(zse) &&
+	     encode_transport_status(zse) &&
 	     zcbor_tstr_put_lit(zse, "uptime_ms") &&
 	     zcbor_uint64_put(zse, k_uptime_get()) &&
 	     zcbor_tstr_put_lit(zse, "received") &&

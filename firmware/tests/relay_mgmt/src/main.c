@@ -359,6 +359,8 @@ ZTEST(relay_mgmt, test_status_reports_counters)
 	uint32_t received = 0U;
 	uint32_t succeeded = 0U;
 	uint32_t invalid_args = 0U;
+	bool usb_cdc_acm = true;
+	bool smp_uart = true;
 
 	(void)call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET, false, encode_empty_request());
 	(void)call_handler(RP2350_RELAY_6CH_MGMT_CMD_SET, true,
@@ -370,7 +372,11 @@ ZTEST(relay_mgmt, test_status_reports_counters)
 	zassert_true(decode_u32(response_len, "received", &received));
 	zassert_true(decode_u32(response_len, "succeeded", &succeeded));
 	zassert_true(decode_u32(response_len, "invalid_args", &invalid_args));
+	zassert_true(decode_bool(response_len, "usb_cdc_acm", &usb_cdc_acm));
+	zassert_true(decode_bool(response_len, "smp_uart", &smp_uart));
 	zassert_equal(received, 3U);
 	zassert_equal(succeeded, 1U);
 	zassert_equal(invalid_args, 1U);
+	zassert_false(usb_cdc_acm);
+	zassert_false(smp_uart);
 }
