@@ -22,6 +22,7 @@ and `6` is `CH6`.
 
 ```sh
 tools/rp2350_relay_cli.py --port COM7 info
+tools/rp2350_relay_cli.py --port COM7 build-info
 tools/rp2350_relay_cli.py --port COM7 get
 tools/rp2350_relay_cli.py --port COM7 get 1
 tools/rp2350_relay_cli.py --port COM7 set 1 on

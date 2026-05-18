@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from .constants import (
+    CMD_BUILD_INFO,
     CMD_GET,
     CMD_INFO,
     CMD_OFF_ALL,
@@ -86,6 +87,9 @@ class RelayClient:
 
     def get_info(self) -> dict[str, Any]:
         return self._request(CMD_INFO, OP_READ, {})
+
+    def get_build_info(self) -> dict[str, Any]:
+        return self._request(CMD_BUILD_INFO, OP_READ, {})
 
     def get_relays(self, channel: int | None = None) -> dict[str, Any]:
         payload = {}

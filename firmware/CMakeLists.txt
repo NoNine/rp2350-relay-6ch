@@ -3,8 +3,65 @@
 cmake_minimum_required(VERSION 3.20.0)
 
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
-project(rp2350_relay_6ch)
+project(rp2350_relay_6ch VERSION 0.5.0)
 
-target_include_directories(app PRIVATE include)
+find_package(Git QUIET)
+set(RP2350_RELAY_6CH_GIT_COMMIT "unknown")
+set(RP2350_RELAY_6CH_GIT_DIRTY false)
+set(RP2350_RELAY_6CH_GIT_COMMIT_TIME "")
+if(Git_FOUND)
+  execute_process(
+    COMMAND ${GIT_EXECUTABLE} rev-parse --short=12 HEAD
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    OUTPUT_VARIABLE RP2350_RELAY_6CH_GIT_COMMIT
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+  )
+  if(NOT RP2350_RELAY_6CH_GIT_COMMIT)
+    set(RP2350_RELAY_6CH_GIT_COMMIT "unknown")
+  endif()
+
+  execute_process(
+    COMMAND ${GIT_EXECUTABLE} status --porcelain
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    OUTPUT_VARIABLE RP2350_RELAY_6CH_GIT_STATUS
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+  )
+  if(RP2350_RELAY_6CH_GIT_STATUS)
+    set(RP2350_RELAY_6CH_GIT_DIRTY true)
+  endif()
+
+  execute_process(
+    COMMAND ${GIT_EXECUTABLE} show -s --format=%ct HEAD
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    OUTPUT_VARIABLE RP2350_RELAY_6CH_GIT_COMMIT_TIME
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET
+  )
+endif()
+
+set(RP2350_RELAY_6CH_RESTORE_SOURCE_DATE_EPOCH false)
+if(NOT DEFINED ENV{SOURCE_DATE_EPOCH} AND RP2350_RELAY_6CH_GIT_COMMIT_TIME)
+  set(ENV{SOURCE_DATE_EPOCH} "${RP2350_RELAY_6CH_GIT_COMMIT_TIME}")
+  set(RP2350_RELAY_6CH_RESTORE_SOURCE_DATE_EPOCH true)
+endif()
+string(TIMESTAMP RP2350_RELAY_6CH_BUILD_TIMESTAMP "%Y-%m-%dT%H:%M:%SZ" UTC)
+if(RP2350_RELAY_6CH_RESTORE_SOURCE_DATE_EPOCH)
+  unset(ENV{SOURCE_DATE_EPOCH})
+endif()
+set(RP2350_RELAY_6CH_COMPILER
+    "${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}")
+
+configure_file(
+  include/rp2350_relay_6ch/build_info.h.in
+  ${CMAKE_CURRENT_BINARY_DIR}/generated/rp2350_relay_6ch/build_info.h
+  @ONLY
+)
+
+target_include_directories(app PRIVATE
+  include
+  ${CMAKE_CURRENT_BINARY_DIR}/generated
+)
 target_sources(app PRIVATE src/main.c src/relay.c src/relay_mgmt.c)
 target_sources_ifdef(CONFIG_SHELL app PRIVATE src/relay_shell.c)

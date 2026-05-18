@@ -67,9 +67,24 @@ class FakeClient:
     def get_info(self) -> dict[str, Any]:
         self.calls.append(("get_info", ()))
         return {
+            "capabilities": 31,
             "hardware": "Waveshare RP2350-Relay-6CH",
-            "protocol_version": 1,
+            "pulse_max_ms": 60000,
+            "pulse_min_ms": 10,
+            "protocol_version": 2,
             "relay_count": 6,
+        }
+
+    def get_build_info(self) -> dict[str, Any]:
+        self.calls.append(("get_build_info", ()))
+        return {
+            "app_version": "0.5.0",
+            "zephyr_version": "4.2.0",
+            "board": "native_sim",
+            "git_commit": "abcdef123456",
+            "git_dirty": False,
+            "build_timestamp": "2026-05-18T00:00:00Z",
+            "compiler": "GNU 13.3.0",
         }
 
     def get_relays(self, channel: int | None = None) -> dict[str, Any]:
@@ -133,6 +148,42 @@ def test_info_outputs_json_and_uses_connection_options(capsys: pytest.CaptureFix
     assert FakeClient.instances[0].baudrate == 9600
     assert FakeClient.instances[0].timeout_s == 3.5
     assert FakeClient.instances[0].retries == 2
+
+
+def test_info_human_output_lists_all_fields(capsys: pytest.CaptureFixture[str]) -> None:
+    rc = cli.main(["--port", "COM7", "info"])
+
+    captured = capsys.readouterr()
+
+    assert rc == cli.EXIT_OK
+    assert "capabilities: 31" in captured.out
+    assert "hardware: Waveshare RP2350-Relay-6CH" in captured.out
+    assert "pulse_max_ms: 60000" in captured.out
+    assert "pulse_min_ms: 10" in captured.out
+    assert "protocol_version: 2" in captured.out
+    assert "relay_count: 6" in captured.out
+
+
+def test_build_info_outputs_json_and_uses_client(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    rc = cli.main(["--port", "COM7", "--output", "json", "build-info"])
+
+    captured = capsys.readouterr()
+
+    assert rc == cli.EXIT_OK
+    assert '"git_commit": "abcdef123456"' in captured.out
+    assert FakeClient.instances[0].calls == [("get_build_info", ())]
+
+
+def test_build_info_human_output_lists_fields(capsys: pytest.CaptureFixture[str]) -> None:
+    rc = cli.main(["--port", "COM7", "build-info"])
+
+    captured = capsys.readouterr()
+
+    assert rc == cli.EXIT_OK
+    assert "app_version: 0.5.0" in captured.out
+    assert "git_dirty: False" in captured.out
 
 
 def test_set_converts_one_based_channel_to_zero_based() -> None:

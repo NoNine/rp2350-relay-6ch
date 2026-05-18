@@ -7,6 +7,7 @@ import pytest
 
 from rp2350_relay_6ch import RelayClient, SerialSmpTransport, SimulatedPacketTransport
 from rp2350_relay_6ch.constants import (
+    CMD_BUILD_INFO,
     CMD_GET,
     CMD_INFO,
     CMD_PULSE,
@@ -157,11 +158,32 @@ def test_smp_package_encodes_serial_frames() -> None:
 
 def test_get_info_returns_decoded_success_response() -> None:
     transport = SimulatedPacketTransport(
-        [response(CMD_INFO, 0, {"protocol_version": 1, "relay_count": 6})]
+        [response(CMD_INFO, 0, {"protocol_version": 2, "relay_count": 6})]
     )
     client = RelayClient(transport)
 
-    assert client.get_info() == {"protocol_version": 1, "relay_count": 6}
+    assert client.get_info() == {"protocol_version": 2, "relay_count": 6}
+
+
+def test_get_build_info_sends_read_request() -> None:
+    payload = {
+        "app_version": "0.5.0",
+        "zephyr_version": "4.2.0",
+        "board": "native_sim",
+        "git_commit": "abcdef123456",
+        "git_dirty": False,
+        "build_timestamp": "2026-05-18T00:00:00Z",
+        "compiler": "GNU 13.3.0",
+    }
+    transport = SimulatedPacketTransport([response(CMD_BUILD_INFO, 0, payload)])
+    client = RelayClient(transport)
+
+    assert client.get_build_info() == payload
+
+    packet = decode_packet(transport.requests[0])
+    assert packet.op == 0
+    assert packet.command == CMD_BUILD_INFO
+    assert request_payload(transport) == {}
 
 
 def test_set_relay_sends_write_request_payload() -> None:

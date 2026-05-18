@@ -154,6 +154,30 @@ static bool decode_bool(size_t response_len, const char *key, bool *value)
 	return false;
 }
 
+static bool decode_tstr(size_t response_len, const char *key, struct zcbor_string *value)
+{
+	zcbor_state_t zsd[4];
+	struct zcbor_string actual_key;
+
+	zcbor_new_decode_state(zsd, ARRAY_SIZE(zsd), response_buf, response_len, 1, NULL, 0);
+	if (!zcbor_map_start_decode(zsd)) {
+		return false;
+	}
+
+	while (zcbor_tstr_decode(zsd, &actual_key)) {
+		if (actual_key.len == strlen(key) &&
+		    memcmp(actual_key.value, key, actual_key.len) == 0) {
+			return zcbor_tstr_decode(zsd, value);
+		}
+
+		if (!zcbor_any_skip(zsd, NULL)) {
+			return false;
+		}
+	}
+
+	return false;
+}
+
 static bool decode_err(size_t response_len, uint32_t *group, uint32_t *rc)
 {
 	zcbor_state_t zsd[5];
@@ -226,6 +250,7 @@ ZTEST(relay_mgmt, test_group_registered)
 	zassert_not_null(group);
 	zassert_equal(group->mg_handlers_count, RP2350_RELAY_6CH_MGMT_CMD_COUNT);
 	zassert_not_null(mgmt_get_handler(group, RP2350_RELAY_6CH_MGMT_CMD_INFO));
+	zassert_not_null(mgmt_get_handler(group, RP2350_RELAY_6CH_MGMT_CMD_BUILD_INFO));
 }
 
 ZTEST(relay_mgmt, test_info_reports_capabilities)
@@ -245,6 +270,28 @@ ZTEST(relay_mgmt, test_info_reports_capabilities)
 	zassert_equal(relay_count, RP2350_RELAY_6CH_CHANNEL_COUNT);
 	zassert_equal(pulse_min, RP2350_RELAY_6CH_PULSE_MIN_MS);
 	zassert_equal(pulse_max, RP2350_RELAY_6CH_PULSE_MAX_MS);
+}
+
+ZTEST(relay_mgmt, test_build_info_reports_build_metadata)
+{
+	size_t response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_BUILD_INFO, false,
+					   encode_empty_request());
+	struct zcbor_string text;
+	bool git_dirty = true;
+
+	zassert_true(decode_tstr(response_len, "app_version", &text));
+	zassert_not_equal(text.len, 0U);
+	zassert_true(decode_tstr(response_len, "zephyr_version", &text));
+	zassert_not_equal(text.len, 0U);
+	zassert_true(decode_tstr(response_len, "board", &text));
+	zassert_not_equal(text.len, 0U);
+	zassert_true(decode_tstr(response_len, "git_commit", &text));
+	zassert_not_equal(text.len, 0U);
+	zassert_true(decode_bool(response_len, "git_dirty", &git_dirty));
+	zassert_true(decode_tstr(response_len, "build_timestamp", &text));
+	zassert_not_equal(text.len, 0U);
+	zassert_true(decode_tstr(response_len, "compiler", &text));
+	zassert_not_equal(text.len, 0U);
 }
 
 ZTEST(relay_mgmt, test_get_all_default_off)
@@ -350,6 +397,10 @@ ZTEST(relay_mgmt, test_malformed_empty_request_command_returns_decode_error)
 
 	request_buf[0] = 0xffU;
 	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_INFO, false, 1U);
+	assert_error(response_len, RP2350_RELAY_6CH_MGMT_ERR_DECODE);
+
+	request_buf[0] = 0xffU;
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_BUILD_INFO, false, 1U);
 	assert_error(response_len, RP2350_RELAY_6CH_MGMT_ERR_DECODE);
 }
 

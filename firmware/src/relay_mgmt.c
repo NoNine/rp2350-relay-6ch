@@ -23,6 +23,7 @@
 #include <zcbor_decode.h>
 #include <zcbor_encode.h>
 
+#include <rp2350_relay_6ch/build_info.h>
 #include <rp2350_relay_6ch/relay.h>
 #include <rp2350_relay_6ch/relay_mgmt.h>
 
@@ -171,8 +172,6 @@ static int info_handler(struct smp_streamer *ctxt)
 
 	ok = zcbor_tstr_put_lit(zse, "protocol_version") &&
 	     zcbor_uint32_put(zse, RP2350_RELAY_6CH_MGMT_PROTOCOL_VERSION) &&
-	     zcbor_tstr_put_lit(zse, "firmware_version") &&
-	     zcbor_tstr_put_lit(zse, KERNEL_VERSION_STRING) &&
 	     zcbor_tstr_put_lit(zse, "hardware") &&
 	     zcbor_tstr_put_lit(zse, RP2350_RELAY_6CH_HARDWARE_NAME) &&
 	     zcbor_tstr_put_lit(zse, "relay_count") &&
@@ -439,6 +438,41 @@ static int reboot_handler(struct smp_streamer *ctxt)
 	return MGMT_ERR_EOK;
 }
 
+static int build_info_handler(struct smp_streamer *ctxt)
+{
+	zcbor_state_t *zsd = ctxt->reader->zs;
+	zcbor_state_t *zse = ctxt->writer->zs;
+	bool ok;
+
+	counter_inc(RELAY_MGMT_COUNTER_RECEIVED);
+
+	if (!validate_request_map(zsd)) {
+		return error_response(zse, RP2350_RELAY_6CH_MGMT_ERR_DECODE);
+	}
+
+	ok = zcbor_tstr_put_lit(zse, "app_version") &&
+	     zcbor_tstr_put_lit(zse, RP2350_RELAY_6CH_APP_VERSION) &&
+	     zcbor_tstr_put_lit(zse, "zephyr_version") &&
+	     zcbor_tstr_put_lit(zse, KERNEL_VERSION_STRING) &&
+	     zcbor_tstr_put_lit(zse, "board") &&
+	     zcbor_tstr_put_lit(zse, RP2350_RELAY_6CH_BOARD) &&
+	     zcbor_tstr_put_lit(zse, "git_commit") &&
+	     zcbor_tstr_put_lit(zse, RP2350_RELAY_6CH_GIT_COMMIT) &&
+	     zcbor_tstr_put_lit(zse, "git_dirty") &&
+	     zcbor_bool_put(zse, RP2350_RELAY_6CH_GIT_DIRTY) &&
+	     zcbor_tstr_put_lit(zse, "build_timestamp") &&
+	     zcbor_tstr_put_lit(zse, RP2350_RELAY_6CH_BUILD_TIMESTAMP) &&
+	     zcbor_tstr_put_lit(zse, "compiler") &&
+	     zcbor_tstr_put_lit(zse, RP2350_RELAY_6CH_COMPILER);
+
+	if (!ok) {
+		return MGMT_ERR_EMSGSIZE;
+	}
+
+	counter_inc(RELAY_MGMT_COUNTER_SUCCEEDED);
+	return MGMT_ERR_EOK;
+}
+
 static const struct mgmt_handler relay_mgmt_handlers[] = {
 	[RP2350_RELAY_6CH_MGMT_CMD_INFO] = {
 		.mh_read = info_handler,
@@ -471,6 +505,10 @@ static const struct mgmt_handler relay_mgmt_handlers[] = {
 	[RP2350_RELAY_6CH_MGMT_CMD_REBOOT] = {
 		.mh_read = NULL,
 		.mh_write = reboot_handler,
+	},
+	[RP2350_RELAY_6CH_MGMT_CMD_BUILD_INFO] = {
+		.mh_read = build_info_handler,
+		.mh_write = NULL,
 	},
 };
 

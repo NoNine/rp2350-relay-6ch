@@ -52,12 +52,7 @@ def _state_channels(state: int) -> list[str]:
 
 def _format_human(command: str, payload: dict[str, Any]) -> str:
     if command == "info":
-        fields = [
-            f"hardware: {payload.get('hardware', 'unknown')}",
-            f"protocol_version: {payload.get('protocol_version', 'unknown')}",
-            f"relay_count: {payload.get('relay_count', 'unknown')}",
-        ]
-        return "\n".join(fields)
+        return _format_key_values(payload)
 
     if command in {"get", "set", "set-all", "pulse", "off-all"}:
         state = int(payload.get("state", 0))
@@ -75,10 +70,10 @@ def _format_human(command: str, payload: dict[str, Any]) -> str:
         return "\n".join(fields)
 
     if command == "status":
-        lines = []
-        for key in sorted(payload):
-            lines.append(f"{key}: {payload[key]}")
-        return "\n".join(lines)
+        return _format_key_values(payload)
+
+    if command == "build-info":
+        return _format_key_values(payload)
 
     if command == "reboot":
         return "reboot requested"
@@ -87,6 +82,13 @@ def _format_human(command: str, payload: dict[str, Any]) -> str:
         return "smoke test passed"
 
     return _format_json(payload)
+
+
+def _format_key_values(payload: dict[str, Any]) -> str:
+    lines = []
+    for key in sorted(payload):
+        lines.append(f"{key}: {payload[key]}")
+    return "\n".join(lines)
 
 
 def _emit(args: argparse.Namespace, payload: dict[str, Any]) -> None:
@@ -135,6 +137,11 @@ def _require_port(args: argparse.Namespace) -> None:
 def cmd_info(args: argparse.Namespace) -> dict[str, Any]:
     _require_port(args)
     return _client(args).get_info()
+
+
+def cmd_build_info(args: argparse.Namespace) -> dict[str, Any]:
+    _require_port(args)
+    return _client(args).get_build_info()
 
 
 def cmd_get(args: argparse.Namespace) -> dict[str, Any]:
@@ -198,6 +205,7 @@ def cmd_smoke(args: argparse.Namespace) -> dict[str, Any]:
 
 COMMANDS = {
     "info": cmd_info,
+    "build-info": cmd_build_info,
     "get": cmd_get,
     "set": cmd_set,
     "set-all": cmd_set_all,
@@ -226,6 +234,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     subparsers.add_parser("info", help="print relay controller information")
+    subparsers.add_parser("build-info", help="print firmware build information")
 
     get_parser = subparsers.add_parser("get", help="get relay state")
     get_parser.add_argument("channel", nargs="?", type=_parse_channel)

@@ -14,7 +14,7 @@ Firmware tests continue to exercise the management group handlers on
 ## SMP Group
 
 - Group ID: `64`
-- Protocol version: `1`
+- Protocol version: `2`
 - Hardware name: `Waveshare RP2350-Relay-6CH`
 - Relay channel indexes: zero-based, `0` through `5`
 - Relay state masks: bit `0` is `CH1`, bit `5` is `CH6`
@@ -31,6 +31,7 @@ Firmware tests continue to exercise the management group handlers on
 | 5 | `off_all` | Write | Cancel pulses and turn every relay off. |
 | 6 | `status` | Read | Return relay state, uptime, and protocol counters. |
 | 7 | `reboot` | Write | Request controlled reboot when Zephyr reboot support is enabled. |
+| 8 | `build_info` | Read | Return firmware build identity and traceability metadata. |
 
 ## Error Codes
 
@@ -65,12 +66,27 @@ Response:
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `protocol_version` | uint | Relay protocol version. |
-| `firmware_version` | text | Zephyr firmware version string available at build time. |
 | `hardware` | text | Hardware name. |
 | `relay_count` | uint | Number of relays, currently `6`. |
 | `pulse_min_ms` | uint | Minimum pulse duration. |
 | `pulse_max_ms` | uint | Maximum pulse duration. |
 | `capabilities` | uint | Capability bit mask for get, set, set-all, pulse, and off-all. |
+
+### `build_info`
+
+Request: empty CBOR map.
+
+Response:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `app_version` | text | Application version configured by the firmware build. |
+| `zephyr_version` | text | Zephyr kernel version string available at build time. |
+| `board` | text | Zephyr board target used for the build. |
+| `git_commit` | text | Short source commit hash, or `unknown` when unavailable. |
+| `git_dirty` | bool | Whether the source tree had uncommitted changes at CMake configure time. |
+| `build_timestamp` | text | UTC ISO-8601 timestamp from `SOURCE_DATE_EPOCH` when set, otherwise the current Git commit time when available, otherwise CMake configure time. |
+| `compiler` | text | C compiler ID and version used by CMake. |
 
 ### `get`
 
