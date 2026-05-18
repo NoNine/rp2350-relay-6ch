@@ -67,47 +67,33 @@ Set `ZEPHYR_WORKSPACE` or `ZEPHYR_VENV` only when your environment differs.
 
 ## Quick Start
 
-Build the firmware:
+Build and flash:
 
 ```sh
 scripts/build-firmware.sh
-```
-
-Flash the latest firmware build:
-
-```sh
 west flash -d build/firmware
 ```
 
-Run host-side tests:
+Query:
 
 ```sh
-scripts/test-host.sh
+tools/rp2350_relay_cli.py --port <serial-port> info
+tools/rp2350_relay_cli.py --port <serial-port> get
 ```
 
-Run firmware relay tests:
+Control:
 
 ```sh
-west build -s firmware/tests/relay -b native_sim -d build/firmware-tests/relay
-build/firmware-tests/relay/zephyr/zephyr.exe
+tools/rp2350_relay_cli.py --port <serial-port> set 1 on
+tools/rp2350_relay_cli.py --port <serial-port> set 1 off
+tools/rp2350_relay_cli.py --port <serial-port> pulse 1 100
+tools/rp2350_relay_cli.py --port <serial-port> off-all
 ```
 
-Run firmware relay management tests:
+Inspect:
 
 ```sh
-west build -s firmware/tests/relay_mgmt -b native_sim -d build/firmware-tests/relay-mgmt
-build/firmware-tests/relay-mgmt/zephyr/zephyr.exe
-```
-
-Run the hardware smoke-test wrapper:
-
-```sh
-scripts/smoke-hardware.sh
-```
-
-Run the CLI hardware smoke test:
-
-```sh
+tools/rp2350_relay_cli.py --port <serial-port> status
 tools/rp2350_relay_cli.py --port <serial-port> smoke
 ```
 
@@ -146,6 +132,7 @@ docs/       Requirements, hardware notes, phase plans, protocol, and tests
 - [Relay management protocol](docs/protocol/relay-management.md)
 - [Host library](docs/host-library.md)
 - [CLI utility](docs/cli.md)
+- [Test procedures](docs/testing/test-procedures.md)
 - [Relay smoke test](docs/testing/relay-smoke-test.md)
 - [USB RPC smoke test](docs/testing/usb-rpc-smoke-test.md)
 
