@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import sys
+from types import SimpleNamespace
+
 import pytest
 
-from rp2350_relay_6ch import RelayClient, SimulatedPacketTransport
+from rp2350_relay_6ch import RelayClient, SerialSmpTransport, SimulatedPacketTransport
 from rp2350_relay_6ch.constants import (
     CMD_GET,
     CMD_INFO,
@@ -18,6 +21,7 @@ from rp2350_relay_6ch.exceptions import (
     RelayDeviceError,
     RelayProtocolError,
     RelayTimeoutError,
+    RelayTransportError,
     RelayValidationError,
 )
 from rp2350_relay_6ch.smp import (
@@ -28,6 +32,40 @@ from rp2350_relay_6ch.smp import (
     encode_payload,
     serial_frames,
 )
+
+
+class FakeSerial:
+    def __init__(
+        self,
+        *,
+        responses: list[bytes] | None = None,
+        read_error: Exception | None = None,
+        **kwargs: object,
+    ) -> None:
+        self.kwargs = kwargs
+        self.responses = responses or []
+        self.read_error = read_error
+        self.timeout: float | None = kwargs.get("timeout")  # type: ignore[assignment]
+        self.write_timeout: float | None = kwargs.get("write_timeout")  # type: ignore[assignment]
+        self.writes: list[bytes] = []
+        self.reset_count = 0
+        self.closed = False
+
+    def reset_input_buffer(self) -> None:
+        self.reset_count += 1
+
+    def write(self, data: bytes) -> None:
+        self.writes.append(data)
+
+    def readline(self) -> bytes:
+        if self.read_error is not None:
+            raise self.read_error
+        if not self.responses:
+            return b""
+        return self.responses.pop(0)
+
+    def close(self) -> None:
+        self.closed = True
 
 
 def response(command: int, seq: int, payload: dict[str, object], op: int = OP_READ_RSP) -> bytes:
@@ -45,6 +83,36 @@ def response(command: int, seq: int, payload: dict[str, object], op: int = OP_RE
 def request_payload(transport: SimulatedPacketTransport, index: int = 0) -> dict[str, object]:
     packet = decode_packet(transport.requests[index])
     return decode_payload(packet.payload)
+
+
+def framed_response(
+    command: int,
+    seq: int,
+    payload: dict[str, object],
+    op: int = OP_READ_RSP,
+) -> list[bytes]:
+    return serial_frames(response(command, seq, payload, op))
+
+
+def install_fake_serial(
+    monkeypatch: pytest.MonkeyPatch,
+    serials: list[FakeSerial],
+    *,
+    read_error: Exception | None = None,
+) -> None:
+    def serial_factory(**kwargs: object) -> FakeSerial:
+        fake = FakeSerial(
+            responses=[
+                *framed_response(CMD_GET, 0, {"state": 0}),
+                *framed_response(CMD_GET, 1, {"state": 1}),
+            ],
+            read_error=read_error,
+            **kwargs,
+        )
+        serials.append(fake)
+        return fake
+
+    monkeypatch.setitem(sys.modules, "serial", SimpleNamespace(Serial=serial_factory))
 
 
 def test_cbor2_encodes_and_decodes_payload_maps() -> None:
@@ -186,3 +254,72 @@ def test_timeout_after_retry_budget_is_exhausted() -> None:
 
     with pytest.raises(RelayTimeoutError, match="second timeout"):
         client.get_relays()
+
+
+def test_serial_transport_reuses_open_serial_port(monkeypatch: pytest.MonkeyPatch) -> None:
+    serials: list[FakeSerial] = []
+    install_fake_serial(monkeypatch, serials)
+    transport = SerialSmpTransport("COM19")
+    first = encode_packet(
+        SmpPacket(op=2, group=GROUP_RELAY, command=CMD_GET, seq=0, payload=encode_payload({}))
+    )
+    second = encode_packet(
+        SmpPacket(op=2, group=GROUP_RELAY, command=CMD_GET, seq=1, payload=encode_payload({}))
+    )
+
+    assert decode_payload(decode_packet(transport.exchange(first, 1.0)).payload) == {"state": 0}
+    assert decode_payload(decode_packet(transport.exchange(second, 1.5)).payload) == {"state": 1}
+
+    assert len(serials) == 1
+    assert serials[0].kwargs["port"] == "COM19"
+    assert serials[0].reset_count == 2
+    assert serials[0].timeout == 1.5
+    assert serials[0].write_timeout == 1.5
+
+
+def test_serial_transport_close_allows_reopen(monkeypatch: pytest.MonkeyPatch) -> None:
+    serials: list[FakeSerial] = []
+    install_fake_serial(monkeypatch, serials)
+    transport = SerialSmpTransport("COM19")
+    packet = encode_packet(
+        SmpPacket(op=2, group=GROUP_RELAY, command=CMD_GET, seq=0, payload=encode_payload({}))
+    )
+
+    transport.exchange(packet, 1.0)
+    transport.close()
+    transport.exchange(packet, 1.0)
+
+    assert len(serials) == 2
+    assert serials[0].closed is True
+    assert serials[1].closed is False
+
+
+def test_serial_transport_closes_on_serial_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    serials: list[FakeSerial] = []
+    install_fake_serial(monkeypatch, serials, read_error=OSError("lost port"))
+    transport = SerialSmpTransport("COM19")
+    packet = encode_packet(
+        SmpPacket(op=2, group=GROUP_RELAY, command=CMD_GET, seq=0, payload=encode_payload({}))
+    )
+
+    with pytest.raises(RelayTransportError, match="lost port"):
+        transport.exchange(packet, 1.0)
+
+    assert serials[0].closed is True
+
+
+def test_relay_client_context_manager_closes_transport() -> None:
+    class CloseTrackingTransport(SimulatedPacketTransport):
+        def __init__(self) -> None:
+            super().__init__()
+            self.closed = False
+
+        def close(self) -> None:
+            self.closed = True
+
+    transport = CloseTrackingTransport()
+
+    with RelayClient(transport) as client:
+        assert client.transport is transport
+
+    assert transport.closed is True

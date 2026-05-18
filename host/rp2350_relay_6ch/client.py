@@ -75,6 +75,15 @@ class RelayClient:
             retries=retries,
         )
 
+    def __enter__(self) -> "RelayClient":
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+        self.close()
+
+    def close(self) -> None:
+        self.transport.close()
+
     def get_info(self) -> dict[str, Any]:
         return self._request(CMD_INFO, OP_READ, {})
 

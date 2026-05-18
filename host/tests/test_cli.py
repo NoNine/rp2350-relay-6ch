@@ -39,6 +39,7 @@ class FakeClient:
         self.timeout_s = timeout_s
         self.retries = retries
         self.calls: list[tuple[str, tuple[Any, ...]]] = []
+        self.closed = False
         FakeClient.instances.append(self)
 
     @classmethod
@@ -53,6 +54,15 @@ class FakeClient:
         if cls.failure is not None:
             raise cls.failure
         return cls(port, baudrate=baudrate, timeout_s=timeout_s, retries=retries)
+
+    def __enter__(self) -> "FakeClient":
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+        self.close()
+
+    def close(self) -> None:
+        self.closed = True
 
     def get_info(self) -> dict[str, Any]:
         self.calls.append(("get_info", ()))
@@ -208,3 +218,4 @@ def test_smoke_pulses_each_relay_and_forces_teardown() -> None:
         ("pulse_relay", (5, 25)),
     ]
     assert calls[-1:] == [("off_all", ())]
+    assert FakeClient.instances[0].closed is True

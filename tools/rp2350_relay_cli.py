@@ -174,26 +174,26 @@ def cmd_reboot(args: argparse.Namespace) -> dict[str, Any]:
 
 def cmd_smoke(args: argparse.Namespace) -> dict[str, Any]:
     _require_port(args)
-    client = _client(args)
     results: list[dict[str, Any]] = []
     final: dict[str, Any] | None = None
-    try:
-        results.append({"command": "info", "response": client.get_info()})
-        results.append({"command": "status", "response": client.get_status()})
-        for channel in range(RELAY_COUNT):
-            label = f"CH{channel + 1}"
-            results.append(
-                {
-                    "command": "pulse",
-                    "channel": label,
-                    "response": client.pulse_relay(channel, args.pulse_ms),
-                }
-            )
-        final = client.off_all()
-        return {"ok": True, "results": results, "final": final}
-    finally:
-        if final is None:
-            client.off_all()
+    with _client(args) as client:
+        try:
+            results.append({"command": "info", "response": client.get_info()})
+            results.append({"command": "status", "response": client.get_status()})
+            for channel in range(RELAY_COUNT):
+                label = f"CH{channel + 1}"
+                results.append(
+                    {
+                        "command": "pulse",
+                        "channel": label,
+                        "response": client.pulse_relay(channel, args.pulse_ms),
+                    }
+                )
+            final = client.off_all()
+            return {"ok": True, "results": results, "final": final}
+        finally:
+            if final is None:
+                client.off_all()
 
 
 COMMANDS = {

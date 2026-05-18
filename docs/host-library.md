@@ -25,6 +25,15 @@ client = RelayClient.connect("COM31", timeout_s=2.0, retries=1)
 On Linux, the port is typically similar to `/dev/ttyACM0`. On Windows, use the
 assigned `COM` port.
 
+Use the client as a context manager when sending multiple commands. This keeps
+the serial port open for the sequence and closes it when the block exits:
+
+```python
+with RelayClient.connect("COM31", timeout_s=2.0, retries=1) as client:
+    client.set_relay(0, False)
+    relays = client.get_relays()
+```
+
 ## API
 
 The client methods return decoded response dictionaries from the firmware:

@@ -15,6 +15,9 @@ class PacketTransport(Protocol):
     def exchange(self, packet: bytes, timeout_s: float) -> bytes:
         """Send one encoded SMP packet and return one encoded SMP response."""
 
+    def close(self) -> None:
+        """Release transport resources."""
+
 
 class SerialSmpTransport:
     """SMP-over-serial transport for Zephyr's SMP UART framing."""
@@ -22,31 +25,52 @@ class SerialSmpTransport:
     def __init__(self, port: str, baudrate: int = 115200) -> None:
         self.port = port
         self.baudrate = baudrate
+        self._serial: object | None = None
+
+    def __enter__(self) -> "SerialSmpTransport":
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+        self.close()
+
+    def close(self) -> None:
+        ser = self._serial
+        self._serial = None
+        if ser is not None:
+            ser.close()
 
     def exchange(self, packet: bytes, timeout_s: float) -> bytes:
         try:
-            import serial
-        except ImportError as exc:  # pragma: no cover - environment dependent
-            raise RelayTransportError("pyserial is required for serial transport") from exc
+            ser = self._open(timeout_s)
+            ser.timeout = timeout_s
+            ser.write_timeout = timeout_s
+            ser.reset_input_buffer()
+            for frame in serial_frames(packet):
+                ser.write(frame)
+            return decoded_serial_frames(
+                iter(ser.readline, b""),
+                "timed out waiting for SMP response",
+            )
+        except RelayTimeoutError:
+            raise
+        except Exception as exc:  # pragma: no cover - pyserial-specific failures
+            self.close()
+            raise RelayTransportError(str(exc)) from exc
 
-        try:
-            with serial.Serial(
+    def _open(self, timeout_s: float) -> object:
+        if self._serial is None:
+            try:
+                import serial
+            except ImportError as exc:  # pragma: no cover - environment dependent
+                raise RelayTransportError("pyserial is required for serial transport") from exc
+
+            self._serial = serial.Serial(
                 port=self.port,
                 baudrate=self.baudrate,
                 timeout=timeout_s,
                 write_timeout=timeout_s,
-            ) as ser:
-                ser.reset_input_buffer()
-                for frame in serial_frames(packet):
-                    ser.write(frame)
-                return decoded_serial_frames(
-                    iter(ser.readline, b""),
-                    "timed out waiting for SMP response",
-                )
-        except RelayTimeoutError:
-            raise
-        except Exception as exc:  # pragma: no cover - pyserial-specific failures
-            raise RelayTransportError(str(exc)) from exc
+            )
+        return self._serial
 
 
 class SimulatedPacketTransport:
@@ -58,6 +82,9 @@ class SimulatedPacketTransport:
 
     def queue_response(self, response: bytes | Exception) -> None:
         self.responses.append(response)
+
+    def close(self) -> None:
+        pass
 
     def exchange(self, packet: bytes, timeout_s: float) -> bytes:
         del timeout_s
