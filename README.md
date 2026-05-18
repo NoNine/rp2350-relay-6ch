@@ -50,20 +50,15 @@ Planned:
 
 ## Prerequisites
 
-- Zephyr workspace with the Zephyr SDK/toolchain available.
-- Python 3.12 or newer.
-- Python dependencies installed in the active environment:
+- Zephyr workspace with the Zephyr SDK/toolchain installed.
+- Python 3.12 or newer with this package installed in the active environment.
+- Waveshare RP2350-Relay-6CH hardware, USB access, and suitable relay-side
+  power for hardware smoke tests.
+- Safe relay-side wiring with hazardous loads disconnected during bring-up.
 
-  ```sh
-  pip install -e . pytest
-  ```
-
-- Waveshare RP2350-Relay-6CH hardware, USB connection, and suitable power for
-  hardware smoke tests.
-- Safe relay-side wiring. Keep hazardous loads disconnected during bring-up.
-
-Wrapper scripts default to `${ZEPHYR_WORKSPACE:-$HOME/zephyrproject}/.venv`.
-Set `ZEPHYR_WORKSPACE` or `ZEPHYR_VENV` only when your environment differs.
+For first-time setup, including workspace creation, Python dependencies,
+environment variables, and verification commands, see
+[Development setup](docs/development-setup.md).
 
 ## Quick Start
 
@@ -110,6 +105,7 @@ docs/       Requirements, hardware notes, phase plans, protocol, and tests
 ## Documentation
 
 - [Product requirements](docs/prd.md)
+- [Development setup](docs/development-setup.md)
 - [Hardware information](docs/hardware-info.md)
 - [Implementation plan](docs/implementation-plan.md)
 - [Relay management protocol](docs/protocol/relay-management.md)
