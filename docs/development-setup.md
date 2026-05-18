@@ -125,7 +125,7 @@ scripts/build-firmware.sh
 The wrapper defaults to:
 
 ```text
-BOARD=rpi_pico2/rp2350a/m33/w
+BOARD=waveshare_rp2350_relay_6ch/rp2350b/m33
 BUILD_DIR=build/firmware
 ```
 
@@ -134,6 +134,11 @@ Override these when needed:
 ```sh
 BOARD=<zephyr-board> BUILD_DIR=build/<name> scripts/build-firmware.sh
 ```
+
+Use `BOARD=waveshare_rp2350_relay_6ch/rp2350b/m33/w` only when explicitly
+building for the optional RM2 Wi-Fi assembly. Do not use the Raspberry Pi Pico
+2 W target for relay hardware builds; its Wi-Fi GPIO assignments conflict with
+the Waveshare relay board.
 
 Run firmware unit tests on `native_sim`:
 

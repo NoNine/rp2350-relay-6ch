@@ -8,6 +8,9 @@ RPC or host tooling are introduced. The default build target remains
 is added, and the app overlay models `CH1` through `CH6` as active-high GPIO
 outputs on GPIO26 through GPIO31.
 
+Historical note: the dedicated board definition now provides the relay GPIOs,
+and current relay hardware builds use `waveshare_rp2350_relay_6ch/rp2350b/m33`.
+
 All relay outputs must initialize off on boot and return off during test and
 manual smoke-test teardown.
 

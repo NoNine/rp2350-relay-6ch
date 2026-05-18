@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ZEPHYR_WORKSPACE="${ZEPHYR_WORKSPACE:-${HOME}/zephyrproject}"
 VENV_DIR="${ZEPHYR_VENV:-${ZEPHYR_WORKSPACE}/.venv}"
-BOARD="${BOARD:-rpi_pico2/rp2350a/m33/w}"
+BOARD="${BOARD:-waveshare_rp2350_relay_6ch/rp2350b/m33}"
 BUILD_DIR="${BUILD_DIR:-${ROOT_DIR}/build/firmware}"
 
 if [[ -f "${VENV_DIR}/bin/activate" ]]; then

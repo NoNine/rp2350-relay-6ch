@@ -1,42 +1,7 @@
 / {
 	chosen {
-		zephyr,console = &uart0;
-		zephyr,shell-uart = &uart0;
 		zephyr,uart-mcumgr = &cdc_acm_uart0;
 	};
-
-	relays {
-		compatible = "gpio-leds";
-
-		ch1 {
-			gpios = <&gpio0 26 GPIO_ACTIVE_HIGH>;
-		};
-
-		ch2 {
-			gpios = <&gpio0 27 GPIO_ACTIVE_HIGH>;
-		};
-
-		ch3 {
-			gpios = <&gpio0 28 GPIO_ACTIVE_HIGH>;
-		};
-
-		ch4 {
-			gpios = <&gpio0 29 GPIO_ACTIVE_HIGH>;
-		};
-
-		ch5 {
-			gpios = <&gpio0 30 GPIO_ACTIVE_HIGH>;
-		};
-
-		ch6 {
-			gpios = <&gpio0 31 GPIO_ACTIVE_HIGH>;
-		};
-	};
-};
-
-&uart0 {
-	current-speed = <115200>;
-	status = "okay";
 };
 
 &zephyr_udc0 {

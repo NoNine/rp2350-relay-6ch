@@ -31,8 +31,6 @@ Planned:
 - Host library and CLI firmware image upload, test-image, and confirm-image
   workflows.
 - Firmware signing, flashing, and release helper scripts.
-- Dedicated Waveshare RP2350-Relay-6CH board definition or board-specific
-  overlay once the target configuration is finalized.
 - Optional status outputs for the buzzer and WS2812 RGB LED if they do not
   interfere with relay control or RPC behavior.
 - Optional communication-loss safety timeout, disabled by default unless a
@@ -40,8 +38,9 @@ Planned:
 
 ## Current Status
 
-- Development board target: `rpi_pico2/rp2350a/m33/w` for Raspberry Pi Pico 2 W.
-- Final hardware target: Waveshare RP2350-Relay-6CH.
+- Default board target: `waveshare_rp2350_relay_6ch/rp2350b/m33`.
+- Optional Wi-Fi board target:
+  `waveshare_rp2350_relay_6ch/rp2350b/m33/w`.
 - Relay outputs: `CH1` through `CH6` on GPIO26 through GPIO31.
 - Relay polarity: active high unless board testing proves otherwise.
 - Host control: Python RPC library and CLI over the configured SMP serial route.
@@ -122,6 +121,9 @@ Phase plans and verification reports live under `docs/phase-*-plan.md` and
 
 - Do not repurpose GPIO26, GPIO27, GPIO28, GPIO29, GPIO30, or GPIO31; they are
   relay outputs on the target hardware.
+- Do not use `rpi_pico2/rp2350a/m33/w` for target hardware builds; its Wi-Fi
+  devicetree uses GPIOs that conflict with this board's buzzer, RS485, and
+  relay outputs.
 - Keep relay outputs off by default and force them off during test teardown.
 - Use UART0 for the manual Zephyr shell. Keep USB CDC dedicated to host control
   protocol traffic, and keep UART1 available for the isolated RS485 path.

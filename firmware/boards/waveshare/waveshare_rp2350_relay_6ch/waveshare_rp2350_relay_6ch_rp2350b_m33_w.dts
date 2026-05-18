@@ -1,0 +1,48 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+/dts-v1/;
+
+#include <raspberrypi/rpi_pico/rp2350b.dtsi>
+#include <raspberrypi/rpi_pico/m33.dtsi>
+#include "waveshare_rp2350_relay_6ch.dtsi"
+
+&pio0 {
+	status = "okay";
+
+	pio0_spi0: pio0_spi0 {
+		compatible = "raspberrypi,pico-spi-pio";
+		clocks = <&clocks RPI_PICO_CLKID_CLK_SYS>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		cs-gpios = <&gpio0_hi 2 GPIO_ACTIVE_LOW>;
+		clk-gpios = <&gpio0_hi 3 GPIO_ACTIVE_HIGH>;
+		sio-gpios = <&gpio0_hi 1 GPIO_ACTIVE_HIGH>;
+		pinctrl-0 = <&pio0_spi0_default>;
+		pinctrl-names = "default";
+		status = "okay";
+
+		airoc-wifi@0 {
+			compatible = "infineon,airoc-wifi";
+			reg = <0>;
+			wifi-reg-on-gpios = <&gpio0_hi 0 GPIO_ACTIVE_HIGH>;
+			bus-select-gpios = <&gpio0_hi 1 GPIO_ACTIVE_HIGH>;
+			wifi-host-wake-gpios = <&gpio0_hi 1 GPIO_ACTIVE_HIGH>;
+			spi-max-frequency = <10000000>;
+			spi-half-duplex;
+			spi-data-irq-shared;
+			pinctrl-0 = <&airoc_wifi_default>;
+			pinctrl-1 = <&airoc_wifi_host_wake>;
+			pinctrl-names = "default", "host_wake";
+			status = "okay";
+
+			cyw43_gpio: gpio {
+				compatible = "infineon,cyw43-gpio";
+				gpio-controller;
+				#gpio-cells = <2>;
+				ngpios = <3>;
+			};
+		};
+	};
+};

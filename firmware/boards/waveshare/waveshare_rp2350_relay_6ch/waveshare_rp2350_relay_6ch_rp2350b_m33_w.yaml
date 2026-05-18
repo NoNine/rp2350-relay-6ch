@@ -1,0 +1,29 @@
+identifier: waveshare_rp2350_relay_6ch/rp2350b/m33/w
+name: Waveshare RP2350-Relay-6CH with RM2 Wi-Fi (Cortex-M33)
+type: mcu
+arch: arm
+flash: 16384
+ram: 520
+toolchain:
+  - zephyr
+  - gnuarmemb
+supported:
+  - adc
+  - clock
+  - counter
+  - crypto
+  - dma
+  - entropy
+  - gpio
+  - hwinfo
+  - i2c
+  - pico_gpio
+  - pico_i2c
+  - pico_serial
+  - pico_spi
+  - pwm
+  - spi
+  - uart
+  - usbd
+  - watchdog
+  - wifi

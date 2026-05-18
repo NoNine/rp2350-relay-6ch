@@ -66,9 +66,9 @@ Dependencies:
 
 ### Assumptions
 
-- Use Raspberry Pi Pico 2 W (`rpi_pico2/rp2350a/m33/w`) as the temporary
-  development board target until a custom RP2350-Relay-6CH board definition or
-  overlay is available.
+- Historical Phase 0 builds used Raspberry Pi Pico 2 W
+  (`rpi_pico2/rp2350a/m33/w`) as the temporary development target. Current
+  relay hardware builds use `waveshare_rp2350_relay_6ch/rp2350b/m33`.
 
 ## Phase 1: Board Bring-Up And Relay GPIO Control
 

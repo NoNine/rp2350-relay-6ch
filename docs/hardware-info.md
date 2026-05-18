@@ -89,18 +89,18 @@ The schematic names this section `RM2` / `RPI RM2`.
 
 | RM2 Function | RP2350B GPIO / Net | RM2 Ball |
 | --- | --- | --- |
-| `WL_CLK` | GPIO35 | A3 `SCLK` |
-| `WL_D` | GPIO33 | A5 `D1` |
-| `WL_D` | GPIO38 | A6 `DO` |
-| `WL_CS` | GPIO34 | B2 `CS` |
-| `WL_D` / IRQ | GPIO43 | B3 `IRQ` |
 | `WL_ON` | GPIO32 | B5 `WLON` |
-| `VBUS_SENSE` | VBUS through divider | C3 `GPIO2` |
+| `WL_D` | GPIO33 | A5 `D1` |
+| `WL_CS` | GPIO34 | B2 `CS` |
+| `WL_CLK` | GPIO35 | A3 `SCLK` |
+| `WL_D` through R66 470 ohm | GPIO33-derived data path | A6 `DO` |
+| `VBUS_SENSE` | VBUS through R68/R69 divider | C3 `GPIO2` |
 | `VDDBAT` / `VDDIO` | 3.3 V through ferrite bead | C2/B7 |
 
 RM2 notes:
 
 - Several RM2 nets are connected through 10 kOhm or 470-ohm resistors; check the schematic before changing default pulls or drive strength.
+- RM2 module operation and Wi-Fi support have not been verified and are deferred.
 
 ## Expansion Headers
 
@@ -153,9 +153,20 @@ Additional GPIO pads/points:
 
 ## Zephyr Board-Port Notes
 
+- Build relay firmware with `waveshare_rp2350_relay_6ch/rp2350b/m33` by
+  default. Use `waveshare_rp2350_relay_6ch/rp2350b/m33/w` only for the
+  optional RM2 Wi-Fi assembly.
+- Use Zephyr's Raspberry Pi Pico 2 W board definition at
+  `${ZEPHYR_WORKSPACE:-$HOME/zephyrproject}/zephyr/boards/raspberrypi/rpi_pico2`
+  as the base reference for common RP2350 board configuration. The target board
+  differs by using an RP2350B MCU and the Waveshare pin assignment below.
+- Do not use the Raspberry Pi Pico 2 W target for this hardware. Its Wi-Fi
+  devicetree assigns GPIO23, GPIO24, GPIO25, and GPIO29 to Pico 2 W-specific
+  functions that conflict with this board's buzzer, RS485 path, and `CH4`.
 - Model relays as GPIO outputs with an active-high polarity until measured on hardware.
 - Model the buzzer as an active-high GPIO output on GPIO23.
 - Model the WS2812 as a one-wire LED strip data signal on GPIO36.
 - Model RS485 on UART1: `tx-pin = GPIO24`, `rx-pin = GPIO25`. The schematic shows the driver-enable timing handled in hardware through `TXD1EN`, so a Zephyr DE GPIO may not be needed.
 - Be careful assigning GPIO26, GPIO27, GPIO28, GPIO29, GPIO30, and GPIO31 to other functions because they are relay outputs.
-- For wireless support, verify the board assembly option and GPIO conflicts before enabling RM2 in the default device tree.
+- For wireless support, use the `/w` board variant and verify the board
+  assembly option before enabling RM2 driver nodes.

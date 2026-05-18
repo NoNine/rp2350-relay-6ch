@@ -7,6 +7,9 @@ needed for repeatable implementation. The development board target is
 `rpi_pico2/rp2350a/m33/w` for Raspberry Pi Pico 2 W until a custom
 RP2350-Relay-6CH board definition is available.
 
+Historical note: the temporary Pico 2 W target has since been replaced by
+`waveshare_rp2350_relay_6ch/rp2350b/m33` for relay hardware builds.
+
 Assumption: Pico 2 W is the temporary development board until the custom board
 definition or overlay lands.
 
@@ -22,7 +25,7 @@ configuration, and hardware smoke testing begin in Phase 1.
 - Add an importable `rp2350_relay_6ch` host package and a placeholder pytest
   test that verifies discovery.
 - Add wrapper scripts:
-  - `scripts/build-firmware.sh` builds the firmware for
+  - `scripts/build-firmware.sh` originally built the firmware for
     `rpi_pico2/rp2350a/m33/w` by default.
   - `scripts/test-host.sh` runs host-side pytest.
   - `scripts/smoke-hardware.sh` exits with an actionable Phase 1 placeholder
@@ -59,8 +62,8 @@ scripts/smoke-hardware.sh
 Expected results:
 
 - `scripts/build-firmware.sh` configures and builds the baseline Zephyr app for
-  `rpi_pico2/rp2350a/m33/w`, or fails with a clear missing-prerequisite
-  message.
+  the then-current development target, or fails with a clear
+  missing-prerequisite message.
 - `scripts/test-host.sh` starts pytest and passes the placeholder host test.
 - `scripts/smoke-hardware.sh` exits non-zero with a message explaining that
   hardware smoke testing starts in Phase 1.

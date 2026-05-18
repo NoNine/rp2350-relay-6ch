@@ -1,0 +1,9 @@
+board:
+  name: waveshare_rp2350_relay_6ch
+  full_name: Waveshare RP2350-Relay-6CH
+  vendor: waveshare
+  socs:
+    - name: rp2350b
+      variants:
+        - name: w
+          cpucluster: m33
