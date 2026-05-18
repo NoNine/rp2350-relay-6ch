@@ -48,6 +48,11 @@ logging, flash map, and DFU APIs where available.
 For Python, use `snake_case` modules/functions, `PascalCase` classes, and typed
 exceptions for protocol, timeout, transport, validation, and device errors.
 
+For README updates, keep `Quick Start` brief and focused on the shortest
+successful hardware path, using short operation titles. Put command variations,
+full CLI usage, and test matrices in the dedicated docs under `docs/` instead
+of repeating them in both `Quick Start` and example sections.
+
 ## Testing Guidelines
 
 Every phase should leave the repo buildable and testable. Firmware tests should

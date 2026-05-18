@@ -74,26 +74,9 @@ scripts/build-firmware.sh
 west flash -d build/firmware
 ```
 
-Query:
+Smoke test:
 
 ```sh
-tools/rp2350_relay_cli.py --port <serial-port> info
-tools/rp2350_relay_cli.py --port <serial-port> get
-```
-
-Control:
-
-```sh
-tools/rp2350_relay_cli.py --port <serial-port> set 1 on
-tools/rp2350_relay_cli.py --port <serial-port> set 1 off
-tools/rp2350_relay_cli.py --port <serial-port> pulse 1 100
-tools/rp2350_relay_cli.py --port <serial-port> off-all
-```
-
-Inspect:
-
-```sh
-tools/rp2350_relay_cli.py --port <serial-port> status
 tools/rp2350_relay_cli.py --port <serial-port> smoke
 ```
 
