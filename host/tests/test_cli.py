@@ -1,25 +1,16 @@
 from __future__ import annotations
 
-import importlib.util
-from pathlib import Path
 from typing import Any
 
 import pytest
 
+import rp2350_relay_6ch.cli as cli
 from rp2350_relay_6ch.exceptions import (
     RelayDeviceError,
     RelayProtocolError,
     RelayTimeoutError,
     RelayTransportError,
 )
-
-ROOT_DIR = Path(__file__).resolve().parents[2]
-CLI_PATH = ROOT_DIR / "tools" / "rp2350_relay_cli.py"
-SPEC = importlib.util.spec_from_file_location("rp2350_relay_cli", CLI_PATH)
-assert SPEC is not None
-assert SPEC.loader is not None
-cli = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(cli)
 
 
 class FakeClient:

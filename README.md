@@ -29,10 +29,10 @@ flowchart LR
     api["Python relay API"]
   end
 
-  transport["USB relay command channel"]
+  protocol["USB command channel\nSMP frames + CBOR payloads"]
 
   subgraph device["Device Side"]
-    firmware["Relay controller firmware"]
+    zephyr["Zephyr-based relay firmware\nrunning on RP2350B MCU"]
     safety["Safety behavior\ndefault off, validation, pulse limits"]
     relays["Six relay outputs\nCH1-CH6"]
   end
@@ -42,9 +42,9 @@ flowchart LR
   operator --> cli
   cli --> api
   automation --> api
-  api <--> transport
-  transport <--> firmware
-  firmware --> safety
+  api <--> protocol
+  protocol <--> zephyr
+  zephyr --> safety
   safety --> relays
   relays --> loads
 ```
@@ -112,8 +112,11 @@ west flash -d build/firmware
 Smoke test:
 
 ```sh
-tools/rp2350_relay_cli.py --port <serial-port> smoke
+rp2350-relay --port <serial-port> smoke
 ```
+
+CLI-only operators can install the released Python wheel and run
+`rp2350-relay` without a firmware checkout. See [docs/cli.md](docs/cli.md).
 
 ## CLI Examples
 
@@ -121,13 +124,13 @@ CLI channel numbers are one-based and match board labels: `1` is `CH1` and `6`
 is `CH6`.
 
 ```sh
-tools/rp2350_relay_cli.py --port COM7 info
-tools/rp2350_relay_cli.py --port COM7 get
-tools/rp2350_relay_cli.py --port COM7 set 1 on
-tools/rp2350_relay_cli.py --port COM7 pulse 1 100
-tools/rp2350_relay_cli.py --port COM7 off-all
-tools/rp2350_relay_cli.py --port COM7 status
-tools/rp2350_relay_cli.py --port COM7 --output json status
+rp2350-relay --port COM7 info
+rp2350-relay --port COM7 get
+rp2350-relay --port COM7 set 1 on
+rp2350-relay --port COM7 pulse 1 100
+rp2350-relay --port COM7 off-all
+rp2350-relay --port COM7 status
+rp2350-relay --port COM7 --output json status
 ```
 
 See [docs/cli.md](docs/cli.md) for the full command list and exit codes.

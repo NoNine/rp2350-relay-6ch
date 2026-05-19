@@ -38,7 +38,7 @@ scripts/smoke-hardware.sh
 Run the CLI hardware smoke test:
 
 ```sh
-tools/rp2350_relay_cli.py --port <serial-port> smoke
+rp2350-relay --port <serial-port> smoke
 ```
 
 Use the assigned Windows serial port when hardware is attached to a separate

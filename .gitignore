@@ -1,7 +1,9 @@
 # Build outputs
 /build/
+/dist/
 
 # Python caches
 __pycache__/
 *.py[cod]
 .pytest_cache/
+*.egg-info/

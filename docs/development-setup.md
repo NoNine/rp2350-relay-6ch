@@ -161,7 +161,7 @@ west flash -d build/firmware
 Then run a CLI smoke test from the machine connected to the board:
 
 ```sh
-tools/rp2350_relay_cli.py --port <serial-port> smoke
+rp2350-relay --port <serial-port> smoke
 ```
 
 On Linux, the serial port is typically similar to `/dev/ttyACM0`. On Windows,
