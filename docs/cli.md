@@ -6,8 +6,36 @@ library. Developers can also run the repository compatibility wrapper at
 
 ## Operator Install
 
-CLI-only operators need Python 3.12 or newer and the release wheel; no Zephyr
-workspace or source checkout is required.
+Operators need Python 3.12 or newer and the release artifacts; no Zephyr
+workspace or source checkout is required. Download the matching files from the
+same GitHub Release:
+
+- `rp2350_relay_6ch-<version>-py3-none-any.whl`
+- `rp2350_relay_6ch-<version>-waveshare_rp2350_relay_6ch_rp2350b_m33.uf2`
+
+### Firmware
+
+Flash the `.uf2` file when the board is not already running the matching
+firmware. Keep relay loads disconnected during first flash and smoke test.
+
+UF2 drag-and-drop:
+
+1. Put the board in USB bootloader mode.
+2. Copy the `.uf2` file to the mounted `RP2350` drive.
+3. Reconnect the board normally.
+
+`picotool`:
+
+```sh
+picotool load -x rp2350_relay_6ch-<version>-waveshare_rp2350_relay_6ch_rp2350b_m33.uf2
+```
+
+Install `picotool` separately and run this command while the board is in USB
+bootloader mode. The `-x` option runs the firmware after flashing; do not use
+`--force-no-reboot` or `-F` for this operator flow. If Linux cannot access the
+device, retry with appropriate USB permissions or `sudo`.
+
+### CLI Wheel
 
 Windows PowerShell:
 
@@ -41,7 +69,8 @@ python -m pip install build
 python -m build
 ```
 
-Attach the generated `dist/*.whl` file to the GitHub Release.
+Attach the generated `dist/*.whl` file and the renamed
+`build/firmware/zephyr/zephyr.uf2` firmware image to the GitHub Release.
 
 ## Common Options
 
