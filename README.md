@@ -8,6 +8,13 @@ relay management group, and provides USB CDC transport for host control. The
 host side includes an importable Python RPC library, smoke-test helpers, and a
 library-backed CLI. Firmware update support is planned but not implemented.
 
+<p>
+  <img src="docs/assets/readme/rp2350-relay-6ch-w-2.jpg"
+       alt="Waveshare RP2350-Relay-6CH-W product view" width="320">
+  <img src="docs/assets/readme/rp2350-relay-6ch-w-3.jpg"
+       alt="Waveshare RP2350-Relay-6CH-W connector view" width="320">
+</p>
+
 ## Features
 
 Implemented:
