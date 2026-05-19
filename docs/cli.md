@@ -42,7 +42,7 @@ Windows PowerShell:
 ```powershell
 python -m pip install --user pipx
 python -m pipx ensurepath
-python -m pipx install .\rp2350_relay_6ch-0.1.0-py3-none-any.whl
+python -m pipx install .\rp2350_relay_6ch-0.6.0-py3-none-any.whl
 rp2350-relay --port COM7 info
 ```
 
@@ -51,7 +51,7 @@ Linux shell:
 ```sh
 python3 -m pip install --user pipx
 python3 -m pipx ensurepath
-python3 -m pipx install ./rp2350_relay_6ch-0.1.0-py3-none-any.whl
+python3 -m pipx install ./rp2350_relay_6ch-0.6.0-py3-none-any.whl
 rp2350-relay --port /dev/ttyACM0 info
 ```
 
@@ -59,7 +59,7 @@ Open a new terminal after `pipx ensurepath` if `rp2350-relay` is not found.
 Upgrade after downloading a newer wheel with:
 
 ```sh
-pipx install --force ./rp2350_relay_6ch-0.1.0-py3-none-any.whl
+pipx install --force ./rp2350_relay_6ch-0.6.0-py3-none-any.whl
 ```
 
 Release maintainers build the wheel from the repository root:
@@ -72,7 +72,7 @@ python -m build
 Attach the generated `dist/*.whl` file and the renamed
 `build/firmware/zephyr/zephyr.uf2` firmware image to the GitHub Release. For
 the default board, name the firmware
-`rp2350_relay_6ch-0.1.0-rp2350b_m33.uf2`.
+`rp2350_relay_6ch-0.6.0-rp2350b_m33.uf2`.
 
 ## Common Options
 

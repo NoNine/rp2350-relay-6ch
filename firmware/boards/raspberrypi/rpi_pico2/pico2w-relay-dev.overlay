@@ -1,0 +1,36 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Temporary Raspberry Pi Pico 2 W relay development mapping.
+ * The final Waveshare RP2350-Relay-6CH hardware uses GPIO26 through GPIO31.
+ */
+
+/ {
+	relays {
+		compatible = "gpio-leds";
+
+		ch1 {
+			gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
+		};
+
+		ch2 {
+			gpios = <&gpio0 3 GPIO_ACTIVE_HIGH>;
+		};
+
+		ch3 {
+			gpios = <&gpio0 4 GPIO_ACTIVE_HIGH>;
+		};
+
+		ch4 {
+			gpios = <&gpio0 5 GPIO_ACTIVE_HIGH>;
+		};
+
+		ch5 {
+			gpios = <&gpio0 6 GPIO_ACTIVE_HIGH>;
+		};
+
+		ch6 {
+			gpios = <&gpio0 7 GPIO_ACTIVE_HIGH>;
+		};
+	};
+};

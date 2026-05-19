@@ -31,8 +31,8 @@ all tests and manual procedures must leave every relay off during teardown.
 - Update the relay smoke-test procedure with manual pulse checks and an
   explicit all-off teardown step.
 
-The optional session timeout foundation remains out of scope unless it can be
-added without complicating v1 pulse behavior.
+A communication-loss safety mechanism remains out of scope for the current
+project requirements.
 
 ## Acceptance Checks
 

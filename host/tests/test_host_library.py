@@ -167,7 +167,7 @@ def test_get_info_returns_decoded_success_response() -> None:
 
 def test_get_build_info_sends_read_request() -> None:
     payload = {
-        "app_version": "0.5.0",
+        "app_version": "0.6.0",
         "zephyr_version": "4.2.0",
         "board": "native_sim",
         "git_commit": "abcdef123456",

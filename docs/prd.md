@@ -96,9 +96,8 @@ the needed behavior:
   supported range.
 - Firmware shall make relay state queryable after every control operation.
 - Firmware shall return a structured error when a command cannot be executed.
-- Firmware may support an optional command/session timeout that turns all relays
-  off after communication loss. The default v1 behavior is disabled unless
-  explicitly configured.
+- A communication-loss safety mechanism, such as a command/session timeout that
+  turns all relays off, is not a current project requirement.
 
 ### 5.3 Protocol
 

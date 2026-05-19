@@ -127,8 +127,6 @@ Implementation scope:
   - returns relay off when the duration expires
   - rejects overlapping pulse requests for a busy relay
 - Ensure relay state remains queryable during and after a pulse.
-- Add optional compile-time disabled session timeout foundation if it does not
-  complicate v1 relay behavior.
 - Add teardown-safe test utilities that force all relays off.
 
 Tests/gates:

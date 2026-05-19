@@ -74,8 +74,6 @@ Planned:
 - Firmware signing, flashing, and release helper scripts.
 - Optional status outputs for the buzzer and WS2812 RGB LED if they do not
   interfere with relay control or RPC behavior.
-- Optional communication-loss safety timeout, disabled by default unless a
-  deployment explicitly configures it.
 
 ## Current Status
 

@@ -69,7 +69,7 @@ class FakeClient:
     def get_build_info(self) -> dict[str, Any]:
         self.calls.append(("get_build_info", ()))
         return {
-            "app_version": "0.5.0",
+            "app_version": "0.6.0",
             "zephyr_version": "4.2.0",
             "board": "native_sim",
             "git_commit": "abcdef123456",
@@ -173,7 +173,7 @@ def test_build_info_human_output_lists_fields(capsys: pytest.CaptureFixture[str]
     captured = capsys.readouterr()
 
     assert rc == cli.EXIT_OK
-    assert "app_version: 0.5.0" in captured.out
+    assert "app_version: 0.6.0" in captured.out
     assert "git_dirty: False" in captured.out
 
 
