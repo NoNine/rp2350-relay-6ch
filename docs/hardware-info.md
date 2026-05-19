@@ -1,7 +1,8 @@
 # RP2350-Relay-6CH Hardware Info
 
 Hardware reference for the Waveshare RP2350-Relay-6CH board variant using an
-RP2350B MCU and Raspberry Pi Radio Module 2 (RM2).
+RP2350B MCU. The `RP2350-Relay-6CH-W` assembly also includes a Raspberry Pi
+Radio Module 2 (RM2).
 
 Sources:
 
@@ -14,7 +15,7 @@ Sources:
 | Function | Part / Notes |
 | --- | --- |
 | MCU | Raspberry Pi RP2350B |
-| Wireless | Raspberry Pi Radio Module 2 footprint/module |
+| Wireless | Optional Raspberry Pi Radio Module 2 footprint/module on `RP2350-Relay-6CH-W` |
 | Flash | W25Q128JVSIQ 128-Mbit QSPI flash |
 | USB | USB Type-C device connector wired to RP2350B USB D+/D- |
 | Relays | 6x HLS8L-DC5V relay channels |
@@ -31,7 +32,7 @@ Sources:
 | Net | Purpose |
 | --- | --- |
 | 5V / VSYS | USB/external board supply domain |
-| 3V3 | RP2350B, flash, RM2, logic, buzzer, RGB LED |
+| 3V3 | RP2350B, flash, optional RM2, logic, buzzer, RGB LED |
 | 1V1 | RP2350B internal core regulator output domain |
 | Relay-5V | Isolated 5 V relay-side domain |
 | GND | MCU-side ground |
@@ -83,9 +84,10 @@ Protection and termination:
 - The schematic includes a 120-ohm resistor between the isolated bus-side nets.
 - RS485 logic is on isolated `SGND`; do not short `GND` and `SGND` in firmware assumptions.
 
-## Raspberry Pi Radio Module 2
+## Optional Raspberry Pi Radio Module 2
 
-The schematic names this section `RM2` / `RPI RM2`.
+The schematic names this section `RM2` / `RPI RM2`. It applies to the optional
+`RP2350-Relay-6CH-W` wireless assembly.
 
 | RM2 Function | RP2350B GPIO / Net | RM2 Ball |
 | --- | --- | --- |
@@ -114,20 +116,20 @@ The board exposes a Pico-compatible 40-pin header pair `H1`/`H2`.
 | 4 | 3V3 | 4 | GPIO2 |
 | 5 | 3V3 | 5 | GPIO3 |
 | 6 | ADC_VREF | 6 | GPIO4 |
-| 7 | GND | 7 | GPIO5 |
-| 8 | GPIO41 | 8 | GPIO6 |
-| 9 | GPIO40 | 9 | GPIO7 |
-| 10 | RUN | 10 | GPIO8 |
-| 11 | GPIO22 | 11 | GPIO9 |
-| 12 | GND | 12 | GND |
-| 13 | GPIO21 | 13 | GPIO10 |
-| 14 | GPIO20 | 14 | GPIO11 |
-| 15 | GPIO19 | 15 | GPIO12 |
-| 16 | GPIO18 | 16 | GPIO13 |
-| 17 | GND | 17 | GND |
-| 18 | GPIO17 | 18 | GPIO14 |
-| 19 | GPIO16 | 19 | GPIO15 |
-| 20 | GND | 20 | GND |
+| 7 | GPIO42 | 7 | GPIO5 |
+| 8 | GND | 8 | GND |
+| 9 | GPIO41 | 9 | GPIO6 |
+| 10 | GPIO40 | 10 | GPIO7 |
+| 11 | RUN | 11 | GPIO8 |
+| 12 | GPIO22 | 12 | GPIO9 |
+| 13 | GND | 13 | GND |
+| 14 | GPIO21 | 14 | GPIO10 |
+| 15 | GPIO20 | 15 | GPIO11 |
+| 16 | GPIO19 | 16 | GPIO12 |
+| 17 | GPIO18 | 17 | GPIO13 |
+| 18 | GND | 18 | GND |
+| 19 | GPIO17 | 19 | GPIO14 |
+| 20 | GPIO16 | 20 | GPIO15 |
 
 Additional GPIO pads/points:
 
@@ -142,9 +144,9 @@ Additional GPIO pads/points:
 
 | GPIO | ADC Channel | Exposed |
 | ---: | ---: | --- |
-| GPIO40 | ADC0 | H1 pin 9 |
-| GPIO41 | ADC1 | H1 pin 8 |
-| GPIO42 | ADC2 | Header/board net |
+| GPIO40 | ADC0 | H1 pin 10 |
+| GPIO41 | ADC1 | H1 pin 9 |
+| GPIO42 | ADC2 | H1 pin 7 |
 | GPIO43 | ADC3 | P16 / RM2 IRQ path |
 | GPIO44 | ADC4 | P17 |
 | GPIO45 | ADC5 | P18 |
