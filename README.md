@@ -1,7 +1,7 @@
 # RP2350 Relay 6CH
 
-Zephyr firmware and Python host tooling for the Waveshare RP2350-Relay-6CH
-controller.
+Zephyr firmware and Python host tooling for the Waveshare RP2350-Relay-6CH and
+RP2350-Relay-6CH-W controllers.
 
 The firmware controls six relay outputs, exposes a custom Zephyr MCUmgr/SMP
 relay management group, and provides USB CDC transport for host control. The
@@ -14,6 +14,40 @@ library-backed CLI. Firmware update support is planned but not implemented.
   <img src="docs/assets/readme/rp2350-relay-6ch-w-3.jpg"
        alt="Waveshare RP2350-Relay-6CH-W connector view" width="320">
 </p>
+
+Product photos show the Wi-Fi version, `RP2350-Relay-6CH-W`.
+
+## Architecture
+
+```mermaid
+flowchart LR
+  operator["Operator"]
+  automation["External Python script / automation"]
+
+  subgraph host["Host Side"]
+    cli["CLI + scripts"]
+    api["Python relay API"]
+  end
+
+  transport["USB relay command channel"]
+
+  subgraph device["Device Side"]
+    firmware["Relay controller firmware"]
+    safety["Safety behavior\ndefault off, validation, pulse limits"]
+    relays["Six relay outputs\nCH1-CH6"]
+  end
+
+  loads["External circuits / loads"]
+
+  operator --> cli
+  cli --> api
+  automation --> api
+  api <--> transport
+  transport <--> firmware
+  firmware --> safety
+  safety --> relays
+  relays --> loads
+```
 
 ## Features
 
@@ -58,8 +92,8 @@ Planned:
 
 - Zephyr workspace with the Zephyr SDK/toolchain installed.
 - Python 3.12 or newer with this package installed in the active environment.
-- Waveshare RP2350-Relay-6CH hardware, USB access, and suitable relay-side
-  power for hardware smoke tests.
+- Waveshare RP2350-Relay-6CH or RP2350-Relay-6CH-W hardware, USB access, and
+  suitable relay-side power for hardware smoke tests.
 - Safe relay-side wiring with hazardous loads disconnected during bring-up.
 
 For first-time setup, including workspace creation, Python dependencies,
