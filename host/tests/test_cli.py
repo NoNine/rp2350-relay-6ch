@@ -83,7 +83,7 @@ class FakeClient:
             "board": "native_sim",
             "git_commit": "abcdef123456",
             "git_dirty": False,
-            "build_timestamp": "2026-05-18T00:00:00Z",
+            "build_timestamp": "2026-05-18T08:00:00+08:00",
             "compiler": "GNU 13.3.0",
         }
 

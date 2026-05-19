@@ -274,6 +274,7 @@ ZTEST(relay_mgmt, test_info_reports_capabilities)
 
 ZTEST(relay_mgmt, test_build_info_reports_build_metadata)
 {
+	static const char shanghai_offset[] = "+08:00";
 	size_t response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_BUILD_INFO, false,
 					   encode_empty_request());
 	struct zcbor_string text;
@@ -290,6 +291,10 @@ ZTEST(relay_mgmt, test_build_info_reports_build_metadata)
 	zassert_true(decode_bool(response_len, "git_dirty", &git_dirty));
 	zassert_true(decode_tstr(response_len, "build_timestamp", &text));
 	zassert_not_equal(text.len, 0U);
+	zassert_true(text.len > strlen(shanghai_offset));
+	zassert_equal(memcmp(text.value + text.len - strlen(shanghai_offset), shanghai_offset,
+			     strlen(shanghai_offset)),
+		      0);
 	zassert_true(decode_tstr(response_len, "compiler", &text));
 	zassert_not_equal(text.len, 0U);
 }

@@ -85,7 +85,7 @@ Response:
 | `board` | text | Zephyr board target used for the build. |
 | `git_commit` | text | Short source commit hash, or `unknown` when unavailable. |
 | `git_dirty` | bool | Whether the source tree had uncommitted changes at CMake configure time. |
-| `build_timestamp` | text | UTC ISO-8601 timestamp from `SOURCE_DATE_EPOCH` when set, otherwise the current Git commit time when available, otherwise CMake configure time. |
+| `build_timestamp` | text | Shanghai-time ISO-8601 timestamp with `+08:00` offset from `SOURCE_DATE_EPOCH` when set, otherwise the current Git commit time when available, otherwise CMake configure time. |
 | `compiler` | text | C compiler ID and version used by CMake. |
 
 ### `get`
