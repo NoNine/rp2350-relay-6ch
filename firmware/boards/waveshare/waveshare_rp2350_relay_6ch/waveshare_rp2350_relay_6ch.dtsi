@@ -102,9 +102,9 @@
 			   <20 0 &gpio0 20 0>,	/* GP20 */
 			   <21 0 &gpio0 21 0>,	/* GP21 */
 			   <22 0 &gpio0 22 0>,	/* GP22 */
-			   <26 0 &gpio0 26 0>,	/* GP26 */
-			   <27 0 &gpio0 27 0>,	/* GP27 */
-			   <28 0 &gpio0 28 0>;	/* GP28 */
+			   <26 0 &gpio0_hi 8 0>,	/* GP40 / ADC0 */
+			   <27 0 &gpio0_hi 9 0>,	/* GP41 / ADC1 */
+			   <28 0 &gpio0_hi 10 0>;	/* GP42 / ADC2 */
 	};
 };
 
@@ -161,7 +161,7 @@ gpio1: &gpio0_hi {
 };
 
 &pwm {
-	pinctrl-0 = <&pwm_ch4b_default>;
+	pinctrl-0 = <&pwm_buzzer_default>;
 	pinctrl-names = "default";
 	divider-int-0 = <255>;
 };
