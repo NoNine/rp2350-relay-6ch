@@ -102,6 +102,10 @@ Pull requests should include a summary, commands run, hardware used, linked
 issues or phase references, and docs updates for changed protocol, GPIO, safety,
 or test behavior. Never leave a relay on as a test side effect.
 
+Firmware UF2 release artifacts must use
+`rp2350_relay_6ch-<version>-<board-qualifier>.uf2`. Use board qualifiers such
+as `rp2350b_m33`, not full Zephyr board names.
+
 ## Safety & Configuration Tips
 
 Relays are active-high on GPIO26 through GPIO31 and must default off on boot,
