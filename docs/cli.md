@@ -6,32 +6,32 @@ library. Developers can also run the repository compatibility wrapper at
 
 ## Operator Install
 
-Operators who only need the CLI do not need a Zephyr workspace or firmware
-source checkout. Install the wheel file from the project GitHub Release.
+CLI-only operators need Python 3.12 or newer and the release wheel; no Zephyr
+workspace or source checkout is required.
 
 Windows PowerShell:
 
 ```powershell
-py -3.12 -m pip install --user pipx
-py -3.12 -m pipx ensurepath
-py -3.12 -m pipx install .\rp2350_relay_6ch-0.1.0-py3-none-any.whl
+python -m pip install --user pipx
+python -m pipx ensurepath
+python -m pipx install .\rp2350_relay_6ch-0.1.0-py3-none-any.whl
 rp2350-relay --port COM7 info
 ```
 
 Linux shell:
 
 ```sh
-python3.12 -m pip install --user pipx
-python3.12 -m pipx ensurepath
-python3.12 -m pipx install ./rp2350_relay_6ch-0.1.0-py3-none-any.whl
+python3 -m pip install --user pipx
+python3 -m pipx ensurepath
+python3 -m pipx install ./rp2350_relay_6ch-0.1.0-py3-none-any.whl
 rp2350-relay --port /dev/ttyACM0 info
 ```
 
 Open a new terminal after `pipx ensurepath` if `rp2350-relay` is not found.
-Upgrade an existing install with:
+Upgrade after downloading a newer wheel with:
 
 ```sh
-pipx upgrade rp2350-relay-6ch
+pipx install --force ./rp2350_relay_6ch-0.1.0-py3-none-any.whl
 ```
 
 Release maintainers build the wheel from the repository root:
