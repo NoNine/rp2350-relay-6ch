@@ -116,9 +116,15 @@ When staged changes are under review, do not stage follow-up edits unless the
 user explicitly asks. Leave cleanup edits unstaged so staged and working-tree
 diffs remain separately reviewable.
 
-Firmware UF2 release artifacts must use
-`rp2350_relay_6ch-<version>-<board-qualifier>.uf2`. Use board qualifiers such
-as `rp2350b_m33`, not full Zephyr board names.
+Every GitHub Release must include at least these artifacts:
+
+- `rp2350_relay_6ch-<version>-py3-none-any.whl`: host CLI wheel.
+- `rp2350_relay_6ch-<version>-waveshare.uf2`: Waveshare firmware.
+- `rp2350_relay_6ch-<version>-pico2.uf2`: Raspberry Pi Pico 2 firmware.
+
+Additional artifacts such as an sdist or Pico 2 W firmware may be attached when
+useful. Firmware UF2 artifact names should use short release qualifiers such as
+`waveshare`, `pico2`, or `pico2w`, not full Zephyr board names.
 
 ## Safety & Configuration Tips
 

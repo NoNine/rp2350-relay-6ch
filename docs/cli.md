@@ -11,7 +11,8 @@ workspace or source checkout is required. Download the matching files from the
 same GitHub Release:
 
 - `rp2350_relay_6ch-<version>-py3-none-any.whl`
-- `rp2350_relay_6ch-<version>-rp2350b_m33.uf2`
+- `rp2350_relay_6ch-<version>-waveshare.uf2`
+- `rp2350_relay_6ch-<version>-pico2.uf2`
 
 ### Firmware
 
@@ -27,7 +28,7 @@ UF2 drag-and-drop:
 `picotool`:
 
 ```sh
-picotool load -x rp2350_relay_6ch-<version>-rp2350b_m33.uf2
+picotool load -x rp2350_relay_6ch-<version>-waveshare.uf2
 ```
 
 Install `picotool` separately and run this command while the board is in USB
@@ -69,10 +70,13 @@ python -m pip install build
 python -m build
 ```
 
-Attach the generated `dist/*.whl` file and the renamed
-`build/firmware/zephyr/zephyr.uf2` firmware image to the GitHub Release. For
-the default board, name the firmware
-`rp2350_relay_6ch-<version>-rp2350b_m33.uf2`.
+Attach at least the generated `dist/*.whl` file and renamed firmware images to
+the GitHub Release:
+
+- `build/firmware/zephyr/zephyr.uf2` as
+  `rp2350_relay_6ch-<version>-waveshare.uf2`
+- `build/firmware-pico2/zephyr/zephyr.uf2` as
+  `rp2350_relay_6ch-<version>-pico2.uf2`
 
 ## Common Options
 
