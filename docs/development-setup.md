@@ -137,21 +137,8 @@ BOARD=<zephyr-board> BUILD_DIR=build/<name> scripts/build-firmware.sh
 ```
 
 Use `BOARD=waveshare_rp2350_relay_6ch/rp2350b/m33/w` only when explicitly
-building for the optional RM2 Wi-Fi assembly. Do not use the Raspberry Pi Pico
-2 W target for relay hardware builds; its Wi-Fi GPIO assignments conflict with
-the Waveshare relay board.
-
-When Waveshare hardware is not available, build the temporary Raspberry Pi
-Pico 2 W development profile:
-
-```sh
-TARGET=pico2w-dev scripts/build-firmware.sh
-```
-
-This profile builds `BOARD=rpi_pico2/rp2350a/m33/w`, writes to
-`build/firmware-pico2w-dev`, and applies a relay overlay that maps `CH1`
-through `CH6` to Pico GP2 through GP7. Use it only with a Pico 2 W wired to an
-external active-high relay board; it is not the target-hardware build.
+building for the optional RM2 Wi-Fi assembly. For Raspberry Pi Pico 2 DIY relay
+hardware, see [Pico 2 DIY targets](pico-diy-targets.md).
 
 Run firmware unit tests on `native_sim`:
 
@@ -169,13 +156,6 @@ Flash the most recent firmware build:
 
 ```sh
 west flash -d build/firmware
-```
-
-For the temporary Pico 2 W development profile, flash the separate build
-directory:
-
-```sh
-west flash -d build/firmware-pico2w-dev
 ```
 
 Then run a CLI smoke test from the machine connected to the board:

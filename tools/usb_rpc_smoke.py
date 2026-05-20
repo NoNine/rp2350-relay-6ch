@@ -294,7 +294,7 @@ def require(condition: bool, message: str) -> None:
 def run_smoke(args: argparse.Namespace) -> None:
     info = call(args.port, args.baud, CMD_INFO, OP_READ, {})
     print_response(info)
-    require(info.get("protocol_version") == 1, "protocol_version is not 1")
+    require(info.get("protocol_version") == 2, "protocol_version is not 2")
     require(info.get("relay_count") == 6, "relay_count is not 6")
     require(info.get("hardware") == "Waveshare RP2350-Relay-6CH", "unexpected hardware name")
 

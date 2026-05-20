@@ -53,6 +53,16 @@ successful hardware path, using short operation titles. Put command variations,
 full CLI usage, and test matrices in the dedicated docs under `docs/` instead
 of repeating them in both `Quick Start` and example sections.
 
+Keep documentation roles distinct. `docs/prd.md` should state product
+requirements, not setup steps, implementation instructions, or marketing copy.
+`docs/implementation-plan.md` should hold the current cross-phase
+implementation plan and rules. Dedicated docs should hold detailed target,
+build, wiring, protocol, and test guidance.
+
+Do not retrofit completed phase plans for new direction changes. Treat completed
+`docs/phase-*-plan.md` files as historical records unless the user explicitly
+asks to correct or revise them.
+
 ## Testing Guidelines
 
 Every phase should leave the repo buildable and testable. Firmware tests should
@@ -101,6 +111,10 @@ Before running `git commit`, verify the commit message manually:
 Pull requests should include a summary, commands run, hardware used, linked
 issues or phase references, and docs updates for changed protocol, GPIO, safety,
 or test behavior. Never leave a relay on as a test side effect.
+
+When staged changes are under review, do not stage follow-up edits unless the
+user explicitly asks. Leave cleanup edits unstaged so staged and working-tree
+diffs remain separately reviewable.
 
 Firmware UF2 release artifacts must use
 `rp2350_relay_6ch-<version>-<board-qualifier>.uf2`. Use board qualifiers such

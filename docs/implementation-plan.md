@@ -2,7 +2,7 @@
 
 This plan turns the PRD in `docs/prd.md` into staged, testable work. The
 first phases prioritize relay safety and relay control before host tooling and
-firmware update flows.
+firmware update flows across supported RP2350 relay targets.
 
 ## Scaffolded Structure
 
@@ -31,10 +31,15 @@ docs/
   documentation is updated, and
   `docs/testing/phase-{phase-no}-verification.md` records the verification
   result.
+- Do not create or update phase verification reports automatically during
+  implementation. Write or update them only when explicitly requested, and
+  include only verification commands and results that actually ran.
 - Later phases may not start until dependencies from earlier phases are
   verified and their phase verification reports exist.
 - Relay outputs must fail safe: all six channels default off on boot, reset,
   firmware restart, and test setup/teardown.
+- Non-Waveshare RP2350 builds must provide explicit devicetree relay mappings
+  for `ch1` through `ch6`; the protocol remains fixed at six channels.
 - Temporary debug paths are allowed only inside the current phase and must be
   removed or replaced before the phase is marked complete.
 

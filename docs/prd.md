@@ -2,19 +2,19 @@
 
 ## 1. Summary
 
-This product is a Zephyr-based firmware and host tooling stack for the
-Waveshare RP2350-Relay-6CH board. The device receives commands from a host
-computer and controls six relay outputs accordingly. The host communicates with
-the device through a packet-based RPC protocol, with a Python library providing
-the protocol implementation and a CLI utility providing test, debug, and
+This product is a Zephyr-based firmware and host tooling stack for six-channel
+RP2350 relay controllers. The device receives commands from a host computer
+and controls six relay outputs accordingly. The host communicates with the
+device through a packet-based RPC protocol, with a Python library providing the
+protocol implementation and a CLI utility providing test, debug, and
 operations workflows.
 
 The project is expected to be implemented in multiple phases because it spans
 embedded firmware, host-side protocol code, command-line tooling, firmware
 upgrade, and bootloader integration.
 
-Primary hardware details are maintained in
-[hardware-info.md](hardware-info.md). The required target is the
+Primary Waveshare hardware details are maintained in
+[hardware-info.md](hardware-info.md). The required Waveshare target is the
 RP2350B-based RP2350-Relay-6CH board with six active-high relay GPIOs:
 
 | Relay | GPIO | Default state |
@@ -29,6 +29,8 @@ RP2350B-based RP2350-Relay-6CH board with six active-high relay GPIOs:
 ## 2. Goals
 
 - Provide reliable host-controlled relay switching for all six relay channels.
+- Support board-specific relay mappings through devicetree so the firmware and
+  host tooling can be reused across supported RP2350 relay targets.
 - Reuse Zephyr OS subsystems where practical instead of implementing custom
   infrastructure from scratch.
 - Use a packet-based RPC protocol suitable for command, response, error, and
@@ -53,12 +55,14 @@ RP2350B-based RP2350-Relay-6CH board with six active-high relay GPIOs:
 
 - Firmware shall target the Waveshare RP2350-Relay-6CH board variant described
   in `docs/hardware-info.md`.
-- Firmware shall model relays as six active-high GPIO outputs on GPIO26 through
-  GPIO31.
+- Firmware shall support documented board-specific devicetree relay mappings
+  for reusable RP2350 relay builds.
+- Firmware shall model relays as six GPIO outputs defined by devicetree. On
+  Waveshare hardware these shall be active-high GPIO26 through GPIO31.
 - Firmware shall initialize all relay outputs to off as early as practical
   during boot.
 - Firmware shall avoid assigning relay GPIOs to any alternate function.
-- Firmware shall support the board USB-C device connector as the primary host
+- Firmware shall support the board USB device connector as the primary host
   communication path.
 - Firmware should expose the active-high buzzer on GPIO23 and WS2812 RGB LED on
   GPIO36 for status indication, if doing so does not interfere with the relay

@@ -8,6 +8,10 @@ relay management group, and provides USB CDC transport for host control. The
 host side includes an importable Python RPC library, smoke-test helpers, and a
 library-backed CLI. Firmware update support is planned but not implemented.
 
+Raspberry Pi Pico 2 and Pico 2 W are also supported as DIY relay targets when
+an explicit six-relay devicetree overlay maps `CH1` through `CH6`; see
+[Pico 2 DIY targets](docs/pico-diy-targets.md).
+
 <p>
   <img src="docs/assets/readme/rp2350-relay-6ch-w-2.jpg"
        alt="Waveshare RP2350-Relay-6CH-W product view" width="320">
@@ -148,6 +152,7 @@ docs/       Requirements, hardware notes, phase plans, protocol, and tests
 - [Product requirements](docs/prd.md)
 - [Development setup](docs/development-setup.md)
 - [Hardware information](docs/hardware-info.md)
+- [Pico 2 DIY targets](docs/pico-diy-targets.md)
 - [Implementation plan](docs/implementation-plan.md)
 - [Relay management protocol](docs/protocol/relay-management.md)
 - [Host library](docs/host-library.md)
@@ -162,10 +167,7 @@ Phase plans and verification reports live under `docs/phase-*-plan.md` and
 ## Safety Notes
 
 - Do not repurpose GPIO26, GPIO27, GPIO28, GPIO29, GPIO30, or GPIO31; they are
-  relay outputs on the target hardware.
-- Do not use `rpi_pico2/rp2350a/m33/w` for target hardware builds; its Wi-Fi
-  devicetree uses GPIOs that conflict with this board's buzzer, RS485, and
-  relay outputs.
+  relay outputs on Waveshare hardware.
 - Keep relay outputs off by default and force them off during test teardown.
 - Use UART0 for the manual Zephyr shell. Keep USB CDC dedicated to host control
   protocol traffic, and keep UART1 available for the isolated RS485 path.
