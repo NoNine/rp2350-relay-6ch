@@ -14,6 +14,10 @@ same GitHub Release:
 - `rp2350_relay_6ch-<version>-waveshare.uf2`
 - `rp2350_relay_6ch-<version>-pico2.uf2`
 
+Use the Waveshare UF2 for RP2350-Relay-6CH and RP2350-Relay-6CH-W boards. Use
+the Pico 2 artifact only for a supported DIY target with a matching relay
+overlay.
+
 ### Firmware
 
 Flash the `.uf2` file when the board is not already running the matching
@@ -44,7 +48,7 @@ Windows PowerShell:
 python -m pip install --user pipx
 python -m pipx ensurepath
 python -m pipx install .\rp2350_relay_6ch-<version>-py3-none-any.whl
-rp2350-relay --port COM7 info
+rp2350-relay --port <serial-port> info
 ```
 
 Linux shell:
@@ -53,7 +57,7 @@ Linux shell:
 python3 -m pip install --user pipx
 python3 -m pipx ensurepath
 python3 -m pipx install ./rp2350_relay_6ch-<version>-py3-none-any.whl
-rp2350-relay --port /dev/ttyACM0 info
+rp2350-relay --port <serial-port> info
 ```
 
 Open a new terminal after `pipx ensurepath` if `rp2350-relay` is not found.
@@ -62,6 +66,55 @@ Upgrade after downloading a newer wheel with:
 ```sh
 pipx install --force ./rp2350_relay_6ch-<version>-py3-none-any.whl
 ```
+
+Run a smoke test after installing the CLI and flashing the matching firmware:
+
+```sh
+rp2350-relay --port <serial-port> smoke
+```
+
+Use `COM7`-style ports on Windows and `/dev/ttyACM0`-style ports on Linux.
+Confirm all relays are off after the command exits.
+
+### Linux Serial Permissions
+
+If Linux cannot open the serial port, the CLI may report:
+
+```text
+transport error: [Errno 13] could not open port /dev/ttyACM0: Permission denied
+```
+
+Do not use `sudo rp2350-relay` as the normal fix. The command is often installed
+for the current user, so root may not find it and may report:
+
+```text
+sudo: rp2350-relay: command not found
+```
+
+Check the device permissions and add your user to the serial-port group:
+
+```sh
+ls -l /dev/ttyACM0
+sudo usermod -aG dialout "$USER"
+```
+
+Fully log out and log back in, then verify `dialout` appears:
+
+```sh
+groups
+rp2350-relay --port <serial-port> info
+```
+
+For a temporary local workaround, grant access to the current device node:
+
+```sh
+sudo chmod a+rw /dev/ttyACM0
+```
+
+The `chmod` workaround is reset when the board is unplugged, reconnected, or the
+system reboots.
+
+## Release Artifact Notes
 
 Release maintainers build the wheel from the repository root:
 
@@ -96,24 +149,24 @@ and `6` is `CH6`.
 ## Commands
 
 ```sh
-rp2350-relay --port COM7 info
-rp2350-relay --port COM7 build-info
-rp2350-relay --port COM7 get
-rp2350-relay --port COM7 get 1
-rp2350-relay --port COM7 set 1 on
-rp2350-relay --port COM7 set 1 off
-rp2350-relay --port COM7 set-all 0x21
-rp2350-relay --port COM7 pulse 1 100
-rp2350-relay --port COM7 off-all
-rp2350-relay --port COM7 status
-rp2350-relay --port COM7 reboot
-rp2350-relay --port COM7 smoke --pulse-ms 100
+rp2350-relay --port <serial-port> info
+rp2350-relay --port <serial-port> build-info
+rp2350-relay --port <serial-port> get
+rp2350-relay --port <serial-port> get 1
+rp2350-relay --port <serial-port> set 1 on
+rp2350-relay --port <serial-port> set 1 off
+rp2350-relay --port <serial-port> set-all 0x21
+rp2350-relay --port <serial-port> pulse 1 100
+rp2350-relay --port <serial-port> off-all
+rp2350-relay --port <serial-port> status
+rp2350-relay --port <serial-port> reboot
+rp2350-relay --port <serial-port> smoke --pulse-ms 100
 ```
 
 Use JSON output for scripts:
 
 ```sh
-rp2350-relay --port COM7 --output json status
+rp2350-relay --port <serial-port> --output json status
 ```
 
 ## Hardware Smoke Test

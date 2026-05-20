@@ -92,33 +92,111 @@ Planned:
 
 ## Prerequisites
 
-- Zephyr workspace with the Zephyr SDK/toolchain installed.
-- Python 3.12 or newer with this package installed in the active environment.
-- Waveshare RP2350-Relay-6CH or RP2350-Relay-6CH-W hardware, USB access, and
-  suitable relay-side power for hardware smoke tests.
-- Safe relay-side wiring with hazardous loads disconnected during bring-up.
+Choose the path that matches your role.
 
-For first-time setup, including workspace creation, Python dependencies,
-environment variables, and verification commands, see
-[Development setup](docs/development-setup.md).
+Operators need:
+
+- Python 3.12 or newer.
+- Release artifacts from the same GitHub Release:
+  `rp2350_relay_6ch-<version>-py3-none-any.whl` and the matching `.uf2`
+  firmware image.
+- Waveshare RP2350-Relay-6CH or RP2350-Relay-6CH-W hardware with USB access.
+- Safe relay-side wiring with hazardous loads disconnected during first flash
+  and smoke test.
+
+Developers need:
+
+- Zephyr workspace with the Zephyr SDK/toolchain installed.
+- Zephyr workspace virtual environment, normally
+  `${ZEPHYR_WORKSPACE:-$HOME/zephyrproject}/.venv`.
+- This repository checked out under the Zephyr workspace.
+- Python host package dependencies installed in editable mode.
 
 ## Quick Start
 
-Build and flash:
+### Operator Quick Start
+
+Use this path to install released tools and flash released firmware. No source
+checkout or Zephyr workspace is required.
+
+1. Download the wheel and matching Waveshare UF2 from the same GitHub Release:
+   `rp2350_relay_6ch-<version>-py3-none-any.whl` and
+   `rp2350_relay_6ch-<version>-waveshare.uf2`.
+
+2. Flash the firmware.
+
+   UF2 drag-and-drop:
+
+   ```text
+   Put the board in USB bootloader mode.
+   Copy rp2350_relay_6ch-<version>-waveshare.uf2 to the mounted RP2350 drive.
+   Reconnect the board normally.
+   ```
+
+   Or use `picotool` while the board is in USB bootloader mode:
+
+   ```sh
+   picotool load -x rp2350_relay_6ch-<version>-waveshare.uf2
+   ```
+
+3. Install the CLI wheel.
+
+   Windows PowerShell:
+
+   ```powershell
+   python -m pip install --user pipx
+   python -m pipx ensurepath
+   python -m pipx install .\rp2350_relay_6ch-<version>-py3-none-any.whl
+   ```
+
+   Linux shell:
+
+   ```sh
+   python3 -m pip install --user pipx
+   python3 -m pipx ensurepath
+   python3 -m pipx install ./rp2350_relay_6ch-<version>-py3-none-any.whl
+   ```
+
+4. Verify the board from the machine connected to the USB device port:
+
+   ```sh
+   rp2350-relay --port <serial-port> info
+   rp2350-relay --port <serial-port> smoke
+   ```
+
+   Use `COM7`-style ports on Windows and `/dev/ttyACM0`-style ports on Linux.
+   If Linux reports permission denied for `/dev/ttyACM*`, add the user to
+   `dialout` and log out/in; see [CLI utility](docs/cli.md#linux-serial-permissions).
+   Confirm all relays are off after the smoke test.
+
+Full operator install, upgrade, and CLI details are in
+[CLI utility](docs/cli.md). For Pico 2 DIY firmware artifacts, see
+[Pico 2 DIY targets](docs/pico-diy-targets.md).
+
+### Developer Quick Start
+
+Use this path to build firmware and run tests from source.
+Run these commands from the repository root after completing the Zephyr setup:
 
 ```sh
+source "${ZEPHYR_WORKSPACE:-$HOME/zephyrproject}/.venv/bin/activate"
+python -m pip install -e . pytest
+scripts/test-host.sh
 scripts/build-firmware.sh
 west flash -d build/firmware
-```
-
-Smoke test:
-
-```sh
 rp2350-relay --port <serial-port> smoke
 ```
 
-CLI-only operators can install the released Python wheel and run
-`rp2350-relay` without a firmware checkout. See [docs/cli.md](docs/cli.md).
+The firmware wrapper defaults to:
+
+```text
+TARGET=waveshare
+BOARD=waveshare_rp2350_relay_6ch/rp2350b/m33
+BUILD_DIR=build/firmware
+```
+
+For first-time setup and full verification commands, see
+[Development setup](docs/development-setup.md).
 
 ## CLI Examples
 
@@ -126,13 +204,13 @@ CLI channel numbers are one-based and match board labels: `1` is `CH1` and `6`
 is `CH6`.
 
 ```sh
-rp2350-relay --port COM7 info
-rp2350-relay --port COM7 get
-rp2350-relay --port COM7 set 1 on
-rp2350-relay --port COM7 pulse 1 100
-rp2350-relay --port COM7 off-all
-rp2350-relay --port COM7 status
-rp2350-relay --port COM7 --output json status
+rp2350-relay --port <serial-port> info
+rp2350-relay --port <serial-port> get
+rp2350-relay --port <serial-port> set 1 on
+rp2350-relay --port <serial-port> pulse 1 100
+rp2350-relay --port <serial-port> off-all
+rp2350-relay --port <serial-port> status
+rp2350-relay --port <serial-port> --output json status
 ```
 
 See [docs/cli.md](docs/cli.md) for the full command list and exit codes.

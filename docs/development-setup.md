@@ -178,7 +178,7 @@ relays are off after boot, reset, smoke tests, and teardown.
   Zephyr virtual environment.
 - `west build` cannot find Zephyr: run `west zephyr-export`, set
   `ZEPHYR_WORKSPACE`, or export `ZEPHYR_BASE=/path/to/zephyrproject/zephyr`.
-- Linux flash or serial permission errors: add the required udev rules for the
-  debug probe or USB serial device, reconnect the board, and start a new shell.
+- Linux serial permission errors: add the user to `dialout`, log out and back
+  in, and see [CLI Linux serial permissions](cli.md#linux-serial-permissions).
 - Wrong serial port: check the device list before and after plugging in the
   board, then pass the new port explicitly with `--port`.
