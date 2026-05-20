@@ -7,6 +7,64 @@ release assets. The section shape is inspired by Adafruit CircuitPython release
 notes: highlights, install/assets, verification, known limitations, and safety
 notes.
 
+## 0.6.0 - 2026-05-20
+
+Release packaging and documentation update for the current relay CLI and
+firmware line.
+
+- Tag: `v0.6.0`
+- Commit: the `v0.6.0` tag target.
+
+### Highlights
+
+- Added Pico 2 and Pico 2 W DIY relay target support through explicit six-relay
+  devicetree overlays.
+- Updated the host package and firmware build metadata to version `0.6.0`.
+- Documented the required GitHub Release artifact set and shortened firmware
+  artifact names to `waveshare`, `pico2`, and optional `pico2w` qualifiers.
+- Clarified operator install and firmware flashing instructions for wheel and
+  UF2 release artifacts.
+- Added a deferred remaining-features review covering firmware upgrade,
+  signing, recovery, release, and optional status-output gaps.
+
+### Install / Assets
+
+- Install the host CLI from the GitHub Release wheel:
+  `rp2350_relay_6ch-0.6.0-py3-none-any.whl`.
+- Flash one of the matching firmware artifacts from the same release:
+  `rp2350_relay_6ch-0.6.0-waveshare.uf2` or
+  `rp2350_relay_6ch-0.6.0-pico2.uf2`.
+- The source distribution `rp2350_relay_6ch-0.6.0.tar.gz` is available as an
+  additional artifact.
+
+### Verification
+
+- Clean host package build completed with:
+  `${ZEPHYR_WORKSPACE:-$HOME/zephyrproject}/.venv/bin/python -m build`.
+- Clean Waveshare firmware build completed with `scripts/build-firmware.sh`.
+- Clean Pico 2 firmware build completed with:
+  `TARGET=pico2 RELAY_OVERLAY=firmware/boards/raspberrypi/rpi_pico2/pico2w-relay-dev.overlay scripts/build-firmware.sh`.
+- Release-named artifacts were created under `dist/`.
+- Build output included a Zephyr `hwinfo_rpi_pico.c` unused-variable warning and
+  a setuptools deprecation warning from environment configuration.
+
+### Known Limitations
+
+- MCUboot-compatible firmware upload, test-image, confirm-image, and rollback
+  workflows remain planned but not implemented.
+- Pico 2 and Pico 2 W DIY builds require explicit relay overlays and external
+  relay driver hardware.
+- RS485 and wireless host communication are not v1 control paths.
+- Application-layer authentication is not implemented; this release assumes
+  trusted local USB access.
+
+### Safety Notes
+
+- Keep hazardous relay-side loads disconnected during bring-up.
+- Confirm all relays are off after flashing, reset, smoke tests, and teardown.
+- DIY Pico targets must use relay-driver circuitry compatible with the selected
+  GPIO mapping and relay loads.
+
 ## 0.1.0 - 2026-05-17
 
 First packaged operator release for the Waveshare RP2350-Relay-6CH controller.
