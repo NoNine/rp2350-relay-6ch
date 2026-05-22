@@ -63,6 +63,22 @@ Do not retrofit completed phase plans for new direction changes. Treat completed
 `docs/phase-*-plan.md` files as historical records unless the user explicitly
 asks to correct or revise them.
 
+## Scope Discipline
+
+Treat discussion documents as idea exploration, not implementation approval.
+RAS, SmartPDU, dual-core, networking, telemetry, monitoring, aliases, audit
+logs, persistent state, and similar future-looking ideas must not become
+firmware, protocol, host, or release scope unless the user explicitly promotes
+them into the PRD, implementation plan, or a phase plan.
+
+For v1, prefer the smallest reliable product path: safe local relay control,
+deterministic host RPC, firmware update/rollback, and narrowly justified
+watchdog or health checks. Put operator ergonomics such as aliases, sequences,
+monitoring, and support bundles in host tooling before adding firmware
+complexity. Do not add network control, persistent relay-on state, telemetry
+claims, SmartPDU-like mains-power behavior, or dual-core isolation as
+incidental follow-up work.
+
 ## Testing Guidelines
 
 Every phase should leave the repo buildable and testable. Firmware tests should

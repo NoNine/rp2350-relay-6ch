@@ -186,3 +186,21 @@ custom relay management group and MCUmgr enumeration support.
    ```sh
    python tools/usb_rpc_smoke.py --port "$PORT" off-all
    ```
+
+## Optional Local Indicator Checks
+
+Run these checks only on firmware that enables the RGB LED and buzzer status
+indicator feature documented in
+[status-indicators.md](../status-indicators.md).
+
+- After boot and USB RPC initialization, confirm the RGB LED reaches the ready
+  state and no buzzer alarm is active.
+- While a relay is commanded on or pulsing, confirm the RGB LED shows the
+  relay-active state. Treat this as commanded state only, not verified load
+  power or contact closure.
+- After a valid command, confirm any command-accepted indication is brief and
+  does not delay the RPC response.
+- After invalid-channel or invalid-pulse checks, confirm any rejected-command
+  buzzer feedback is bounded and the device remains responsive to `status`.
+- Before teardown, run `off_all` and confirm the RGB LED no longer indicates an
+  active relay state.

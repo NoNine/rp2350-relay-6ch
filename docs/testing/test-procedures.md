@@ -46,4 +46,6 @@ operator PC, for example `COM7`.
 
 See [relay-smoke-test.md](relay-smoke-test.md) for manual relay checks and
 [usb-rpc-smoke-test.md](usb-rpc-smoke-test.md) for USB RPC bring-up checks.
+When local indicator support is enabled, also check
+[status-indicators.md](../status-indicators.md) during hardware smoke testing.
 Phase verification reports live in `docs/testing/phase-*-verification.md`.

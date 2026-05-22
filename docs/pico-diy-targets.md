@@ -61,6 +61,25 @@ Use `GPIO_ACTIVE_LOW` only when the external relay interface is proven
 active-low. The host CLI still uses one-based channel numbers: `1` is `CH1`
 and `6` is `CH6`.
 
+## Pico 2 W Indicator Development Fixture
+
+Pico 2 W may be used as the Phase 7 development fixture for the planned RGB
+LED and buzzer status-indicator feature. This note documents wiring constraints
+only. It does not imply firmware support, devicetree overlay support, build
+configuration, or runtime indicator behavior.
+
+The current relay example overlay keeps `CH1` through `CH6` on GP2 through
+GP7. RGB LED and buzzer fixture wiring must use separate GPIOs and must avoid
+the Pico 2 W Wi-Fi pins GP23, GP24, GP25, and GP29. Keep UART0 GP0 and GP1
+available for debug console use.
+
+Concrete indicator fixture wiring is still to be assigned:
+
+| Function | Pico 2 W GPIO |
+| --- | --- |
+| RGB LED data | `TBD by development fixture wiring` |
+| Buzzer active-high output | `TBD by development fixture wiring` |
+
 ## Build And Flash
 
 Build Pico 2 with an explicit relay overlay:

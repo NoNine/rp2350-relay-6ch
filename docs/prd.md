@@ -65,8 +65,8 @@ RP2350B-based RP2350-Relay-6CH board with six active-high relay GPIOs:
 - Firmware shall support the board USB device connector as the primary host
   communication path.
 - Firmware should expose the active-high buzzer on GPIO23 and WS2812 RGB LED on
-  GPIO36 for status indication, if doing so does not interfere with the relay
-  control and RPC requirements.
+  GPIO36 for local status indication, if doing so does not interfere with the
+  relay control and RPC requirements.
 - Firmware shall not assume MCU-side `GND` and isolated RS485/relay-side `SGND`
   are the same domain.
 
@@ -103,7 +103,25 @@ the needed behavior:
 - A communication-loss safety mechanism, such as a command/session timeout that
   turns all relays off, is not a current project requirement.
 
-### 5.3 Protocol
+### 5.3 Local Status Indicators
+
+- The RGB LED shall indicate controller-level state only, such as booting,
+  ready, command accepted, relay-active, degraded, update in progress, or fault.
+- The RGB LED shall not imply measured relay contact closure, load voltage,
+  load current, or external equipment state.
+- A relay-active RGB LED indication shall mean one or more relays are commanded
+  on or pulsing.
+- The buzzer shall be reserved for local attention and explicit user operation
+  feedback. Routine relay toggles shall not generate audible feedback by
+  default.
+- Buzzer alerts shall be bounded by a timeout or silence policy. Firmware shall
+  not generate an indefinite alarm without an operator-controlled silence path.
+- Indicator failures shall not block relay control, `off-all`, pulse teardown,
+  reboot handling, or RPC responses.
+- Host-visible status and command responses remain authoritative for automation
+  and troubleshooting.
+
+### 5.4 Protocol
 
 The device protocol shall be based on Zephyr MCUmgr/SMP:
 
@@ -136,7 +154,7 @@ Required firmware-update commands may use Zephyr's standard MCUmgr image
 management group where available instead of duplicating image upload semantics
 inside the custom relay group.
 
-### 5.4 Error Handling
+### 5.5 Error Handling
 
 - Invalid CBOR payloads shall return decode errors.
 - Unknown command IDs shall return command-not-supported errors.
@@ -308,7 +326,23 @@ Acceptance criteria:
 - CLI can run hardware smoke tests for all six relays.
 - CLI is suitable for scripted debug and manufacturing checks.
 
-### Phase 7: Firmware Upgrade Foundation
+### Phase 7: Local Status Indicators
+
+- Enable the RGB LED and buzzer where supported by the target hardware.
+- Implement controller-level RGB LED states for boot, ready, command accepted,
+  relay-active, degraded, update, and fault conditions.
+- Keep buzzer feedback quiet by default, bounded, and reserved for local
+  attention or explicit operator feedback.
+- Ensure indicator failures do not affect relay control, `off-all`, pulse
+  teardown, reboot handling, or RPC responses.
+
+Acceptance criteria:
+
+- Firmware tests cover RGB LED state priority and buzzer feedback mapping.
+- Existing relay, relay-management, host, and CLI tests still pass.
+- Hardware smoke checks verify local indicators without leaving relays on.
+
+### Phase 8: Firmware Upgrade Foundation
 
 - Add MCUboot bootloader integration.
 - Define flash partition layout for A/B slots.
@@ -322,7 +356,7 @@ Acceptance criteria:
 - Device boots a signed application image.
 - Relay defaults remain off with MCUboot enabled.
 
-### Phase 8: Host Firmware Upload And Rollback Workflow
+### Phase 9: Host Firmware Upload And Rollback Workflow
 
 - Add Python and CLI wrappers for standard MCUmgr image upload and image state.
 - Implement test-image, reboot, health-check, confirm, and rollback behavior.
@@ -349,6 +383,9 @@ Acceptance criteria:
   codes, and representative relay/update commands.
 - Hardware smoke tests shall verify all six relays can be controlled
   independently and that reset returns relays off.
+- Local-indicator tests shall verify RGB LED state-priority behavior, buzzer
+  feedback patterns, and that indicator failures do not affect relay safety or
+  host RPC behavior when the feature is enabled.
 - Upgrade tests shall verify valid upload, invalid image rejection, pending/test
   boot, image confirmation, rollback after no confirmation, and interrupted
   upload recovery.
@@ -359,6 +396,8 @@ Acceptance criteria:
 - Document protocol version, group ID, command IDs, CBOR fields, and error
   codes.
 - Document host library API and CLI usage.
+- Document RGB LED and buzzer status meanings before enabling local indicator
+  support in released firmware.
 - Document firmware signing and upgrade workflow.
 - Document recovery procedure for failed update attempts.
 - Document known limitations for v1, including lack of RS485 and wireless

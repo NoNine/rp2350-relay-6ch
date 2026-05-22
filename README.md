@@ -76,8 +76,8 @@ Planned:
 - Host library and CLI firmware image upload, test-image, and confirm-image
   workflows.
 - Firmware signing, flashing, and release helper scripts.
-- Optional status outputs for the buzzer and WS2812 RGB LED if they do not
-  interfere with relay control or RPC behavior.
+- Optional local status indicators for the buzzer and WS2812 RGB LED if they
+  do not interfere with relay control or RPC behavior.
 
 ## Current Status
 
@@ -235,6 +235,7 @@ docs/       Requirements, hardware notes, phase plans, protocol, and tests
 - [Relay management protocol](docs/protocol/relay-management.md)
 - [Host library](docs/host-library.md)
 - [CLI utility](docs/cli.md)
+- [Status indicators](docs/status-indicators.md)
 - [Test procedures](docs/testing/test-procedures.md)
 - [Relay smoke test](docs/testing/relay-smoke-test.md)
 - [USB RPC smoke test](docs/testing/usb-rpc-smoke-test.md)

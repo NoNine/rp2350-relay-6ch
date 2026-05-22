@@ -26,12 +26,13 @@ verification status.
   invalid signature rejection, no-confirm rollback, unhealthy-image rollback,
   and relay default-off behavior after each boot path.
 - Ownership decision for optional buzzer and WS2812 RGB LED status outputs,
-  which are listed as planned but are not assigned to a remaining phase.
+  which were listed as planned but were not assigned to a remaining phase.
+  Resolved in the follow-up notes below.
 
 ## Ambiguities To Resolve Before Implementation
 
-- Whether Phase 7 and Phase 8 apply only to the Waveshare board targets or also
-  to Pico 2 and Pico 2 W DIY relay targets.
+- Whether firmware upgrade Phases 8 and 9 apply only to the Waveshare board
+  targets or also to Pico 2 and Pico 2 W DIY relay targets.
 - Which firmware artifact format is uploaded by the host workflow: signed
   binary, unsigned binary plus signing step, HEX, UF2, or multiple formats.
 - Whether image confirmation is fully automatic after firmware health checks,
@@ -47,8 +48,8 @@ verification status.
 
 ## Source Context
 
-- [Implementation plan](implementation-plan.md) currently defines Phase 7 as
-  firmware upgrade foundation and Phase 8 as host firmware upload and rollback.
+- [Implementation plan](implementation-plan.md) currently defines Phase 8 as
+  firmware upgrade foundation and Phase 9 as host firmware upload and rollback.
 - [Product requirements](prd.md) require A/B firmware upgrade, signed images,
   inactive-slot upload, test boot, confirmation, rollback, and minimum health
   checks before confirmation.
@@ -56,3 +57,10 @@ verification status.
   workflows, release helper scripts, and optional status outputs as planned.
 - [CLI documentation](cli.md) currently documents release UF2 flashing and wheel
   installation, but not in-field upload commands.
+
+## Follow-Up Resolution
+
+- RGB LED and buzzer ownership is assigned to Phase 7 in
+  [implementation-plan.md](implementation-plan.md).
+- Operator-facing RGB LED and buzzer meanings are documented in
+  [status-indicators.md](status-indicators.md).

@@ -298,7 +298,44 @@ Deliverables:
 - CLI entry point under `tools/`.
 - Usage documentation in `docs/cli.md`.
 
-## Phase 7: Firmware Upgrade Foundation
+## Phase 7: Local Status Indicators
+
+Purpose: add controller-level RGB LED and buzzer feedback as the next product
+phase without changing relay safety semantics or host RPC authority.
+
+Implementation scope:
+
+- Enable the Waveshare WS2812 RGB LED and active-high buzzer nodes only for
+  targets that define the hardware.
+- Add a small indicator module with RGB state-priority handling for boot,
+  ready, command accepted, relay-active, degraded, update, and fault states.
+- Keep buzzer feedback quiet by default or explicitly configurable, with no
+  continuous alarm unless a timeout or silence policy is implemented.
+- Ensure indicator errors are logged but never block relay control, `off-all`,
+  pulse teardown, reboot handling, or RPC responses.
+- Keep the status-indicator manual in `docs/status-indicators.md` aligned with
+  implemented behavior.
+
+Tests/gates:
+
+- Firmware tests cover RGB state priority and buzzer event mapping.
+- Relay and relay-management tests still pass with indicators enabled.
+- Hardware smoke testing verifies boot, ready, command-accepted, relay-active,
+  rejected-command, update/reboot, and fault/attention indications where those
+  states are available.
+
+Dependencies:
+
+- Phase 6 complete for host-visible command and status workflows.
+- Indicator behavior documented before release.
+
+Deliverables:
+
+- Indicator firmware module and target configuration.
+- Operator manual in `docs/status-indicators.md`.
+- Indicator checks added to hardware smoke-test procedures.
+
+## Phase 8: Firmware Upgrade Foundation
 
 Purpose: add A/B update primitives without yet relying on automatic rollback
 for product safety.
@@ -334,7 +371,7 @@ Deliverables:
 - Partition documentation in `docs/firmware-upgrade.md`.
 - Signing/build script updates under `scripts/`.
 
-## Phase 8: Host Firmware Upload And Rollback Workflow
+## Phase 9: Host Firmware Upload And Rollback Workflow
 
 Purpose: complete the PRD update workflow through the Python API and CLI.
 
@@ -381,6 +418,8 @@ Deliverables:
 - `docs/host-library.md`: Python API, exceptions, connection behavior, retry
   behavior, and examples.
 - `docs/cli.md`: command usage, output modes, exit codes, and examples.
+- `docs/status-indicators.md`: RGB LED meanings, buzzer patterns, limitations,
+  and troubleshooting.
 - `docs/firmware-upgrade.md`: signing, upload, test boot, confirmation, and
   rollback.
 - `docs/recovery.md`: failed update and manual recovery procedures.

@@ -175,6 +175,13 @@ The `smoke` command queries the controller, pulses `CH1` through `CH6`, and
 attempts final `off-all` teardown. Keep relay loads disconnected during
 bring-up and confirm all relays are off after the command exits.
 
+## Local Status Indicators
+
+The operator manual for the planned RGB LED and buzzer behavior is
+[Status indicators](status-indicators.md). Current firmware defines the
+hardware but leaves both indicators disabled; use CLI command responses and
+`status` output as the source of truth.
+
 ## Exit Codes
 
 - `0`: success.
