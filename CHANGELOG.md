@@ -7,6 +7,68 @@ release assets. The section shape is inspired by Adafruit CircuitPython release
 notes: highlights, install/assets, verification, known limitations, and safety
 notes.
 
+## 0.7.0 - 2026-05-24
+
+Local status indicator release for the current relay CLI and firmware line.
+
+- Tag: `v0.7.0`
+- Commit: the `v0.7.0` tag target.
+
+### Highlights
+
+- Added controller-level RGB LED and passive buzzer status indication.
+- Added indicator priority handling for boot, ready, relay-active, command
+  feedback, update/reboot, degraded, and fault conditions.
+- Added Waveshare RP2350-Relay-6CH indicator GPIO definitions for the WS2812
+  RGB LED and passive buzzer.
+- Added a Pico 2 W relay development fixture overlay for indicator hardware
+  verification.
+- Added host status output for indicator availability.
+- Recorded Phase 7 Pico 2 W indicator verification.
+
+### Install / Assets
+
+- Install the host CLI from the GitHub Release wheel:
+  `rp2350_relay_6ch-0.7.0-py3-none-any.whl`.
+- Flash one of the matching firmware artifacts from the same release:
+  `rp2350_relay_6ch-0.7.0-waveshare.uf2` or
+  `rp2350_relay_6ch-0.7.0-pico2.uf2`.
+- The source distribution `rp2350_relay_6ch-0.7.0.tar.gz` is available as an
+  additional artifact.
+
+### Verification
+
+- Clean host tests completed with `scripts/test-host.sh`.
+- Clean relay firmware unit tests built and passed under `native_sim`.
+- Clean relay-management firmware unit tests built and passed under
+  `native_sim`.
+- Clean indicator firmware unit tests built and passed under `native_sim`.
+- Clean host package build completed with `python -m build`.
+- Clean Waveshare firmware build completed with `scripts/build-firmware.sh
+  --pristine`.
+- Clean Pico 2 firmware build completed with `TARGET=pico2
+  RELAY_OVERLAY=firmware/boards/raspberrypi/rpi_pico2/pico2w-relay-dev.overlay
+  scripts/build-firmware.sh --pristine`.
+
+### Known Limitations
+
+- MCUboot-compatible firmware upload, test-image, confirm-image, and rollback
+  workflows remain planned but not implemented.
+- Communication-loss safety and daemon mode remain planned but not implemented.
+- Pico 2 and Pico 2 W DIY builds require explicit relay overlays and external
+  relay driver hardware.
+- RS485 and wireless host communication are not v1 control paths.
+- Application-layer authentication is not implemented; this release assumes
+  trusted local USB access.
+
+### Safety Notes
+
+- Keep hazardous relay-side loads disconnected during bring-up.
+- Confirm all relays are off after flashing, reset, smoke tests, and teardown.
+- Local indicators report controller state and commanded relay state only; they
+  do not measure contact closure, load voltage, load current, or external
+  equipment health.
+
 ## 0.6.0 - 2026-05-20
 
 Release packaging and documentation update for the current relay CLI and
