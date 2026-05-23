@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: Apache-2.0
+
+mainmenu "RP2350 Relay 6CH application"
+
+config RP2350_RELAY_6CH_INDICATORS
+	bool "Enable local RGB LED and buzzer status indicators"
+	default y
+	depends on LED_STRIP && PWM
+	help
+	  Enable controller-level local status indication using the board's
+	  WS2812 RGB LED and passive PWM buzzer when those devices are present.
+
+config RP2350_RELAY_6CH_BUZZER_FEEDBACK
+	bool "Enable local buzzer command feedback"
+	depends on RP2350_RELAY_6CH_INDICATORS
+	default n
+	help
+	  Enable bounded audible command feedback. Leave this disabled for
+	  quiet-by-default normal builds.
+
+source "Kconfig.zephyr"

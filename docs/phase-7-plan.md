@@ -78,16 +78,17 @@ Buzzer policy:
 
 Hardware and integration:
 
-- Enable the buzzer on GPIO23 and WS2812 RGB LED on GPIO36 only for supported
-  Waveshare targets that define those devices.
-- Model the buzzer as a passive PWM-driven device on GPIO23. Silent means PWM
-  output disabled or zero duty; audible feedback uses bounded tone windows.
+- Enable indicators only for supported targets that define the devices.
+  Waveshare uses the buzzer on GPIO23 and WS2812 RGB LED on GPIO36; the Pico 2
+  W development fixture uses buzzer PWM on GP9 and WS2812 RGB LED on GP8.
+- Model the buzzer as a passive PWM-driven device. Silent means PWM output
+  disabled or zero duty; audible feedback uses bounded tone windows.
 - Use Zephyr `led_strip_update_rgb()` for the WS2812 RGB LED.
 - Use Zephyr's RP2350-compatible `worldsemi,ws2812-rpi_pico-pio` binding for
   the RGB LED, with an enabled PIO node and a pinctrl group for `PIO*_P36`.
   Do not use `worldsemi,ws2812-gpio` on RP2350; Zephyr's GPIO bit-bang driver
   is not the RP2350 path.
-- Keep GPIO36 dedicated to RGB LED data and GPIO23 dedicated to the buzzer. Do
+- Keep the target-specific RGB LED and buzzer GPIOs dedicated to indicators. Do
   not assign relay GPIO26 through GPIO31 to alternate functions.
 - Add the required LED strip and PIO configuration only for targets that support
   the hardware.
@@ -139,10 +140,10 @@ nonblocking presentation layer:
 
 ## Pico 2 W Development Fixture
 
-Pico 2 W may be used as the Phase 7 development fixture before testing on
-Waveshare RP2350-Relay-6CH hardware. This is a documentation note only; it does
-not add firmware overlays, devicetree nodes, build configuration, or runtime
-indicator behavior.
+Pico 2 W is the first Phase 7 hardware verification fixture before testing on
+Waveshare RP2350-Relay-6CH hardware. The repository already provides the
+fixture devicetree overlay at
+`firmware/boards/raspberrypi/rpi_pico2/pico2w-relay-dev.overlay`.
 
 Fixture pin assignments must follow these constraints:
 
@@ -150,9 +151,9 @@ Fixture pin assignments must follow these constraints:
 - Do not collide with the current example relay overlay pins GP2 through GP7.
 - Keep UART0 GP0 and GP1 available for debug console use.
 - Keep RGB LED data and buzzer GPIOs separate from relay outputs.
-- Record concrete fixture wiring as:
-  - RGB LED data: `TBD by development fixture wiring`
-  - Buzzer PWM output: `TBD by development fixture wiring`
+- Use the existing fixture wiring:
+  - RGB LED data: `GP8` via PIO1.
+  - Buzzer PWM output: `GP9` via PWM slice 4B.
 
 ## Acceptance Checks
 
@@ -163,6 +164,8 @@ west build -s firmware/tests/relay -b native_sim -d build/firmware-tests/relay
 build/firmware-tests/relay/zephyr/zephyr.exe
 west build -s firmware/tests/relay_mgmt -b native_sim -d build/firmware-tests/relay-mgmt
 build/firmware-tests/relay-mgmt/zephyr/zephyr.exe
+west build -s firmware/tests/indicator -b native_sim -d build/firmware-tests/indicator
+build/firmware-tests/indicator/zephyr/zephyr.exe
 ```
 
 Expected results:

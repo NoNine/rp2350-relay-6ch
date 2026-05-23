@@ -11,6 +11,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/util.h>
 
+#include <rp2350_relay_6ch/indicator.h>
 #include <rp2350_relay_6ch/relay.h>
 
 LOG_MODULE_REGISTER(rp2350_relay, LOG_LEVEL_INF);
@@ -53,6 +54,11 @@ static struct relay_pulse_work relay_pulses[] = {
 static bool channel_valid(uint8_t channel)
 {
 	return channel < ARRAY_SIZE(relays);
+}
+
+static void publish_indicator_state(uint8_t state_mask, uint8_t pulse_mask)
+{
+	indicator_set_relay_state(state_mask, pulse_mask);
 }
 
 static int apply_state_locked(uint8_t state_mask)
@@ -108,6 +114,9 @@ static void pulse_expired(struct k_work *work)
 	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
 	struct relay_pulse_work *pulse =
 		CONTAINER_OF(dwork, struct relay_pulse_work, work);
+	uint8_t state_mask = 0U;
+	uint8_t pulse_mask = 0U;
+	bool publish = false;
 	int ret;
 
 	k_mutex_lock(&relay_lock, K_FOREVER);
@@ -118,7 +127,16 @@ static void pulse_expired(struct k_work *work)
 
 	relay_pulse_mask &= (uint8_t)~BIT(pulse->channel);
 	ret = set_channel_locked(pulse->channel, false);
+	if (ret == 0) {
+		state_mask = relay_state_mask;
+		pulse_mask = relay_pulse_mask;
+		publish = true;
+	}
 	k_mutex_unlock(&relay_lock);
+
+	if (publish) {
+		publish_indicator_state(state_mask, pulse_mask);
+	}
 
 	if (ret < 0) {
 		LOG_ERR("Failed to end relay %u pulse: %d",
@@ -152,6 +170,7 @@ int relay_init(void)
 
 	relay_state_mask = 0U;
 	relay_pulse_mask = 0U;
+	publish_indicator_state(relay_state_mask, relay_pulse_mask);
 	LOG_INF("Initialized %u relays off", (unsigned int)ARRAY_SIZE(relays));
 
 	return 0;
@@ -211,6 +230,8 @@ int relay_is_pulsing(uint8_t channel, bool *pulsing)
 
 int relay_set(uint8_t channel, bool on)
 {
+	uint8_t state_mask = 0U;
+	uint8_t pulse_mask = 0U;
 	int ret;
 
 	if (!channel_valid(channel)) {
@@ -220,13 +241,23 @@ int relay_set(uint8_t channel, bool on)
 	k_mutex_lock(&relay_lock, K_FOREVER);
 	cancel_pulses_locked(BIT(channel));
 	ret = set_channel_locked(channel, on);
+	if (ret == 0) {
+		state_mask = relay_state_mask;
+		pulse_mask = relay_pulse_mask;
+	}
 	k_mutex_unlock(&relay_lock);
+
+	if (ret == 0) {
+		publish_indicator_state(state_mask, pulse_mask);
+	}
 
 	return ret;
 }
 
 int relay_set_all(uint8_t state_mask)
 {
+	uint8_t next_state_mask = 0U;
+	uint8_t pulse_mask = 0U;
 	int ret;
 
 	if ((state_mask & ~BIT_MASK(ARRAY_SIZE(relays))) != 0U) {
@@ -236,7 +267,15 @@ int relay_set_all(uint8_t state_mask)
 	k_mutex_lock(&relay_lock, K_FOREVER);
 	cancel_pulses_locked(BIT_MASK(ARRAY_SIZE(relays)));
 	ret = apply_state_locked(state_mask);
+	if (ret == 0) {
+		next_state_mask = relay_state_mask;
+		pulse_mask = relay_pulse_mask;
+	}
 	k_mutex_unlock(&relay_lock);
+
+	if (ret == 0) {
+		publish_indicator_state(next_state_mask, pulse_mask);
+	}
 
 	return ret;
 }
@@ -248,6 +287,8 @@ int relay_off_all(void)
 
 int relay_pulse(uint8_t channel, uint32_t duration_ms)
 {
+	uint8_t state_mask = 0U;
+	uint8_t pulse_mask = 0U;
 	int ret;
 
 	if (!channel_valid(channel)) {
@@ -272,9 +313,16 @@ int relay_pulse(uint8_t channel, uint32_t duration_ms)
 		if (ret < 0) {
 			relay_pulse_mask &= (uint8_t)~BIT(channel);
 			(void)set_channel_locked(channel, false);
+		} else {
+			state_mask = relay_state_mask;
+			pulse_mask = relay_pulse_mask;
 		}
 	}
 	k_mutex_unlock(&relay_lock);
+
+	if (ret >= 0) {
+		publish_indicator_state(state_mask, pulse_mask);
+	}
 
 	return ret < 0 ? ret : 0;
 }

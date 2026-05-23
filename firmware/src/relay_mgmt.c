@@ -24,6 +24,7 @@
 #include <zcbor_encode.h>
 
 #include <rp2350_relay_6ch/build_info.h>
+#include <rp2350_relay_6ch/indicator.h>
 #include <rp2350_relay_6ch/relay.h>
 #include <rp2350_relay_6ch/relay_mgmt.h>
 
@@ -51,6 +52,26 @@ static bool encode_relay_error(zcbor_state_t *zse,
 	return smp_add_cmd_err(zse, RP2350_RELAY_6CH_MGMT_GROUP_ID, error);
 }
 
+static void record_error_indicator(enum rp2350_relay_6ch_mgmt_err error)
+{
+	switch (error) {
+	case RP2350_RELAY_6CH_MGMT_ERR_INVALID_ARGUMENT:
+	case RP2350_RELAY_6CH_MGMT_ERR_DECODE:
+	case RP2350_RELAY_6CH_MGMT_ERR_REBOOT_UNAVAILABLE:
+		indicator_record_command(INDICATOR_COMMAND_REJECTED);
+		break;
+	case RP2350_RELAY_6CH_MGMT_ERR_BUSY:
+		indicator_record_command(INDICATOR_COMMAND_BUSY);
+		break;
+	case RP2350_RELAY_6CH_MGMT_ERR_RELAY_IO:
+		indicator_set_fault(true);
+		break;
+	case RP2350_RELAY_6CH_MGMT_ERR_OK:
+	default:
+		break;
+	}
+}
+
 static int error_response(zcbor_state_t *zse,
 			  enum rp2350_relay_6ch_mgmt_err error)
 {
@@ -67,6 +88,8 @@ static int error_response(zcbor_state_t *zse,
 	default:
 		break;
 	}
+
+	record_error_indicator(error);
 
 	return encode_relay_error(zse, error) ? MGMT_ERR_EOK : MGMT_ERR_EMSGSIZE;
 }
@@ -131,6 +154,7 @@ static int encode_state_or_error(zcbor_state_t *zse)
 	}
 
 	counter_inc(RELAY_MGMT_COUNTER_SUCCEEDED);
+	indicator_record_command(INDICATOR_COMMAND_ACCEPTED);
 	return MGMT_ERR_EOK;
 }
 
@@ -188,6 +212,7 @@ static int info_handler(struct smp_streamer *ctxt)
 	}
 
 	counter_inc(RELAY_MGMT_COUNTER_SUCCEEDED);
+	indicator_record_command(INDICATOR_COMMAND_ACCEPTED);
 	return MGMT_ERR_EOK;
 }
 
@@ -239,6 +264,7 @@ static int get_handler(struct smp_streamer *ctxt)
 	}
 
 	counter_inc(RELAY_MGMT_COUNTER_SUCCEEDED);
+	indicator_record_command(INDICATOR_COMMAND_ACCEPTED);
 	return MGMT_ERR_EOK;
 }
 
@@ -392,6 +418,7 @@ static int status_handler(struct smp_streamer *ctxt)
 	}
 
 	counter_inc(RELAY_MGMT_COUNTER_SUCCEEDED);
+	indicator_record_command(INDICATOR_COMMAND_ACCEPTED);
 	return MGMT_ERR_EOK;
 }
 
@@ -434,6 +461,9 @@ static int reboot_handler(struct smp_streamer *ctxt)
 
 #ifdef CONFIG_REBOOT
 	counter_inc(RELAY_MGMT_COUNTER_SUCCEEDED);
+	indicator_set_reboot_pending(true);
+#else
+	record_error_indicator(RP2350_RELAY_6CH_MGMT_ERR_REBOOT_UNAVAILABLE);
 #endif
 	return MGMT_ERR_EOK;
 }
@@ -470,6 +500,7 @@ static int build_info_handler(struct smp_streamer *ctxt)
 	}
 
 	counter_inc(RELAY_MGMT_COUNTER_SUCCEEDED);
+	indicator_record_command(INDICATOR_COMMAND_ACCEPTED);
 	return MGMT_ERR_EOK;
 }
 

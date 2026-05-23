@@ -3,9 +3,9 @@
 This page is the operator manual for the RP2350-Relay-6CH local RGB LED and
 buzzer behavior.
 
-Current firmware defines the buzzer and WS2812 RGB LED hardware in devicetree,
-but leaves both disabled. The behavior below is the required operator-facing
-meaning for the planned indicator feature once firmware support is implemented.
+Current firmware enables local status indication when the target devicetree
+provides the WS2812 RGB LED or passive buzzer devices. Buzzer command feedback
+is quiet by default unless explicitly enabled at build time.
 
 The indicators are local diagnostics. They help an operator answer whether the
 controller is alive, ready, handling a command, degraded, updating, or faulted.
@@ -40,7 +40,7 @@ rollback workflows.
 | Brief green blink | A valid host command was accepted. | No action unless the host reports an error. |
 | Solid cyan or blue | One or more relays are commanded on, or a pulse is active. | Confirm this matches the intended operation. Use `rp2350-relay status` for the commanded state mask. |
 | Yellow pulse | Degraded or attention state, such as RPC not ready, repeated invalid requests, busy pulse rejection, or pending update attention. | Query `rp2350-relay status` and review the host command result. |
-| Purple or blue animation | Reserved for Phase 8/9 firmware upgrade support: upload, test-image, reboot, confirmation, or rollback workflow active. | Do not remove power unless following a documented recovery procedure. |
+| Purple or blue animation | Controlled reboot is pending, or reserved Phase 8/9 firmware upgrade support is active. | Do not remove power unless following a documented recovery procedure. |
 | Red blink | Firmware or hardware fault requiring attention. Relays should be off unless the fault occurred after an explicit command state. | Run `rp2350-relay status` if reachable, then force `off-all` before inspecting wiring or logs. |
 
 The cyan or blue relay-active indication means commanded relay state only. It
@@ -58,7 +58,7 @@ background heartbeat.
 | Silent | Normal default, buzzer disabled, or PWM output off/zero duty. | No action. |
 | One short beep | Operation accepted. This feedback is allowed only when buzzer feedback is explicitly enabled. | No action unless the host reports an error. |
 | Two short beeps | Command rejected or validation error. | Check the CLI error, command arguments, channel number, pulse duration, and current relay pulse state. |
-| Three short beeps | Reserved for Phase 8/9 firmware upgrade support: update stage transition or controlled reboot scheduled. | Wait for the board to return and verify `info` or `status`. |
+| Three short beeps | Controlled reboot scheduled, or reserved Phase 8/9 firmware upgrade support. | Wait for the board to return and verify `info` or `status`. |
 | Time-limited repeating chirp | Fault or local attention condition. | Silence or power down according to site procedure, then run status/recovery checks. |
 
 The firmware must not generate a continuous alarm without a timeout or silence

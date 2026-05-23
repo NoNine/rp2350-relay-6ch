@@ -177,10 +177,9 @@ bring-up and confirm all relays are off after the command exits.
 
 ## Local Status Indicators
 
-The operator manual for the planned RGB LED and buzzer behavior is
-[Status indicators](status-indicators.md). Current firmware defines the
-hardware but leaves both indicators disabled; use CLI command responses and
-`status` output as the source of truth.
+The operator manual for RGB LED and buzzer behavior is
+[Status indicators](status-indicators.md). Local indicators are diagnostic aids;
+use CLI command responses and `status` output as the source of truth.
 
 ## Exit Codes
 
