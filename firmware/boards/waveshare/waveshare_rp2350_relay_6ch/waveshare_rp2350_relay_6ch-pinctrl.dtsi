@@ -60,6 +60,12 @@
 		};
 	};
 
+	ws2812_pio1_default: ws2812_pio1_default {
+		group1 {
+			pinmux = <PIO1_P36>;
+		};
+	};
+
 	adc_default: adc_default {
 		group1 {
 			pinmux = <ADC_CH0_P40>, <ADC_CH1_P41>, <ADC_CH2_P42>, <ADC_CH3_P43>,

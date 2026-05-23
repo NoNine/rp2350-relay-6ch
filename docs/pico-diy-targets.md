@@ -64,9 +64,9 @@ and `6` is `CH6`.
 ## Pico 2 W Indicator Development Fixture
 
 Pico 2 W may be used as the Phase 7 development fixture for the planned RGB
-LED and buzzer status-indicator feature. This note documents wiring constraints
-only. It does not imply firmware support, devicetree overlay support, build
-configuration, or runtime indicator behavior.
+LED and buzzer status-indicator feature. This fixture mapping provides
+devicetree hardware definitions only. It does not imply runtime indicator
+behavior.
 
 The current relay example overlay keeps `CH1` through `CH6` on GP2 through
 GP7. RGB LED and buzzer fixture wiring must use separate GPIOs and must avoid
@@ -76,12 +76,13 @@ available for debug console use.
 Do not copy the Waveshare board's GPIO23 buzzer assignment to a Pico 2 W
 fixture. Choose a non-Wi-Fi PWM-capable GPIO for the passive buzzer.
 
-Concrete indicator fixture wiring is still to be assigned:
+The repository's Pico 2 W relay development overlay assigns concrete indicator
+fixture pins:
 
 | Function | Pico 2 W GPIO |
 | --- | --- |
-| RGB LED data | `TBD by development fixture wiring` |
-| Buzzer PWM output | `TBD by development fixture wiring` |
+| RGB LED data | `GP8` via PIO1 |
+| Buzzer PWM output | `GP9` via PWM slice 4B |
 
 ## Build And Flash
 

@@ -16,9 +16,9 @@
 		clocks = <&clocks RPI_PICO_CLKID_CLK_SYS>;
 		#address-cells = <1>;
 		#size-cells = <0>;
-		cs-gpios = <&gpio0_hi 2 GPIO_ACTIVE_LOW>;
-		clk-gpios = <&gpio0_hi 3 GPIO_ACTIVE_HIGH>;
-		sio-gpios = <&gpio0_hi 1 GPIO_ACTIVE_HIGH>;
+		cs-gpios = <&gpio0_hi 2 GPIO_ACTIVE_LOW>;	/* GP34 */
+		clk-gpios = <&gpio0_hi 3 GPIO_ACTIVE_HIGH>;	/* GP35 */
+		sio-gpios = <&gpio0_hi 1 GPIO_ACTIVE_HIGH>;	/* GP33 */
 		pinctrl-0 = <&pio0_spi0_default>;
 		pinctrl-names = "default";
 		status = "okay";
@@ -26,9 +26,9 @@
 		airoc-wifi@0 {
 			compatible = "infineon,airoc-wifi";
 			reg = <0>;
-			wifi-reg-on-gpios = <&gpio0_hi 0 GPIO_ACTIVE_HIGH>;
-			bus-select-gpios = <&gpio0_hi 1 GPIO_ACTIVE_HIGH>;
-			wifi-host-wake-gpios = <&gpio0_hi 1 GPIO_ACTIVE_HIGH>;
+			wifi-reg-on-gpios = <&gpio0_hi 0 GPIO_ACTIVE_HIGH>;	/* GP32 */
+			bus-select-gpios = <&gpio0_hi 1 GPIO_ACTIVE_HIGH>;	/* GP33 */
+			wifi-host-wake-gpios = <&gpio0_hi 1 GPIO_ACTIVE_HIGH>;	/* GP33 */
 			spi-max-frequency = <10000000>;
 			spi-half-duplex;
 			spi-data-irq-shared;

@@ -4,7 +4,21 @@
  * Example Raspberry Pi Pico 2 / Pico 2 W DIY relay overlay.
  */
 
+#include <freq.h>
+#include <zephyr/dt-bindings/led/led.h>
+#include <zephyr/dt-bindings/pinctrl/rpi-pico-rp2350a-pinctrl.h>
+#include <zephyr/dt-bindings/pwm/pwm.h>
+
 / {
+	aliases {
+		led-strip = &rgb_led;
+	};
+
+	zephyr,user {
+		/* Passive buzzer fixture output: GP9 / PWM slice 4B. */
+		pwms = <&pwm 9 PWM_USEC(1000) PWM_POLARITY_NORMAL>;
+	};
+
 	relays {
 		compatible = "gpio-leds";
 
@@ -30,6 +44,48 @@
 
 		ch6 {
 			gpios = <&gpio0 7 GPIO_ACTIVE_HIGH>;
+		};
+	};
+};
+
+&pinctrl {
+	pwm_buzzer_default: pwm_buzzer_default {
+		group1 {
+			pinmux = <PWM_4B_P9>;
+		};
+	};
+
+	ws2812_pio1_default: ws2812_pio1_default {
+		group1 {
+			pinmux = <PIO1_P8>;
+		};
+	};
+};
+
+&pwm {
+	pinctrl-0 = <&pwm_buzzer_default>;
+	pinctrl-names = "default";
+	status = "okay";
+};
+
+&pio1 {
+	status = "okay";
+
+	pio1_ws2812 {
+		compatible = "worldsemi,ws2812-rpi_pico-pio";
+		pinctrl-0 = <&ws2812_pio1_default>;
+		pinctrl-names = "default";
+		bit-waveform = <3>, <3>, <4>;
+		status = "okay";
+
+		rgb_led: rgb_led {
+			/* WS2812 RGB LED fixture data output: GP8 via PIO1. */
+			gpios = <&gpio0 8 GPIO_ACTIVE_HIGH>;
+			chain-length = <1>;
+			color-mapping = <LED_COLOR_ID_GREEN LED_COLOR_ID_RED LED_COLOR_ID_BLUE>;
+			reset-delay = <280>;
+			frequency = <DT_FREQ_K(800)>;
+			status = "okay";
 		};
 	};
 };
