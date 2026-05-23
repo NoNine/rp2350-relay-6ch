@@ -305,16 +305,16 @@ phase without changing relay safety semantics or host RPC authority.
 
 Implementation scope:
 
-- Enable the Waveshare WS2812 RGB LED and active-high buzzer nodes only for
+- Use `docs/phase-7-plan.md` as the authoritative implementation plan for the
+  indicator API, state model, hardware binding, event sources, and tests.
+- Enable the Waveshare WS2812 RGB LED and passive PWM-driven buzzer only for
   targets that define the hardware.
-- Add a small indicator module with RGB state-priority handling for boot,
-  ready, command accepted, relay-active, degraded, update, and fault states.
 - Keep buzzer feedback quiet by default or explicitly configurable, with no
   continuous alarm unless a timeout or silence policy is implemented.
 - Ensure indicator errors are logged but never block relay control, `off-all`,
   pulse teardown, reboot handling, or RPC responses.
 - Keep the status-indicator manual in `docs/status-indicators.md` aligned with
-  implemented behavior.
+  implemented operator-visible behavior.
 
 Tests/gates:
 

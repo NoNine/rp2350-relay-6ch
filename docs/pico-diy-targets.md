@@ -73,12 +73,15 @@ GP7. RGB LED and buzzer fixture wiring must use separate GPIOs and must avoid
 the Pico 2 W Wi-Fi pins GP23, GP24, GP25, and GP29. Keep UART0 GP0 and GP1
 available for debug console use.
 
+Do not copy the Waveshare board's GPIO23 buzzer assignment to a Pico 2 W
+fixture. Choose a non-Wi-Fi PWM-capable GPIO for the passive buzzer.
+
 Concrete indicator fixture wiring is still to be assigned:
 
 | Function | Pico 2 W GPIO |
 | --- | --- |
 | RGB LED data | `TBD by development fixture wiring` |
-| Buzzer active-high output | `TBD by development fixture wiring` |
+| Buzzer PWM output | `TBD by development fixture wiring` |
 
 ## Build And Flash
 

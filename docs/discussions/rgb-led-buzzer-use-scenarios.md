@@ -69,9 +69,9 @@ complexity.
 
 ## Repo integration
 
-- Current PRD already allows the active-high buzzer on GPIO23 and WS2812 RGB
-  LED on GPIO36 if relay control and RPC are unaffected.
-- Hardware notes confirm the active-high buzzer and RGB LED hardware.
+- Current PRD already allows the passive PWM-driven buzzer on GPIO23 and
+  WS2812 RGB LED on GPIO36 if relay control and RPC are unaffected.
+- Hardware notes confirm the passive buzzer and RGB LED hardware.
 - Devicetree currently defines both outputs but disables them.
 - First implementation step should be a short design doc or PRD/implementation
   plan update assigning ownership, because the remaining-features review

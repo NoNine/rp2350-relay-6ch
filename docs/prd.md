@@ -64,9 +64,9 @@ RP2350B-based RP2350-Relay-6CH board with six active-high relay GPIOs:
 - Firmware shall avoid assigning relay GPIOs to any alternate function.
 - Firmware shall support the board USB device connector as the primary host
   communication path.
-- Firmware should expose the active-high buzzer on GPIO23 and WS2812 RGB LED on
-  GPIO36 for local status indication, if doing so does not interfere with the
-  relay control and RPC requirements.
+- Firmware should expose the passive PWM-driven buzzer on GPIO23 and WS2812 RGB
+  LED on GPIO36 for local status indication, if doing so does not interfere
+  with the relay control and RPC requirements.
 - Firmware shall not assume MCU-side `GND` and isolated RS485/relay-side `SGND`
   are the same domain.
 

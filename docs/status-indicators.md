@@ -16,7 +16,7 @@ They do not replace `rp2350-relay status`, logs, or host-side error reporting.
 | Indicator | Hardware | Firmware signal |
 | --- | --- | --- |
 | RGB LED | On-board WS2812B-0807 | `RGB_CTRL` / GPIO36 |
-| Buzzer | 3.3 V buzzer through transistor drive | `BUZZER` / GPIO23 |
+| Buzzer | 3.3 V passive buzzer through transistor drive | `BUZZER` / GPIO23 PWM |
 
 The six relay channels also have relay-side indicator LEDs. Those relay LEDs
 show relay-side drive behavior and are separate from the controller RGB LED.
@@ -49,12 +49,13 @@ equipment state.
 
 ## Buzzer Meanings
 
-The buzzer is for local attention and deliberate operator feedback. It must not
-be used as a continuous background heartbeat.
+The buzzer is a passive device driven by a PWM tone. It is for local attention
+and deliberate operator feedback, and must not be used as a continuous
+background heartbeat.
 
 | Pattern | Meaning | Operator action |
 | --- | --- | --- |
-| Silent | Normal default, or buzzer disabled. | No action. |
+| Silent | Normal default, buzzer disabled, or PWM output off/zero duty. | No action. |
 | One short beep | Operation accepted. This feedback is allowed only when buzzer feedback is explicitly enabled. | No action unless the host reports an error. |
 | Two short beeps | Command rejected or validation error. | Check the CLI error, command arguments, channel number, pulse duration, and current relay pulse state. |
 | Three short beeps | Reserved for Phase 8/9 firmware upgrade support: update stage transition or controlled reboot scheduled. | Wait for the board to return and verify `info` or `status`. |
