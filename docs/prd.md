@@ -331,8 +331,8 @@ Acceptance criteria:
 - Enable the RGB LED and buzzer where supported by the target hardware.
 - Implement controller-level RGB LED states for boot, ready, command accepted,
   relay-active, degraded, update, and fault conditions.
-- Keep buzzer feedback quiet by default, bounded, and reserved for local
-  attention or explicit operator feedback.
+- Keep buzzer feedback bounded and build-time configurable. Development builds
+  enable command feedback by default for hardware verification.
 - Ensure indicator failures do not affect relay control, `off-all`, pulse
   teardown, reboot handling, or RPC responses.
 

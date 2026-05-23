@@ -4,8 +4,10 @@ This page is the operator manual for the RP2350-Relay-6CH local RGB LED and
 buzzer behavior.
 
 Current firmware enables local status indication when the target devicetree
-provides the WS2812 RGB LED or passive buzzer devices. Buzzer command feedback
-is quiet by default unless explicitly enabled at build time.
+provides the WS2812 RGB LED or passive buzzer devices. Development firmware
+enables bounded buzzer command feedback by default so the buzzer path can be
+verified during hardware smoke testing. Release or quiet-site builds can disable
+the buzzer feedback Kconfig option explicitly.
 
 The indicators are local diagnostics. They help an operator answer whether the
 controller is alive, ready, handling a command, degraded, updating, or faulted.
@@ -55,14 +57,15 @@ background heartbeat.
 
 | Pattern | Meaning | Operator action |
 | --- | --- | --- |
-| Silent | Normal default, buzzer disabled, or PWM output off/zero duty. | No action. |
-| One short beep | Operation accepted. This feedback is allowed only when buzzer feedback is explicitly enabled. | No action unless the host reports an error. |
+| Silent | Buzzer disabled, unsupported, idle, or PWM output off/zero duty. | No action. |
+| One short beep | Operation accepted when buzzer feedback is enabled. | No action unless the host reports an error. |
 | Two short beeps | Command rejected or validation error. | Check the CLI error, command arguments, channel number, pulse duration, and current relay pulse state. |
 | Three short beeps | Controlled reboot scheduled, or reserved Phase 8/9 firmware upgrade support. | Wait for the board to return and verify `info` or `status`. |
 | Time-limited repeating chirp | Fault or local attention condition. | Silence or power down according to site procedure, then run status/recovery checks. |
 
 The firmware must not generate a continuous alarm without a timeout or silence
-policy. Routine relay toggles should not beep by default.
+policy. Routine relay toggles should produce only bounded feedback when buzzer
+feedback is enabled.
 
 ## Troubleshooting
 

@@ -16,6 +16,8 @@ from rp2350_relay_6ch.exceptions import (
 class FakeClient:
     instances: list["FakeClient"] = []
     failure: Exception | None = None
+    relay_state = 0x21
+    relay_pulsing = 0
 
     def __init__(
         self,
@@ -80,7 +82,13 @@ class FakeClient:
 
     def get_relays(self, channel: int | None = None) -> dict[str, Any]:
         self.calls.append(("get_relays", (channel,)))
-        return {"state": 0x21, "pulsing": 0}
+        if channel is None:
+            return {"state": self.relay_state, "pulsing": self.relay_pulsing}
+        return {
+            "channel": channel,
+            "on": (self.relay_state & (1 << channel)) != 0,
+            "pulsing": (self.relay_pulsing & (1 << channel)) != 0,
+        }
 
     def set_relay(self, channel: int, on: bool) -> dict[str, Any]:
         self.calls.append(("set_relay", (channel, on)))
@@ -111,6 +119,8 @@ class FakeClient:
 def fake_client(monkeypatch: pytest.MonkeyPatch) -> None:
     FakeClient.instances = []
     FakeClient.failure = None
+    FakeClient.relay_state = 0x21
+    FakeClient.relay_pulsing = 0
     monkeypatch.setattr(cli, "RelayClient", FakeClient)
 
 
@@ -191,7 +201,21 @@ def test_set_all_accepts_hex_mask() -> None:
     assert FakeClient.instances[0].calls == [("set_all_relays", (0x21,))]
 
 
-def test_get_channel_human_output_names_enabled_relays(
+def test_get_all_human_output_names_enabled_relays(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    rc = cli.main(["--port", "COM7", "get"])
+
+    captured = capsys.readouterr()
+
+    assert rc == cli.EXIT_OK
+    assert "state: 0x21" in captured.out
+    assert "on: CH1, CH6" in captured.out
+    assert "pulsing: none" in captured.out
+    assert FakeClient.instances[0].calls == [("get_relays", (None,))]
+
+
+def test_get_channel_human_output_reports_on_channel(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     rc = cli.main(["--port", "COM7", "get", "1"])
@@ -199,8 +223,41 @@ def test_get_channel_human_output_names_enabled_relays(
     captured = capsys.readouterr()
 
     assert rc == cli.EXIT_OK
-    assert "on: CH1, CH6" in captured.out
+    assert "channel: CH1" in captured.out
+    assert "on: True" in captured.out
+    assert "pulsing: False" in captured.out
     assert FakeClient.instances[0].calls == [("get_relays", (0,))]
+
+
+def test_get_channel_human_output_reports_off_channel(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    FakeClient.relay_state = 0
+
+    rc = cli.main(["--port", "COM7", "get", "1"])
+
+    captured = capsys.readouterr()
+
+    assert rc == cli.EXIT_OK
+    assert "channel: CH1" in captured.out
+    assert "on: False" in captured.out
+    assert "pulsing: False" in captured.out
+
+
+def test_get_channel_human_output_reports_pulsing_channel(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    FakeClient.relay_state = 1
+    FakeClient.relay_pulsing = 1
+
+    rc = cli.main(["--port", "COM7", "get", "1"])
+
+    captured = capsys.readouterr()
+
+    assert rc == cli.EXIT_OK
+    assert "channel: CH1" in captured.out
+    assert "on: True" in captured.out
+    assert "pulsing: True" in captured.out
 
 
 def test_missing_port_returns_argument_exit(capsys: pytest.CaptureFixture[str]) -> None:

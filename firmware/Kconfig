@@ -15,7 +15,8 @@ config RP2350_RELAY_6CH_BUZZER_FEEDBACK
 	depends on RP2350_RELAY_6CH_INDICATORS
 	default n
 	help
-	  Enable bounded audible command feedback. Leave this disabled for
-	  quiet-by-default normal builds.
+	  Enable bounded audible command feedback. The development firmware
+	  enables this in prj.conf so hardware smoke tests can verify the
+	  buzzer path; release or quiet-site builds can disable it explicitly.
 
 source "Kconfig.zephyr"

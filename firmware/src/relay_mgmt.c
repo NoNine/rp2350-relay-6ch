@@ -30,6 +30,8 @@
 
 LOG_MODULE_REGISTER(rp2350_relay_mgmt, LOG_LEVEL_INF);
 
+#define REBOOT_PENDING_INDICATION_MS 500
+
 enum relay_mgmt_counter {
 	RELAY_MGMT_COUNTER_RECEIVED,
 	RELAY_MGMT_COUNTER_SUCCEEDED,
@@ -449,7 +451,7 @@ static int reboot_handler(struct smp_streamer *ctxt)
 	}
 
 #ifdef CONFIG_REBOOT
-	(void)k_work_schedule(&reboot_work, K_MSEC(100));
+	(void)k_work_schedule(&reboot_work, K_MSEC(REBOOT_PENDING_INDICATION_MS));
 	ok = zcbor_tstr_put_lit(zse, "ok") && zcbor_bool_put(zse, true);
 #else
 	ok = encode_relay_error(zse, RP2350_RELAY_6CH_MGMT_ERR_REBOOT_UNAVAILABLE);

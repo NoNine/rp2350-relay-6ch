@@ -43,9 +43,23 @@ def _state_channels(state: int) -> list[str]:
     return [f"CH{channel + 1}" for channel in range(RELAY_COUNT) if state & (1 << channel)]
 
 
+def _format_single_channel(payload: dict[str, Any]) -> str:
+    channel = int(payload["channel"])
+    fields = [
+        f"channel: CH{channel + 1}",
+        f"on: {bool(payload.get('on', False))}",
+    ]
+    if "pulsing" in payload:
+        fields.append(f"pulsing: {bool(payload['pulsing'])}")
+    return "\n".join(fields)
+
+
 def _format_human(command: str, payload: dict[str, Any]) -> str:
     if command == "info":
         return _format_key_values(payload)
+
+    if command == "get" and "channel" in payload:
+        return _format_single_channel(payload)
 
     if command in {"get", "set", "set-all", "pulse", "off-all"}:
         state = int(payload.get("state", 0))
