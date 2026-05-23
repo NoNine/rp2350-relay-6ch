@@ -35,6 +35,58 @@ ZTEST(indicator, test_booting_to_ready)
 
 	zassert_equal(snap.rgb, INDICATOR_RGB_READY);
 	zassert_true(snap.ready);
+	if (IS_ENABLED(CONFIG_RP2350_RELAY_6CH_BUZZER_FEEDBACK)) {
+		zassert_equal(snap.buzzer, INDICATOR_BUZZER_BOOT_READY);
+	} else {
+		zassert_equal(snap.buzzer, INDICATOR_BUZZER_SILENT);
+	}
+}
+
+ZTEST(indicator, test_boot_ready_buzzer_is_long_when_enabled)
+{
+	struct indicator_test_snapshot snap;
+
+	if (!IS_ENABLED(CONFIG_RP2350_RELAY_6CH_BUZZER_FEEDBACK)) {
+		ztest_test_skip();
+	}
+
+	indicator_set_ready(true);
+	snap = snapshot();
+	zassert_equal(snap.buzzer, INDICATOR_BUZZER_BOOT_READY);
+
+	indicator_test_advance(61U);
+	indicator_test_get_snapshot(&snap);
+	zassert_equal(snap.buzzer, INDICATOR_BUZZER_BOOT_READY);
+
+	indicator_test_advance(240U);
+	indicator_test_get_snapshot(&snap);
+	zassert_equal(snap.buzzer, INDICATOR_BUZZER_BOOT_READY);
+
+	indicator_test_advance(61U);
+	indicator_test_get_snapshot(&snap);
+	zassert_equal(snap.buzzer, INDICATOR_BUZZER_SILENT);
+}
+
+ZTEST(indicator, test_boot_ready_buzzer_does_not_repeat_when_already_ready)
+{
+	struct indicator_test_snapshot snap;
+
+	indicator_set_ready(true);
+	snap = snapshot();
+	if (IS_ENABLED(CONFIG_RP2350_RELAY_6CH_BUZZER_FEEDBACK)) {
+		zassert_equal(snap.buzzer, INDICATOR_BUZZER_BOOT_READY);
+	} else {
+		zassert_equal(snap.buzzer, INDICATOR_BUZZER_SILENT);
+	}
+
+	indicator_test_advance(301U);
+	indicator_test_advance(61U);
+	indicator_test_get_snapshot(&snap);
+	zassert_equal(snap.buzzer, INDICATOR_BUZZER_SILENT);
+
+	indicator_set_ready(true);
+	snap = snapshot();
+	zassert_equal(snap.buzzer, INDICATOR_BUZZER_SILENT);
 }
 
 ZTEST(indicator, test_relay_active_overrides_ready)

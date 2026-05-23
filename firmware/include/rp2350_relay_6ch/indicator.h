@@ -34,6 +34,7 @@ enum indicator_buzzer_pattern {
 	INDICATOR_BUZZER_ACCEPTED,
 	INDICATOR_BUZZER_REJECTED,
 	INDICATOR_BUZZER_REBOOT_PENDING,
+	INDICATOR_BUZZER_BOOT_READY,
 };
 
 struct indicator_test_snapshot {

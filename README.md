@@ -67,6 +67,8 @@ Implemented:
   device errors.
 - CLI utility for manual control, JSON output, scripted checks, and hardware
   smoke tests.
+- Local WS2812 RGB status indication and bounded buzzer feedback, including
+  one long beep after the controller reaches ready state.
 - Host-side tests with simulated transports and firmware tests for relay and
   relay-management behavior.
 
@@ -76,8 +78,6 @@ Planned:
 - Host library and CLI firmware image upload, test-image, and confirm-image
   workflows.
 - Firmware signing, flashing, and release helper scripts.
-- Optional local status indicators for the buzzer and WS2812 RGB LED if they
-  do not interfere with relay control or RPC behavior.
 
 ## Current Status
 

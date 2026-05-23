@@ -5,7 +5,7 @@ buzzer behavior.
 
 Current firmware enables local status indication when the target devicetree
 provides the WS2812 RGB LED or passive buzzer devices. Development firmware
-enables bounded buzzer command feedback by default so the buzzer path can be
+enables bounded buzzer feedback by default so the buzzer path can be
 verified during hardware smoke testing. Release or quiet-site builds can disable
 the buzzer feedback Kconfig option explicitly.
 
@@ -58,6 +58,7 @@ background heartbeat.
 | Pattern | Meaning | Operator action |
 | --- | --- | --- |
 | Silent | Buzzer disabled, unsupported, idle, or PWM output off/zero duty. | No action. |
+| One long beep | Controller boot completed and firmware reached ready state. | Begin normal operation, or run `rp2350-relay info` if host communication is not available. |
 | One short beep | Operation accepted when buzzer feedback is enabled. | No action unless the host reports an error. |
 | Two short beeps | Command rejected or validation error. | Check the CLI error, command arguments, channel number, pulse duration, and current relay pulse state. |
 | Three short beeps | Controlled reboot scheduled, or reserved Phase 8/9 firmware upgrade support. | Wait for the board to return and verify `info` or `status`. |

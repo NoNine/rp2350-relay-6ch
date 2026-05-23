@@ -95,3 +95,56 @@ Result: PASS
   `hwinfo_rpi_pico.c` unused-variable warning.
 - The report records only commands that were run or reported as run during
   Phase 7 verification.
+
+## Boot-Ready Beep Follow-Up
+
+Date: 2026-05-23
+Hardware: Raspberry Pi Pico 2 W development fixture
+Firmware basis: commit `7a324b7` plus working-tree changes for boot-ready
+one-long-beep behavior and 20% RGB brightness dimming
+Interfaces: USB CDC ACM SMP on `COM19`
+Result: PASS
+
+Commands and checks run or operator-reported:
+
+- `west build -s firmware/tests/indicator -b native_sim -d build/firmware-tests/indicator`
+- `build/firmware-tests/indicator/zephyr/zephyr.exe`
+- `west build -s firmware/tests/indicator -b native_sim -d build/firmware-tests/indicator-buzzer -- -DCONFIG_RP2350_RELAY_6CH_BUZZER_FEEDBACK=y`
+- `build/firmware-tests/indicator-buzzer/zephyr/zephyr.exe`
+- `TARGET=pico2w RELAY_OVERLAY=firmware/boards/raspberrypi/rpi_pico2/pico2w-relay-dev.overlay scripts/build-firmware.sh`
+- Flash or copy `build/firmware-pico2w/zephyr/zephyr.uf2` to the Pico 2 W
+- `rp2350-relay --port COM19 info`
+- `rp2350-relay --port COM19 status`
+- `rp2350-relay --port COM19 set 1 on`
+- `rp2350-relay --port COM19 get 1`
+- `rp2350-relay --port COM19 set 1 off`
+- `rp2350-relay --port COM19 get 1`
+- `python tools/usb_rpc_smoke.py --port COM19 invalid-channel`
+- `rp2350-relay --port COM19 reboot`
+- `rp2350-relay --port COM19 status`
+- `rp2350-relay --port COM19 get`
+- `rp2350-relay --port COM19 off-all`
+- `rp2350-relay --port COM19 get`
+
+Results:
+
+- Default native indicator test passed: `9 passed`, `2 skipped`.
+- Buzzer-enabled native indicator test passed: `11 passed`.
+- Pico 2 W buzzer-enabled firmware build passed and generated
+  `build/firmware-pico2w/zephyr/zephyr.uf2`.
+- Hardware Section 0 passed: relays stayed off during boot, RGB reached
+  dim-green ready, and the buzzer produced one long boot-ready beep with no
+  repeated alarm afterward.
+- Hardware Section 1 passed: `info` and `status` responded normally and no
+  extra boot-ready long beep repeated during RPC reachability checks.
+- Hardware Section 2 passed: accepted `set` commands still produced one short
+  beep, CH1 turned on and off as commanded, and `get 1` matched the expected
+  relay state.
+- Hardware Section 3 passed: invalid-channel rejection still produced two
+  short beeps, not the boot-ready long beep, and `status` remained responsive.
+- Hardware Section 4 passed: controlled reboot produced three short
+  reboot-pending beeps before reboot, then one long boot-ready beep after the
+  board returned; `get` reported `state: 0x00`, `on: none`, and
+  `pulsing: none`.
+- Hardware Section 5 passed: final `off-all` and `get` left all relays off,
+  RGB ready/idle, and no repeated buzzer alarm active.

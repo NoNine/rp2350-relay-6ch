@@ -63,10 +63,9 @@ and `6` is `CH6`.
 
 ## Pico 2 W Indicator Development Fixture
 
-Pico 2 W may be used as the Phase 7 development fixture for the planned RGB
-LED and buzzer status-indicator feature. This fixture mapping provides
-devicetree hardware definitions only. It does not imply runtime indicator
-behavior.
+Pico 2 W is the first hardware verification fixture for the implemented RGB
+LED and buzzer status-indicator feature. The fixture mapping provides
+devicetree definitions for local indicator runtime behavior.
 
 The current relay example overlay keeps `CH1` through `CH6` on GP2 through
 GP7. RGB LED and buzzer fixture wiring must use separate GPIOs and must avoid

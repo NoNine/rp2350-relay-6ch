@@ -24,8 +24,11 @@ LOG_MODULE_REGISTER(rp2350_relay_indicator, LOG_LEVEL_INF);
 #define ATTENTION_TRANSIENT_MS 600U
 #define RENDER_INTERVAL_MS 100U
 #define BEEP_ON_MS 60U
+#define BOOT_READY_BEEP_ON_MS 300U
 #define BEEP_OFF_MS 60U
 #define BUZZER_PERIOD_NS PWM_USEC(1000)
+#define RGB_BRIGHTNESS_NUMERATOR 1U
+#define RGB_BRIGHTNESS_DENOMINATOR 5U
 
 struct indicator_state {
 	struct k_mutex lock;
@@ -43,6 +46,7 @@ struct indicator_state {
 	enum indicator_buzzer_pattern buzzer_pattern;
 	uint8_t beeps_remaining;
 	bool beep_on;
+	uint32_t beep_on_ms;
 	int64_t beep_next_ms;
 	enum indicator_rgb_pattern last_rgb;
 	enum indicator_buzzer_pattern last_buzzer;
@@ -129,6 +133,18 @@ static enum indicator_rgb_pattern resolve_rgb_locked(int64_t now)
 	return INDICATOR_RGB_BOOTING;
 }
 
+static struct led_rgb rgb_dim(uint8_t red, uint8_t green, uint8_t blue)
+{
+	return (struct led_rgb){
+		.r = (uint8_t)((red * RGB_BRIGHTNESS_NUMERATOR) /
+			       RGB_BRIGHTNESS_DENOMINATOR),
+		.g = (uint8_t)((green * RGB_BRIGHTNESS_NUMERATOR) /
+			       RGB_BRIGHTNESS_DENOMINATOR),
+		.b = (uint8_t)((blue * RGB_BRIGHTNESS_NUMERATOR) /
+			       RGB_BRIGHTNESS_DENOMINATOR),
+	};
+}
+
 static struct led_rgb rgb_color(enum indicator_rgb_pattern pattern, int64_t now)
 {
 	const bool blink_on = ((now / 250) % 2) == 0;
@@ -136,25 +152,22 @@ static struct led_rgb rgb_color(enum indicator_rgb_pattern pattern, int64_t now)
 
 	switch (pattern) {
 	case INDICATOR_RGB_BOOTING:
-		return (struct led_rgb){ .r = 12U, .g = 12U, .b = 12U };
+		return rgb_dim(12U, 12U, 12U);
 	case INDICATOR_RGB_READY:
-		return (struct led_rgb){ .r = 0U, .g = 32U, .b = 0U };
+		return rgb_dim(0U, 32U, 0U);
 	case INDICATOR_RGB_ACCEPTED:
-		return (struct led_rgb){ .r = 0U, .g = 96U, .b = 0U };
+		return rgb_dim(0U, 96U, 0U);
 	case INDICATOR_RGB_RELAY_ACTIVE:
-		return (struct led_rgb){ .r = 0U, .g = 32U, .b = 64U };
+		return rgb_dim(0U, 32U, 64U);
 	case INDICATOR_RGB_ATTENTION:
-		return pulse_on ? (struct led_rgb){ .r = 80U, .g = 48U, .b = 0U } :
-				  (struct led_rgb){ .r = 10U, .g = 6U, .b = 0U };
+		return pulse_on ? rgb_dim(80U, 48U, 0U) : rgb_dim(10U, 6U, 0U);
 	case INDICATOR_RGB_REBOOT_PENDING:
-		return pulse_on ? (struct led_rgb){ .r = 40U, .g = 0U, .b = 80U } :
-				  (struct led_rgb){ .r = 0U, .g = 0U, .b = 60U };
+		return pulse_on ? rgb_dim(40U, 0U, 80U) : rgb_dim(0U, 0U, 60U);
 	case INDICATOR_RGB_FAULT:
-		return blink_on ? (struct led_rgb){ .r = 96U, .g = 0U, .b = 0U } :
-				  (struct led_rgb){ .r = 0U, .g = 0U, .b = 0U };
+		return blink_on ? rgb_dim(96U, 0U, 0U) : rgb_dim(0U, 0U, 0U);
 	case INDICATOR_RGB_OFF:
 	default:
-		return (struct led_rgb){ .r = 0U, .g = 0U, .b = 0U };
+		return rgb_dim(0U, 0U, 0U);
 	}
 }
 
@@ -181,16 +194,24 @@ static void set_buzzer_locked(enum indicator_buzzer_pattern pattern)
 	switch (pattern) {
 	case INDICATOR_BUZZER_ACCEPTED:
 		state.beeps_remaining = 1U;
+		state.beep_on_ms = BEEP_ON_MS;
 		break;
 	case INDICATOR_BUZZER_REJECTED:
 		state.beeps_remaining = 2U;
+		state.beep_on_ms = BEEP_ON_MS;
 		break;
 	case INDICATOR_BUZZER_REBOOT_PENDING:
 		state.beeps_remaining = 3U;
+		state.beep_on_ms = BEEP_ON_MS;
+		break;
+	case INDICATOR_BUZZER_BOOT_READY:
+		state.beeps_remaining = 1U;
+		state.beep_on_ms = BOOT_READY_BEEP_ON_MS;
 		break;
 	case INDICATOR_BUZZER_SILENT:
 	default:
 		state.beeps_remaining = 0U;
+		state.beep_on_ms = BEEP_ON_MS;
 		break;
 	}
 
@@ -275,7 +296,7 @@ static void render_buzzer_locked(int64_t now)
 
 	state.beep_on = true;
 	state.beeps_remaining--;
-	state.beep_next_ms = now + BEEP_ON_MS;
+	state.beep_next_ms = now + state.beep_on_ms;
 	state.last_buzzer = state.buzzer_pattern;
 }
 
@@ -352,6 +373,7 @@ void indicator_init(void)
 	state.buzzer_pattern = INDICATOR_BUZZER_SILENT;
 	state.beeps_remaining = 0U;
 	state.beep_on = false;
+	state.beep_on_ms = BEEP_ON_MS;
 	state.beep_next_ms = 0;
 	state.last_rgb = state.hardware_enabled ? INDICATOR_RGB_BOOTING : INDICATOR_RGB_OFF;
 	state.last_buzzer = INDICATOR_BUZZER_SILENT;
@@ -372,6 +394,9 @@ void indicator_set_ready(bool ready)
 {
 	ensure_initialized();
 	k_mutex_lock(&state.lock, K_FOREVER);
+	if (ready && !state.ready) {
+		set_buzzer_locked(INDICATOR_BUZZER_BOOT_READY);
+	}
 	state.ready = ready;
 	k_mutex_unlock(&state.lock);
 	schedule_render_now();

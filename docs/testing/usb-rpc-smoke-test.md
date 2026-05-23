@@ -194,7 +194,8 @@ indicator feature documented in
 [status-indicators.md](../status-indicators.md).
 
 - After boot and USB RPC initialization, confirm the RGB LED reaches the ready
-  state and no buzzer alarm is active.
+  state. On buzzer-enabled firmware, confirm one bounded long boot-ready beep
+  occurs and no continuous buzzer alarm remains active.
 - While a relay is commanded on or pulsing, confirm the RGB LED shows the
   relay-active state. Treat this as commanded state only, not verified load
   power or contact closure.
