@@ -7,8 +7,8 @@ daemon is independently useful before firmware communication-loss safety: it
 owns the USB CDC serial device, serializes relay commands, handles reconnects,
 and exposes a local API for short-lived CLI and Python clients.
 
-Phase 8a covers Windows session mode separately. Windows production operation
-uses session ownership; Linux production operation uses daemon ownership.
+Phase 8a covers cross-platform direct manual session mode separately. Linux
+production automation uses daemon ownership.
 
 Use [Host daemon mode](host-daemon-mode.md) as the decision-complete implementation
 contract for daemon lifecycle, local IPC, client APIs, reconnect policy,
@@ -21,8 +21,8 @@ Those safety features can be planned later as an extension to daemon mode.
 ## Scope
 
 - Add Linux-only daemon mode for production host operation.
-- Keep Windows production operation on the Phase 8a session path and Windows
-  diagnostics on the existing direct serial CLI path.
+- Keep direct manual operation on the Phase 8a session path and direct
+  diagnostics on the existing serial CLI path.
 - Keep `rp2350-relay` as the direct serial diagnostic CLI.
 - Add `rp2350-relayd` as the foreground-capable daemon process.
 - Add `rp2350-relayctl` as the short-lived daemon-client CLI.
@@ -83,7 +83,7 @@ Expected results:
 
 ## Phase 9 Handoff
 
-After Phase 8a and Phase 8b, firmware upgrade work can assume production
-host-control paths exist for Windows and Linux, but it must not require daemon
-mode unless the Phase 9 plan explicitly chooses that dependency for operator
-workflows.
+After Phase 8a and Phase 8b, firmware upgrade work can assume long-lived
+manual session control and Linux production daemon control exist, but it must
+not require daemon mode unless the Phase 9 plan explicitly chooses that
+dependency for operator workflows.

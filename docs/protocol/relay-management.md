@@ -14,7 +14,7 @@ Firmware tests continue to exercise the management group handlers on
 ## SMP Group
 
 - Group ID: `64`
-- Protocol version: `2`
+- Protocol version: `3`
 - Hardware name: `Waveshare RP2350-Relay-6CH`
 - Relay channel indexes: zero-based, `0` through `5`
 - Relay state masks: bit `0` is `CH1`, bit `5` is `CH6`
@@ -32,6 +32,7 @@ Firmware tests continue to exercise the management group handlers on
 | 6 | `status` | Read | Return relay state, uptime, and protocol counters. |
 | 7 | `reboot` | Write | Request controlled reboot when Zephyr reboot support is enabled. |
 | 8 | `build_info` | Read | Return firmware build identity and traceability metadata. |
+| 9 | `heartbeat` | Write | Return a no-op liveness acknowledgement for host session polling. |
 
 ## Error Codes
 
@@ -181,6 +182,20 @@ Response:
 
 If Zephyr reboot support is not enabled, the command returns
 `reboot_unavailable`.
+
+### `heartbeat`
+
+Request: empty CBOR map.
+
+Response:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `ok` | bool | Present and true when the heartbeat request was accepted. |
+
+In Phase 8a, `heartbeat` is a no-op liveness command for host session polling.
+It does not change relay state, enforce communication-loss timeout, expose
+heartbeat health state, call `off_all`, or schedule a reboot.
 
 ## Relay Pulse Bounds
 

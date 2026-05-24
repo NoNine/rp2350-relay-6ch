@@ -127,7 +127,7 @@ custom relay management group and MCUmgr enumeration support.
    python tools/usb_rpc_smoke.py --port $env:PORT info
    ```
 
-   Confirm the response reports protocol version `2`, relay count `6`, and
+   Confirm the response reports protocol version `3`, relay count `6`, and
    hardware `Waveshare RP2350-Relay-6CH`.
 3. Send a `status` request to group `64`, command `6`:
 

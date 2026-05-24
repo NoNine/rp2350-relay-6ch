@@ -34,6 +34,9 @@ with RelayClient.connect("COM31", timeout_s=2.0, retries=1) as client:
     relays = client.get_relays()
 ```
 
+The `rp2350-relay session` CLI uses the same direct connection model for
+long-lived manual operation. It does not add a separate Python client API.
+
 ## API
 
 The client methods return decoded response dictionaries from the firmware:

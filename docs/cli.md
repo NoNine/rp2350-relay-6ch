@@ -146,9 +146,24 @@ rp2350-relay --port <serial-port> [options] <command>
 CLI channel arguments are one-based and match the board labels: `1` is `CH1`
 and `6` is `CH6`.
 
+## Session Mode
+
+Session mode is a long-lived manual operator workflow for Windows and Linux:
+
+```sh
+rp2350-relay session
+rp2350-relay --port <serial-port> session
+rp2350-relay --serial <usb-serial> session
+```
+
+Without `--port` or `--serial`, the session discovers relay controllers and
+asks the operator to choose from a list showing port and USB serial number.
+Run `off-all` before exiting; normal session exit confirms relays are off.
+
 ## Commands
 
 ```sh
+rp2350-relay session
 rp2350-relay --port <serial-port> info
 rp2350-relay --port <serial-port> build-info
 rp2350-relay --port <serial-port> get

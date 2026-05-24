@@ -342,24 +342,27 @@ Acceptance criteria:
 - Existing relay, relay-management, host, and CLI tests still pass.
 - Hardware smoke checks verify local indicators without leaving relays on.
 
-### Phase 8a: Windows Session Mode
+### Phase 8a: Cross-Platform Session Mode
 
-- Add `rp2350-relay --port COM7 session` as the main Windows PC operator
+- Add `rp2350-relay session` as a cross-platform manual/direct operator
   workflow.
-- Keep the session as a long-lived direct-serial owner for the assigned COM
-  port while it is open.
+- Keep the session as a long-lived direct-serial owner for one selected serial
+  connection while it is connected.
+- Support explicit `--port`, exact `--serial`, and interactive USB discovery
+  and selection for session startup.
 - Reuse the existing host client, validation rules, typed exceptions, and
   one-based CLI channel arguments.
 - Keep one-shot direct serial commands available for diagnostics and simple
   checks.
-- Do not require firmware communication-loss safety or heartbeat support.
+- Do not require firmware communication-loss safety beyond the dummy heartbeat
+  command used for session polling.
 
 Acceptance criteria:
 
 - Session tests pass without hardware.
 - Existing direct host library and CLI tests still pass.
-- Windows hardware smoke checks can control relays through one long-lived
-  session and leave all relays off after manual teardown.
+- Windows and Linux hardware smoke checks can control relays through one
+  long-lived session and leave all relays off after manual teardown.
 
 ### Phase 8b: Host Daemon Mode
 
@@ -419,9 +422,10 @@ Acceptance criteria:
   retries, timeout handling, typed errors, and simulated device responses.
 - CLI tests shall cover argument parsing, output modes, non-zero failure exit
   codes, and representative relay/update commands.
-- Session tests shall cover Windows session command parsing, command dispatch,
-  one-connection session ownership, typed error handling, and compatibility
-  with existing one-shot direct commands.
+- Session tests shall cover cross-platform session command parsing, USB
+  discovery, command dispatch, one-connection session ownership, typed error
+  handling, safe close behavior, reconnect behavior, and compatibility with
+  existing one-shot direct commands.
 - Daemon tests shall cover local protocol parsing, command serialization,
   client command behavior, reconnect handling, startup state query, no-client
   relay-state policy, and clean shutdown.
@@ -440,8 +444,9 @@ Acceptance criteria:
 - Document protocol version, group ID, command IDs, CBOR fields, and error
   codes.
 - Document host library API and CLI usage.
-- Document Windows session mode, daemon mode, `systemd --user` operation,
-  local socket path, direct diagnostic mode, and daemon smoke testing.
+- Document cross-platform session mode, daemon mode, `systemd --user`
+  operation, local socket path, direct diagnostic mode, and host-control smoke
+  testing.
 - Document RGB LED and buzzer status meanings before enabling local indicator
   support in released firmware.
 - Document firmware signing and upgrade workflow.

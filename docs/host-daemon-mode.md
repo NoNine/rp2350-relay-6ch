@@ -8,9 +8,9 @@ the implementation lands.
 ## Scope Boundaries
 
 - Phase 8b daemon mode is Linux-only.
-- Windows production operation is covered by Phase 8a session mode. Windows
-  diagnostics and simple checks remain supported through direct serial tooling,
-  for example `rp2350-relay --port COM7 info`.
+- Direct manual operation on Windows and Linux is covered by Phase 8a session
+  mode. Diagnostics and simple checks remain supported through direct serial
+  tooling, for example `rp2350-relay --port COM7 info`.
 - The daemon is independent from firmware communication-loss safety.
 - Do not add firmware heartbeat commands, communication-loss timeout commands,
   reboot-on-silence behavior, daemon authentication, audit logs, network APIs,

@@ -335,35 +335,41 @@ Deliverables:
 - Operator manual in `docs/status-indicators.md`.
 - Indicator checks added to hardware smoke-test procedures.
 
-## Phase 8a: Windows Session Mode
+## Phase 8a: Cross-Platform Session Mode
 
-Purpose: add the main Windows PC host-control workflow before firmware upgrade
-work, independent of any future firmware communication-loss safety.
+Purpose: add the cross-platform manual/direct host-control workflow before
+firmware upgrade work, independent of any future firmware communication-loss
+safety.
 
 Implementation scope:
 
-- Use `docs/phase-8a-plan.md` as the authoritative implementation plan for
-  Windows session behavior, CLI shape, compatibility expectations, deferred
-  decisions, and tests.
-- Add `rp2350-relay --port COM7 session` as a long-lived direct-serial session
-  that owns the assigned Windows COM port while open and serializes relay
-  commands through one direct `RelayClient` connection.
+- Use `docs/phase-8a-plan.md` as the concise phase plan and
+  `docs/host-session-mode.md` as the decision-complete implementation contract
+  for session behavior, CLI shape, discovery, compatibility expectations, and
+  tests.
+- Add `rp2350-relay session` as a long-lived direct-serial session that owns
+  one selected serial connection while connected and serializes relay commands
+  through one direct `RelayClient` connection.
+- Support explicit `--port`, exact `--serial`, and interactive USB discovery
+  and selection for session startup.
 - Reuse the existing direct CLI command surface, one-based channel arguments,
   host-side validation rules, output conventions, and typed exception mapping
   where practical.
 - Keep one-shot `rp2350-relay --port COM7 <command>` behavior available for
   diagnostics and simple checks.
-- Do not require firmware heartbeat, communication-loss timeout commands, or
-  new firmware protocol fields in this phase.
+- Allow only the dummy firmware `heartbeat` command for session polling. Do not
+  require communication-loss timeout commands or firmware safety behavior in
+  this phase.
 
 Tests/gates:
 
 - Host tests cover session command parsing, command dispatch, typed error
-  handling, one-connection session ownership, and compatibility with existing
-  one-shot direct commands.
+  handling, USB discovery, one-connection session ownership, safe close
+  behavior, reconnect behavior, and compatibility with existing one-shot direct
+  commands.
 - Existing direct host library and CLI tests still pass.
-- Manual hardware smoke testing can run session mode from Windows and leave
-  relays off after manual teardown.
+- Manual hardware smoke testing can run session mode from Windows and Linux and
+  leave relays off after manual teardown.
 
 Dependencies:
 
@@ -373,8 +379,8 @@ Dependencies:
 Deliverables:
 
 - Session command under the existing host CLI package.
-- Windows session usage documentation.
-- Windows session smoke-test procedure under `docs/testing/`.
+- Cross-platform session usage documentation.
+- Cross-platform session smoke-test procedure under `docs/testing/`.
 
 ## Phase 8b: Host Daemon Mode
 
