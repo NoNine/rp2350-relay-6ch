@@ -89,6 +89,47 @@ ZTEST(indicator, test_boot_ready_buzzer_does_not_repeat_when_already_ready)
 	zassert_equal(snap.buzzer, INDICATOR_BUZZER_SILENT);
 }
 
+ZTEST(indicator, test_reboot_pending_buzzer_finishes_before_reset_delay)
+{
+	struct indicator_test_snapshot snap;
+
+	if (!IS_ENABLED(CONFIG_RP2350_RELAY_6CH_BUZZER_FEEDBACK)) {
+		ztest_test_skip();
+	}
+
+	indicator_set_reboot_pending(true);
+	snap = snapshot();
+	zassert_equal(snap.buzzer, INDICATOR_BUZZER_REBOOT_PENDING);
+
+	indicator_test_advance(61U);
+	indicator_test_get_snapshot(&snap);
+	zassert_equal(snap.buzzer, INDICATOR_BUZZER_REBOOT_PENDING);
+
+	indicator_test_advance(60U);
+	indicator_test_get_snapshot(&snap);
+	zassert_equal(snap.buzzer, INDICATOR_BUZZER_REBOOT_PENDING);
+
+	indicator_test_advance(61U);
+	indicator_test_get_snapshot(&snap);
+	zassert_equal(snap.buzzer, INDICATOR_BUZZER_REBOOT_PENDING);
+
+	indicator_test_advance(60U);
+	indicator_test_get_snapshot(&snap);
+	zassert_equal(snap.buzzer, INDICATOR_BUZZER_REBOOT_PENDING);
+
+	indicator_test_advance(61U);
+	indicator_test_get_snapshot(&snap);
+	zassert_equal(snap.buzzer, INDICATOR_BUZZER_REBOOT_PENDING);
+
+	indicator_test_advance(60U);
+	indicator_test_get_snapshot(&snap);
+	zassert_equal(snap.buzzer, INDICATOR_BUZZER_SILENT);
+
+	indicator_test_advance(436U);
+	indicator_test_get_snapshot(&snap);
+	zassert_equal(snap.buzzer, INDICATOR_BUZZER_SILENT);
+}
+
 ZTEST(indicator, test_relay_active_overrides_ready)
 {
 	struct indicator_test_snapshot snap;

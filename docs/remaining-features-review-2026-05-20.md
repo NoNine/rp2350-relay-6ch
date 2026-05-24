@@ -48,8 +48,8 @@ verification status.
 
 ## Source Context
 
-- [Implementation plan](implementation-plan.md) currently defines Phase 8 as
-  firmware upgrade foundation and Phase 9 as host firmware upload and rollback.
+- [Implementation plan](implementation-plan.md) currently defines Phase 9 as
+  firmware upgrade foundation and Phase 10 as host firmware upload and rollback.
 - [Product requirements](prd.md) require A/B firmware upgrade, signed images,
   inactive-slot upload, test boot, confirmation, rollback, and minimum health
   checks before confirmation.

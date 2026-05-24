@@ -30,8 +30,8 @@ there is only one RGB LED, it cannot truthfully show six independent relay
 states at the same time.
 
 Firmware-update-specific indications are reserved until the firmware upgrade
-workflows are implemented. Phase 8 owns MCUboot and firmware upgrade
-foundation work, and Phase 9 owns host upload, test-image, confirmation, and
+workflows are implemented. Phase 9 owns MCUboot and firmware upgrade
+foundation work, and Phase 10 owns host upload, test-image, confirmation, and
 rollback workflows.
 
 | Pattern | Meaning | Operator action |
@@ -42,7 +42,7 @@ rollback workflows.
 | Brief green blink | A valid host command was accepted. | No action unless the host reports an error. |
 | Solid cyan or blue | One or more relays are commanded on, or a pulse is active. | Confirm this matches the intended operation. Use `rp2350-relay status` for the commanded state mask. |
 | Yellow pulse | Degraded or attention state, such as RPC not ready, repeated invalid requests, busy pulse rejection, or pending update attention. | Query `rp2350-relay status` and review the host command result. |
-| Purple or blue animation | Controlled reboot is pending, or reserved Phase 8/9 firmware upgrade support is active. | Do not remove power unless following a documented recovery procedure. |
+| Purple or blue animation | Controlled reboot is pending, or reserved Phase 9/10 firmware upgrade support is active. | Do not remove power unless following a documented recovery procedure. |
 | Red blink | Firmware or hardware fault requiring attention. Relays should be off unless the fault occurred after an explicit command state. | Run `rp2350-relay status` if reachable, then force `off-all` before inspecting wiring or logs. |
 
 The cyan or blue relay-active indication means commanded relay state only. It
@@ -61,7 +61,7 @@ background heartbeat.
 | One long beep | Controller boot completed and firmware reached ready state. | Begin normal operation, or run `rp2350-relay info` if host communication is not available. |
 | One short beep | Operation accepted when buzzer feedback is enabled. | No action unless the host reports an error. |
 | Two short beeps | Command rejected or validation error. | Check the CLI error, command arguments, channel number, pulse duration, and current relay pulse state. |
-| Three short beeps | Controlled reboot scheduled, or reserved Phase 8/9 firmware upgrade support. | Wait for the board to return and verify `info` or `status`. |
+| Three short beeps | Controlled reboot scheduled, or reserved Phase 9/10 firmware upgrade support. | Wait for the board to return and verify `info` or `status`. |
 | Time-limited repeating chirp | Fault or local attention condition. | Silence or power down according to site procedure, then run status/recovery checks. |
 
 The firmware must not generate a continuous alarm without a timeout or silence

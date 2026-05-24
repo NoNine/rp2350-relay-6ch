@@ -30,7 +30,8 @@
 
 LOG_MODULE_REGISTER(rp2350_relay_mgmt, LOG_LEVEL_INF);
 
-#define REBOOT_PENDING_INDICATION_MS 500
+/* Cover three short reboot beeps plus a quiet gap before reset. */
+#define REBOOT_PENDING_INDICATION_MS 800
 
 enum relay_mgmt_counter {
 	RELAY_MGMT_COUNTER_RECEIVED,

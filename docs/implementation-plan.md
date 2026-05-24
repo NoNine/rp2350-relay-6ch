@@ -335,7 +335,90 @@ Deliverables:
 - Operator manual in `docs/status-indicators.md`.
 - Indicator checks added to hardware smoke-test procedures.
 
-## Phase 8: Firmware Upgrade Foundation
+## Phase 8a: Windows Session Mode
+
+Purpose: add the main Windows PC host-control workflow before firmware upgrade
+work, independent of any future firmware communication-loss safety.
+
+Implementation scope:
+
+- Use `docs/phase-8a-plan.md` as the authoritative implementation plan for
+  Windows session behavior, CLI shape, compatibility expectations, deferred
+  decisions, and tests.
+- Add `rp2350-relay --port COM7 session` as a long-lived direct-serial session
+  that owns the assigned Windows COM port while open and serializes relay
+  commands through one direct `RelayClient` connection.
+- Reuse the existing direct CLI command surface, one-based channel arguments,
+  host-side validation rules, output conventions, and typed exception mapping
+  where practical.
+- Keep one-shot `rp2350-relay --port COM7 <command>` behavior available for
+  diagnostics and simple checks.
+- Do not require firmware heartbeat, communication-loss timeout commands, or
+  new firmware protocol fields in this phase.
+
+Tests/gates:
+
+- Host tests cover session command parsing, command dispatch, typed error
+  handling, one-connection session ownership, and compatibility with existing
+  one-shot direct commands.
+- Existing direct host library and CLI tests still pass.
+- Manual hardware smoke testing can run session mode from Windows and leave
+  relays off after manual teardown.
+
+Dependencies:
+
+- Phase 6 complete for the direct host library and CLI command surface.
+- Phase 7 complete before this phase starts under the current phase order.
+
+Deliverables:
+
+- Session command under the existing host CLI package.
+- Windows session usage documentation.
+- Windows session smoke-test procedure under `docs/testing/`.
+
+## Phase 8b: Host Daemon Mode
+
+Purpose: add the production Linux host-control architecture before firmware
+upgrade work, independent of any future firmware communication-loss safety.
+
+Implementation scope:
+
+- Use `docs/phase-8b-plan.md` as the authoritative Phase 8b implementation plan
+  for the daemon lifecycle, local IPC, client API, CLI behavior, reconnect
+  handling, shutdown policy, and tests.
+- Add `rp2350-relayd` as a long-running foreground-capable daemon that owns the
+  USB CDC serial port, serializes relay commands, caches recent status, and
+  handles reconnect after device reboot or USB reset.
+- Add `rp2350-relayctl` as the short-lived daemon-client CLI while keeping
+  `rp2350-relay` as the direct serial diagnostic CLI.
+- Add a Python daemon client API alongside the existing direct `RelayClient`.
+- Use newline-delimited JSON over a same-user Unix domain socket under
+  `$XDG_RUNTIME_DIR`, falling back to `/run/user/$UID`.
+- Ship a `systemd --user` unit for production operation.
+- Do not require firmware heartbeat, communication-loss timeout commands, or
+  new firmware protocol fields in this phase.
+
+Tests/gates:
+
+- Host tests cover daemon request parsing, response formatting, command
+  serialization, client behavior, CLI behavior, startup state query, clean
+  shutdown, no-client relay-state policy, and simulated reconnect.
+- Existing direct host library and CLI tests still pass.
+- Manual hardware smoke testing can run daemon mode from Linux without root and
+  leave relays off after clean shutdown.
+
+Dependencies:
+
+- Phase 6 complete for the direct host library and CLI command surface.
+- Phase 7 complete before this phase starts under the current phase order.
+
+Deliverables:
+
+- Daemon, daemon client, and daemon-client CLI under the host tooling package.
+- User service/unit documentation and daemon usage documentation.
+- Daemon smoke-test procedure under `docs/testing/`.
+
+## Phase 9: Firmware Upgrade Foundation
 
 Purpose: add A/B update primitives without yet relying on automatic rollback
 for product safety.
@@ -364,6 +447,8 @@ Tests/gates:
 Dependencies:
 
 - Phase 4 complete.
+- Phase 8a and Phase 8b complete for Windows and Linux production
+  host-control workflows.
 - Flash layout validated for RP2350 external flash.
 
 Deliverables:
@@ -371,7 +456,7 @@ Deliverables:
 - Partition documentation in `docs/firmware-upgrade.md`.
 - Signing/build script updates under `scripts/`.
 
-## Phase 9: Host Firmware Upload And Rollback Workflow
+## Phase 10: Host Firmware Upload And Rollback Workflow
 
 Purpose: complete the PRD update workflow through the Python API and CLI.
 
@@ -403,7 +488,8 @@ Tests/gates:
 Dependencies:
 
 - Phase 7 complete.
-- Phase 5 and Phase 6 complete for host workflow.
+- Phase 9 complete.
+- Phase 5 and Phase 6 complete for direct host workflow.
 
 Deliverables:
 
@@ -417,7 +503,10 @@ Deliverables:
   CBOR fields, response fields, and error codes.
 - `docs/host-library.md`: Python API, exceptions, connection behavior, retry
   behavior, and examples.
-- `docs/cli.md`: command usage, output modes, exit codes, and examples.
+- `docs/cli.md`: direct and daemon-client command usage, output modes, exit
+  codes, and examples.
+- Daemon documentation: user service operation, local socket path, lifecycle,
+  reconnect behavior, and daemon-mode limitations.
 - `docs/status-indicators.md`: RGB LED meanings, buzzer patterns, limitations,
   and troubleshooting.
 - `docs/firmware-upgrade.md`: signing, upload, test boot, confirmation, and

@@ -342,7 +342,45 @@ Acceptance criteria:
 - Existing relay, relay-management, host, and CLI tests still pass.
 - Hardware smoke checks verify local indicators without leaving relays on.
 
-### Phase 8: Firmware Upgrade Foundation
+### Phase 8a: Windows Session Mode
+
+- Add `rp2350-relay --port COM7 session` as the main Windows PC operator
+  workflow.
+- Keep the session as a long-lived direct-serial owner for the assigned COM
+  port while it is open.
+- Reuse the existing host client, validation rules, typed exceptions, and
+  one-based CLI channel arguments.
+- Keep one-shot direct serial commands available for diagnostics and simple
+  checks.
+- Do not require firmware communication-loss safety or heartbeat support.
+
+Acceptance criteria:
+
+- Session tests pass without hardware.
+- Existing direct host library and CLI tests still pass.
+- Windows hardware smoke checks can control relays through one long-lived
+  session and leave all relays off after manual teardown.
+
+### Phase 8b: Host Daemon Mode
+
+- Add Linux daemon mode as the production host-control workflow.
+- Add `rp2350-relayd` to own the USB CDC serial port, serialize commands, and
+  handle reconnects.
+- Add `rp2350-relayctl` and a Python daemon client API for short-lived local
+  clients.
+- Use newline-delimited JSON over a same-user Unix domain socket.
+- Ship a `systemd --user` unit for production operation.
+- Keep direct serial control available through the existing CLI for diagnostics.
+- Do not require firmware communication-loss safety or heartbeat support.
+
+Acceptance criteria:
+
+- Daemon and daemon-client tests pass without hardware.
+- Existing direct host library and CLI tests still pass.
+- Linux hardware smoke checks can control relays through the daemon without
+  root and leave all relays off after clean shutdown.
+
+### Phase 9: Firmware Upgrade Foundation
 
 - Add MCUboot bootloader integration.
 - Define flash partition layout for A/B slots.
@@ -356,7 +394,7 @@ Acceptance criteria:
 - Device boots a signed application image.
 - Relay defaults remain off with MCUboot enabled.
 
-### Phase 9: Host Firmware Upload And Rollback Workflow
+### Phase 10: Host Firmware Upload And Rollback Workflow
 
 - Add Python and CLI wrappers for standard MCUmgr image upload and image state.
 - Implement test-image, reboot, health-check, confirm, and rollback behavior.
@@ -381,6 +419,12 @@ Acceptance criteria:
   retries, timeout handling, typed errors, and simulated device responses.
 - CLI tests shall cover argument parsing, output modes, non-zero failure exit
   codes, and representative relay/update commands.
+- Session tests shall cover Windows session command parsing, command dispatch,
+  one-connection session ownership, typed error handling, and compatibility
+  with existing one-shot direct commands.
+- Daemon tests shall cover local protocol parsing, command serialization,
+  client command behavior, reconnect handling, startup state query, no-client
+  relay-state policy, and clean shutdown.
 - Hardware smoke tests shall verify all six relays can be controlled
   independently and that reset returns relays off.
 - Local-indicator tests shall verify RGB LED state-priority behavior, buzzer
@@ -396,6 +440,8 @@ Acceptance criteria:
 - Document protocol version, group ID, command IDs, CBOR fields, and error
   codes.
 - Document host library API and CLI usage.
+- Document Windows session mode, daemon mode, `systemd --user` operation,
+  local socket path, direct diagnostic mode, and daemon smoke testing.
 - Document RGB LED and buzzer status meanings before enabling local indicator
   support in released firmware.
 - Document firmware signing and upgrade workflow.
