@@ -5,10 +5,19 @@ from dataclasses import dataclass
 from typing import Any
 
 import pytest
+from prompt_toolkit.completion import Completer
+from prompt_toolkit.history import InMemoryHistory
 
 from rp2350_relay_6ch.discovery import RelayUsbDevice, list_relay_devices, select_device_by_serial
 from rp2350_relay_6ch.exceptions import RelayTimeoutError, RelayTransportError
-from rp2350_relay_6ch.session import HeartbeatPoller, RelaySession, SessionOptions, _format_prompt
+from rp2350_relay_6ch.session import (
+    HeartbeatPoller,
+    RelaySession,
+    RelaySessionCompleter,
+    SessionOptions,
+    _format_prompt,
+)
+import rp2350_relay_6ch.session as session_module
 
 
 @dataclass
@@ -380,6 +389,30 @@ def test_session_commands_reuse_same_client_and_one_based_channels() -> None:
     assert len(SessionFakeClient.instances) == 1
 
 
+def test_ctrl_c_cancels_input_line_without_closing_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session, output = make_session(port="COM7")
+    reads = 0
+
+    def fake_read_input(prompt: str) -> str:
+        nonlocal reads
+        del prompt
+        reads += 1
+        if reads == 1:
+            raise KeyboardInterrupt
+        return "exit"
+
+    monkeypatch.setattr(session, "_read_input", fake_read_input)
+
+    assert session.run() == 0
+
+    client = SessionFakeClient.instances[0]
+    assert client.closed is True
+    assert client.calls == [("get_info", ()), ("get_status", ()), ("get_status", ())]
+    assert "^C" in output.getvalue()
+
+
 def test_connected_prompt_includes_port() -> None:
     session, _output = make_session(port="COM7")
     session._connect_from_options(session.options)
@@ -412,6 +445,99 @@ def test_help_output_is_grouped_and_mentions_safe_exit() -> None:
     assert "Notes:" in text
     assert "Run off-all before disconnecting or exiting." in text
     assert "Use --force only when you intentionally accept unknown or active relay state." in text
+
+
+def test_connected_completion_suggests_all_session_commands() -> None:
+    completer = RelaySessionCompleter(lambda: True)
+
+    assert completer.complete("") == [
+        "info",
+        "build-info",
+        "get",
+        "set",
+        "set-all",
+        "pulse",
+        "off-all",
+        "status",
+        "reboot",
+        "disconnect",
+        "connect",
+        "help",
+        "exit",
+        "quit",
+    ]
+
+
+def test_session_completer_uses_prompt_toolkit_base_class() -> None:
+    completer = RelaySessionCompleter(lambda: True)
+
+    assert isinstance(completer, Completer)
+    assert hasattr(completer, "get_completions_async")
+
+
+def test_session_uses_in_memory_prompt_history() -> None:
+    session, _output = make_session(port=None)
+
+    assert isinstance(session.history, InMemoryHistory)
+
+
+def test_prompt_toolkit_input_receives_session_history(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session, _output = make_session(port=None)
+    captured: dict[str, Any] = {}
+
+    def fake_prompt(message: object, **kwargs: Any) -> str:
+        captured["message"] = message
+        captured.update(kwargs)
+        return "status"
+
+    monkeypatch.setattr(session, "_prompt_toolkit_enabled", lambda: True)
+    monkeypatch.setattr(session_module, "prompt_toolkit_prompt", fake_prompt)
+    monkeypatch.setattr(session_module.sys, "stdin", session.input_stream)
+    monkeypatch.setattr(session_module.sys, "stdout", session.output)
+
+    assert session._read_input("rp2350-relay[disconnected]$ ") == "status"
+    assert captured["completer"] is session.completer
+    assert captured["history"] is session.history
+
+
+def test_disconnected_completion_suggests_only_available_commands() -> None:
+    completer = RelaySessionCompleter(lambda: False)
+
+    assert completer.complete("") == ["connect", "help", "exit", "quit"]
+    assert completer.complete("s") == []
+
+
+def test_completion_filters_partial_commands() -> None:
+    completer = RelaySessionCompleter(lambda: True)
+
+    assert completer.complete("st") == ["status"]
+    assert completer.complete("set") == ["set", "set-all"]
+
+
+def test_completion_suggests_channel_arguments() -> None:
+    completer = RelaySessionCompleter(lambda: True)
+
+    assert completer.complete("get ") == ["1", "2", "3", "4", "5", "6"]
+    assert completer.complete("set ") == ["1", "2", "3", "4", "5", "6"]
+    assert completer.complete("pulse ") == ["1", "2", "3", "4", "5", "6"]
+
+
+def test_completion_suggests_set_state_argument() -> None:
+    completer = RelaySessionCompleter(lambda: True)
+
+    assert completer.complete("set 1 ") == ["on", "off"]
+    assert completer.complete("set 1 o") == ["on", "off"]
+
+
+def test_completion_suggests_supported_options() -> None:
+    completer = RelaySessionCompleter(lambda: True)
+
+    assert completer.complete("connect --") == ["--port", "--serial"]
+    assert completer.complete("disconnect --") == ["--force"]
+    assert completer.complete("exit --") == ["--force"]
+    assert completer.complete("quit --") == ["--force"]
 
 
 def test_disconnect_refuses_when_relay_is_on_and_force_closes_without_off_all() -> None:

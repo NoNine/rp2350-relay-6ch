@@ -42,6 +42,8 @@ device, retry with appropriate USB permissions or `sudo`.
 
 ### CLI Wheel
 
+Use the wheel for the primary operator install path.
+
 Windows PowerShell:
 
 ```powershell
@@ -75,6 +77,27 @@ rp2350-relay --port <serial-port> smoke
 
 Use `COM7`-style ports on Windows and `/dev/ttyACM0`-style ports on Linux.
 Confirm all relays are off after the command exits.
+
+### Optional CLI Executable
+
+Some releases may include a platform executable as a convenience add-on. Use it
+when avoiding a Python install matters. The executable bundles the Python host
+CLI and its Python dependencies, but it is not the primary install path.
+
+Windows PowerShell:
+
+```powershell
+.\rp2350_relay_6ch-<version>-windows-x64.exe --port <serial-port> info
+.\rp2350_relay_6ch-<version>-windows-x64.exe --port <serial-port> smoke
+```
+
+Linux shell:
+
+```sh
+chmod +x ./rp2350_relay_6ch-<version>-linux-x64
+./rp2350_relay_6ch-<version>-linux-x64 --port <serial-port> info
+./rp2350_relay_6ch-<version>-linux-x64 --port <serial-port> smoke
+```
 
 ### Linux Serial Permissions
 
@@ -123,6 +146,21 @@ python -m pip install build
 python -m build
 ```
 
+Optionally build each platform executable on the matching operating system. On
+Windows, run from PowerShell:
+
+```powershell
+python -m pip install -e ".[release]"
+python scripts\build_host_executable.py
+```
+
+On Linux, run:
+
+```sh
+python -m pip install -e '.[release]'
+scripts/build-host-executable.sh
+```
+
 Attach at least the generated `dist/*.whl` file and renamed firmware images to
 the GitHub Release:
 
@@ -130,6 +168,11 @@ the GitHub Release:
   `rp2350_relay_6ch-<version>-waveshare.uf2`
 - `build/firmware-pico2/zephyr/zephyr.uf2` as
   `rp2350_relay_6ch-<version>-pico2.uf2`
+
+Optional executable artifacts may also be attached:
+
+- `dist/rp2350_relay_6ch-<version>-linux-x64`
+- `dist/rp2350_relay_6ch-<version>-windows-x64.exe`
 
 ## Common Options
 
@@ -166,7 +209,9 @@ mode so you can plug in hardware and run `connect`. Startup `--port` or
 Run `off-all` before exiting; normal session exit confirms relays are off.
 Connected sessions use a bracket prompt such as `rp2350-relay[COM7]$`; the
 disconnected prompt is `rp2350-relay[disconnected]$`. The REPL Plus UX contract
-is [REPL Plus CLI UX contract](host-cli-ux-repl-plus.md).
+is [REPL Plus CLI UX contract](host-cli-ux-repl-plus.md). USB removal and
+reinsert recovery semantics are defined in
+[Host session mode](host-session-mode.md#usb-removal-and-recovery).
 
 ## Commands
 

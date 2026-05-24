@@ -169,6 +169,10 @@ checkout or Zephyr workspace is required.
    `dialout` and log out/in; see [CLI utility](docs/cli.md#linux-serial-permissions).
    Confirm all relays are off after the smoke test.
 
+Some releases may also provide a platform executable as a convenience add-on.
+Use it when avoiding a Python install matters, but keep the wheel path as the
+default documented install flow.
+
 Full operator install, upgrade, and CLI details are in
 [CLI utility](docs/cli.md). For Pico 2 DIY firmware artifacts, see
 [Pico 2 DIY targets](docs/pico-diy-targets.md).

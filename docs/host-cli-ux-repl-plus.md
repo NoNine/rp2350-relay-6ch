@@ -19,13 +19,15 @@ This contract covers:
 - Session startup and disconnected prompt examples.
 - One-shot human output expectations.
 - Parser ergonomics for session startup options.
+- Session command tab completion.
 
 This contract does not add firmware behavior, protocol fields, daemon behavior,
 network control, telemetry, aliases, sequences, audit logs, persistent
-relay-on state, full-screen TUI behavior, command history, line editing, or tab
-completion.
+relay-on state, full-screen TUI behavior, command history, or full line-editing
+features beyond command tab completion.
 
-Line editing, command history, and tab completion remain future REPL Plus work.
+Line editing beyond the completion support provided by the prompt library and
+command history remain future REPL Plus work.
 
 ## Motivation
 
@@ -185,6 +187,14 @@ Notes:
 The help text must stay plain and copyable. It may be updated for exact field
 names or spacing during implementation, but it must preserve the same command
 groups and safety messages.
+
+## Session tab completion
+
+Interactive session mode should complete command names, supported options,
+relay channel labels `1` through `6`, and `set` states `on` and `off`.
+Completion must be state-aware: disconnected sessions complete only `connect`,
+`help`, `exit`, and `quit`. Completion must not perform USB discovery or change
+command validation semantics.
 
 ## Safe exit output
 

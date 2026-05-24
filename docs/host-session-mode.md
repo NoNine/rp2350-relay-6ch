@@ -215,6 +215,37 @@ Disconnected state is entered when:
 
 Background heartbeat failures do not enter disconnected state.
 
+## USB Removal And Recovery
+
+USB removal and reinsert is handled as an operator recovery flow, not as
+automatic reconnect in Phase 8a.
+
+While connected:
+
+- Heartbeat failures print warnings only.
+- Heartbeat does not enter disconnected mode, rediscover USB devices, or switch
+  the session to a new serial port.
+- If the host OS reuses the same serial port after reinsert, a later heartbeat
+  or foreground command may work through the existing client again.
+- If the host OS assigns a different serial port after reinsert, heartbeat keeps
+  trying the old port until the operator reconnects.
+
+When a foreground command gets a transport error after USB removal, the session
+closes the current client and enters disconnected mode. The normal recovery
+command is `connect`.
+
+Recovery behavior:
+
+- `connect --serial <usb-serial>` is the preferred recovery command when the
+  device USB serial number is known, because it can follow the device to a new
+  host serial port.
+- `connect --port <serial-port>` opens exactly that port and does not
+  substitute another discovered port.
+- Plain `connect` retries a saved startup `--port` or `--serial` selector
+  first, then falls back to USB discovery and the numbered device list.
+- Only the `reboot` command path attempts automatic reconnect by USB serial
+  number.
+
 ## Heartbeat Polling
 
 Phase 8a adds a dummy relay-management `heartbeat` command for host session

@@ -11,6 +11,11 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any, TextIO
 
+from prompt_toolkit import prompt as prompt_toolkit_prompt
+from prompt_toolkit.completion import Completer, Completion
+from prompt_toolkit.formatted_text import ANSI
+from prompt_toolkit.history import InMemoryHistory
+
 from rp2350_relay_6ch import (
     RelayClient,
     RelayDeviceError,
@@ -33,6 +38,23 @@ ANSI_GREEN = "\033[32m"
 ANSI_BLUE = "\033[34m"
 ANSI_RESET = "\033[0m"
 STARTUP_BOX_MIN_WIDTH = 60
+CONNECTED_COMMANDS = (
+    "info",
+    "build-info",
+    "get",
+    "set",
+    "set-all",
+    "pulse",
+    "off-all",
+    "status",
+    "reboot",
+    "disconnect",
+    "connect",
+    "help",
+    "exit",
+    "quit",
+)
+DISCONNECTED_COMMANDS = ("connect", "help", "exit", "quit")
 
 
 @dataclass
@@ -81,6 +103,48 @@ class HeartbeatPoller:
                 print(f"warning: heartbeat failed: {_error_label(exc)}: {exc}", file=self._output)
 
 
+class RelaySessionCompleter(Completer):
+    def __init__(self, connected: Callable[[], bool]) -> None:
+        self._connected = connected
+
+    def complete(self, text: str) -> list[str]:
+        _prefix, suggestions = self._suggestions(text)
+        return suggestions
+
+    def get_completions(self, document: Any, complete_event: Any) -> Iterable[Any]:
+        del complete_event
+        prefix, suggestions = self._suggestions(document.text_before_cursor)
+        start_position = -len(prefix) if prefix else 0
+        for suggestion in suggestions:
+            yield Completion(suggestion, start_position=start_position)
+
+    def _suggestions(self, text: str) -> tuple[str, list[str]]:
+        parsed = _completion_context(text)
+        if parsed is None:
+            return "", []
+        tokens, prefix = parsed
+        if not tokens:
+            return prefix, _matching(self._commands(), prefix)
+
+        command = tokens[0]
+        if command not in self._commands():
+            return prefix, []
+
+        args = tokens[1:]
+        if command == "connect":
+            return prefix, _matching(("--port", "--serial"), prefix)
+        if command in {"disconnect", "exit", "quit"}:
+            return prefix, _matching(("--force",), prefix)
+        if command in {"get", "set", "pulse"} and len(args) == 0:
+            return prefix, _matching(_channel_labels(), prefix)
+        if command == "set" and len(args) == 1:
+            return prefix, _matching(("on", "off"), prefix)
+        return prefix, []
+
+    def _commands(self) -> tuple[str, ...]:
+        return CONNECTED_COMMANDS if self._connected() else DISCONNECTED_COMMANDS
+
+
 class RelaySession:
     def __init__(
         self,
@@ -114,6 +178,8 @@ class RelaySession:
         self.product: str | None = None
         self.connected = False
         self.should_exit = False
+        self.completer = RelaySessionCompleter(lambda: self.connected)
+        self.history = InMemoryHistory()
 
     def run(self) -> int:
         if not self._connect_from_options(self.options, initial=True):
@@ -122,6 +188,9 @@ class RelaySession:
         while not self.should_exit:
             try:
                 line = self._read_input(self._prompt(color=self._prompt_color_enabled()))
+            except KeyboardInterrupt:
+                print("^C", file=self.output)
+                continue
             except EOFError:
                 self._handle_exit(force=False)
                 break
@@ -572,6 +641,12 @@ class RelaySession:
 
     def _read_input(self, prompt: str) -> str:
         if self.input_stream is sys.stdin and self.output is sys.stdout:
+            if self._prompt_toolkit_enabled():
+                return prompt_toolkit_prompt(
+                    ANSI(prompt),
+                    completer=self.completer,
+                    history=self.history,
+                )
             return input(prompt)
         print(prompt, end="", file=self.output, flush=True)
         line = self.input_stream.readline()
@@ -579,11 +654,39 @@ class RelaySession:
             raise EOFError
         return line.rstrip("\n")
 
+    def _prompt_toolkit_enabled(self) -> bool:
+        return (
+            self.input_stream is sys.stdin
+            and self.output is sys.stdout
+            and self.input_stream.isatty()
+            and self.output.isatty()
+        )
+
 
 def _format_prompt(state: str, *, color: bool = False) -> str:
     if color:
         return f"{ANSI_GREEN}rp2350-relay{ANSI_RESET}[{ANSI_BLUE}{state}{ANSI_RESET}]$ "
     return f"rp2350-relay[{state}]$ "
+
+
+def _completion_context(text: str) -> tuple[list[str], str] | None:
+    try:
+        if text and text[-1].isspace():
+            return shlex.split(text), ""
+        tokens = shlex.split(text)
+    except ValueError:
+        return None
+    if not tokens:
+        return [], ""
+    return tokens[:-1], tokens[-1]
+
+
+def _matching(values: Iterable[str], prefix: str) -> list[str]:
+    return [value for value in values if value.startswith(prefix)]
+
+
+def _channel_labels() -> tuple[str, ...]:
+    return tuple(str(channel) for channel in range(1, RELAY_COUNT + 1))
 
 
 class _PromptArgParser(argparse.ArgumentParser):
