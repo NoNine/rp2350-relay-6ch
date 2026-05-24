@@ -1,0 +1,380 @@
+from __future__ import annotations
+
+import io
+from dataclasses import dataclass
+from typing import Any
+
+import pytest
+
+from rp2350_relay_6ch.discovery import RelayUsbDevice, list_relay_devices, select_device_by_serial
+from rp2350_relay_6ch.exceptions import RelayTimeoutError, RelayTransportError
+from rp2350_relay_6ch.session import HeartbeatPoller, RelaySession, SessionOptions
+
+
+@dataclass
+class FakePort:
+    device: str
+    vid: int | None
+    pid: int | None
+    product: str | None
+    serial_number: str | None
+
+
+class FakeHeartbeat:
+    instances: list["FakeHeartbeat"] = []
+
+    def __init__(self, client: "SessionFakeClient", output: io.StringIO) -> None:
+        self.client = client
+        self.output = output
+        self.started = False
+        self.stopped = False
+        FakeHeartbeat.instances.append(self)
+
+    def start(self) -> None:
+        self.started = True
+
+    def stop(self) -> None:
+        self.stopped = True
+
+
+class SessionFakeClient:
+    instances: list["SessionFakeClient"] = []
+    failing_ports: set[str] = set()
+    fail_status = False
+    relay_state = 0
+    relay_pulsing = 0
+
+    def __init__(self, port: str, **kwargs: Any) -> None:
+        self.port = port
+        self.kwargs = kwargs
+        self.calls: list[tuple[str, tuple[Any, ...]]] = []
+        self.closed = False
+        SessionFakeClient.instances.append(self)
+
+    @classmethod
+    def connect(cls, port: str, **kwargs: Any) -> "SessionFakeClient":
+        if port in cls.failing_ports:
+            raise RelayTransportError(f"cannot open {port}")
+        return cls(port, **kwargs)
+
+    def close(self) -> None:
+        self.closed = True
+
+    def get_info(self) -> dict[str, Any]:
+        self.calls.append(("get_info", ()))
+        return {
+            "hardware": "Waveshare RP2350-Relay-6CH",
+            "protocol_version": 3,
+            "relay_count": 6,
+        }
+
+    def get_status(self) -> dict[str, Any]:
+        self.calls.append(("get_status", ()))
+        if self.fail_status:
+            raise RelayTransportError("lost")
+        return {"state": self.relay_state, "pulsing": self.relay_pulsing}
+
+    def get_build_info(self) -> dict[str, Any]:
+        self.calls.append(("get_build_info", ()))
+        return {"app_version": "0.7.0"}
+
+    def get_relays(self, channel: int | None = None) -> dict[str, Any]:
+        self.calls.append(("get_relays", (channel,)))
+        return {"state": self.relay_state, "pulsing": self.relay_pulsing}
+
+    def set_relay(self, channel: int, on: bool) -> dict[str, Any]:
+        self.calls.append(("set_relay", (channel, on)))
+        self.relay_state = 1 << channel if on else 0
+        return {"state": self.relay_state, "pulsing": self.relay_pulsing}
+
+    def set_all_relays(self, state: int) -> dict[str, Any]:
+        self.calls.append(("set_all_relays", (state,)))
+        self.relay_state = state
+        return {"state": state, "pulsing": self.relay_pulsing}
+
+    def pulse_relay(self, channel: int, duration_ms: int) -> dict[str, Any]:
+        self.calls.append(("pulse_relay", (channel, duration_ms)))
+        self.relay_state = 1 << channel
+        self.relay_pulsing = 1 << channel
+        return {"state": self.relay_state, "pulsing": self.relay_pulsing}
+
+    def off_all(self) -> dict[str, Any]:
+        self.calls.append(("off_all", ()))
+        self.relay_state = 0
+        self.relay_pulsing = 0
+        return {"state": 0, "pulsing": 0}
+
+    def reboot(self) -> dict[str, Any]:
+        self.calls.append(("reboot", ()))
+        return {"ok": True}
+
+    def heartbeat(self) -> dict[str, Any]:
+        self.calls.append(("heartbeat", ()))
+        return {"ok": True}
+
+
+@pytest.fixture(autouse=True)
+def reset_fakes() -> None:
+    SessionFakeClient.instances = []
+    SessionFakeClient.failing_ports = set()
+    SessionFakeClient.fail_status = False
+    SessionFakeClient.relay_state = 0
+    SessionFakeClient.relay_pulsing = 0
+    FakeHeartbeat.instances = []
+
+
+def make_session(
+    *,
+    port: str | None = "COM7",
+    serial: str | None = None,
+    discover: Any | None = None,
+    selector: Any | None = None,
+) -> tuple[RelaySession, io.StringIO]:
+    output = io.StringIO()
+    session = RelaySession(
+        SessionOptions(port=port, serial=serial, baud=115200, timeout=2.0, retries=1),
+        input_stream=io.StringIO(),
+        output=output,
+        client_factory=SessionFakeClient.connect,
+        discover=discover or (lambda: []),
+        serial_selector=selector
+        or (lambda value: RelayUsbDevice("COM9", value, "RP2350-Relay-6CH")),
+        heartbeat_factory=lambda client, out: FakeHeartbeat(client, out),
+        sleep=lambda seconds: None,
+    )
+    return session, output
+
+
+def test_discovery_filters_relay_usb_metadata() -> None:
+    devices = list_relay_devices(
+        [
+            FakePort("COM7", 0x2E8A, 0x0009, "RP2350-Relay-6CH", "abc"),
+            FakePort("COM8", 0x2E8A, 0x0009, "Other", "def"),
+            FakePort("COM9", 0x1234, 0x0009, "RP2350-Relay-6CH", "ghi"),
+        ]
+    )
+
+    assert devices == [RelayUsbDevice("COM7", "abc", "RP2350-Relay-6CH")]
+
+
+def test_discovery_exact_serial_ignores_serialless_devices() -> None:
+    device = select_device_by_serial(
+        "abc",
+        [
+            FakePort("COM7", 0x2E8A, 0x0009, "RP2350-Relay-6CH", None),
+            FakePort("COM8", 0x2E8A, 0x0009, "RP2350-Relay-6CH", "abc"),
+        ],
+    )
+
+    assert device.port == "COM8"
+
+
+def test_startup_opens_one_client_runs_info_status_and_starts_heartbeat() -> None:
+    session, output = make_session(port="COM7")
+
+    assert session._connect_from_options(session.options) is True
+
+    assert len(SessionFakeClient.instances) == 1
+    assert SessionFakeClient.instances[0].calls == [("get_info", ()), ("get_status", ())]
+    assert FakeHeartbeat.instances[0].started is True
+    assert "connected: port=COM7" in output.getvalue()
+    assert "protocol=3" in output.getvalue()
+
+
+def test_interactive_selection_is_shown_even_for_one_device() -> None:
+    output = io.StringIO()
+    session = RelaySession(
+        SessionOptions(port=None, serial=None, baud=115200, timeout=2.0, retries=1),
+        input_stream=io.StringIO("1\n"),
+        output=output,
+        client_factory=SessionFakeClient.connect,
+        discover=lambda: [RelayUsbDevice("COM7", None, "RP2350-Relay-6CH")],
+        heartbeat_factory=lambda client, out: FakeHeartbeat(client, out),
+    )
+
+    assert session._connect_from_options(session.options) is True
+
+    assert "Relay controllers:" in output.getvalue()
+    assert "serial=unknown" in output.getvalue()
+    assert SessionFakeClient.instances[0].port == "COM7"
+
+
+def test_startup_without_matching_devices_enters_disconnected_prompt_and_exits_zero() -> None:
+    session, output = make_session(port=None, discover=lambda: [])
+
+    assert session.run() == 0
+    assert session.connected is False
+    assert "no relay USB serial devices found" in output.getvalue()
+    assert "rp2350-relay(disconnected)> " in output.getvalue()
+
+
+def test_missing_startup_serial_lists_available_devices_and_plain_connect_falls_back() -> None:
+    selector_calls: list[str] = []
+    devices = [RelayUsbDevice("COM8", "available", "RP2350-Relay-6CH")]
+
+    def selector(usb_serial: str) -> RelayUsbDevice:
+        selector_calls.append(usb_serial)
+        raise RelayTransportError(f"no relay device found with USB serial {usb_serial}")
+
+    output = io.StringIO()
+    session = RelaySession(
+        SessionOptions(port=None, serial="wanted", baud=115200, timeout=2.0, retries=1),
+        input_stream=io.StringIO("1\n"),
+        output=output,
+        client_factory=SessionFakeClient.connect,
+        discover=lambda: devices,
+        serial_selector=selector,
+        heartbeat_factory=lambda client, out: FakeHeartbeat(client, out),
+    )
+
+    assert session._connect_from_options(session.options, initial=True) is False
+    assert session.preferred_serial == "wanted"
+    assert "Relay controllers:" in output.getvalue()
+    assert "serial=available" in output.getvalue()
+
+    session.handle_line("connect")
+
+    assert selector_calls == ["wanted", "wanted"]
+    assert session.connected is True
+    assert SessionFakeClient.instances[0].port == "COM8"
+
+
+def test_failed_startup_port_lists_available_devices_and_plain_connect_falls_back() -> None:
+    SessionFakeClient.failing_ports = {"COM7"}
+    devices = [RelayUsbDevice("COM8", "available", "RP2350-Relay-6CH")]
+    output = io.StringIO()
+    session = RelaySession(
+        SessionOptions(port="COM7", serial=None, baud=115200, timeout=2.0, retries=1),
+        input_stream=io.StringIO("1\n"),
+        output=output,
+        client_factory=SessionFakeClient.connect,
+        discover=lambda: devices,
+        heartbeat_factory=lambda client, out: FakeHeartbeat(client, out),
+    )
+
+    assert session._connect_from_options(session.options, initial=True) is False
+    assert session.preferred_port == "COM7"
+    assert "transport error: cannot open COM7" in output.getvalue()
+    assert "serial=available" in output.getvalue()
+
+    session.handle_line("connect")
+
+    assert session.connected is True
+    assert [client.port for client in SessionFakeClient.instances] == ["COM8"]
+
+
+def test_session_commands_reuse_same_client_and_one_based_channels() -> None:
+    session, _output = make_session(port="COM7")
+    session._connect_from_options(session.options)
+
+    session.handle_line("set 6 on")
+    session.handle_line("get 6")
+
+    client = SessionFakeClient.instances[0]
+    assert client.calls[-2:] == [("set_relay", (5, True)), ("get_relays", (5,))]
+    assert len(SessionFakeClient.instances) == 1
+
+
+def test_disconnect_refuses_when_relay_is_on_and_force_closes_without_off_all() -> None:
+    session, output = make_session(port="COM7")
+    session._connect_from_options(session.options)
+    SessionFakeClient.relay_state = 1
+
+    session.handle_line("disconnect")
+    assert session.connected is True
+    assert "refusing to close" in output.getvalue()
+
+    session.handle_line("disconnect --force")
+    client = SessionFakeClient.instances[0]
+    assert session.connected is False
+    assert client.closed is True
+    assert ("off_all", ()) not in client.calls
+    assert FakeHeartbeat.instances[0].stopped is True
+
+
+def test_disconnected_mode_rejects_relay_commands_and_allows_connect() -> None:
+    session, output = make_session(port=None, discover=lambda: [])
+
+    session.handle_line("status")
+    session.handle_line("connect --port COM7")
+
+    assert "not connected" in output.getvalue()
+    assert session.connected is True
+
+
+def test_transport_failure_enters_disconnected_state() -> None:
+    session, output = make_session(port="COM7")
+    session._connect_from_options(session.options)
+    SessionFakeClient.fail_status = True
+
+    session.handle_line("status")
+
+    assert session.connected is False
+    assert "transport error: lost" in output.getvalue()
+
+
+def test_heartbeat_failure_warns_without_stopping_poller() -> None:
+    class FakeEvent:
+        def __init__(self) -> None:
+            self.waits = 0
+
+        def set(self) -> None:
+            pass
+
+        def wait(self, timeout: float) -> bool:
+            del timeout
+            self.waits += 1
+            return self.waits > 2
+
+    class FakeThread:
+        def __init__(self, *, target: Any, daemon: bool) -> None:
+            del daemon
+            self.target = target
+
+        def start(self) -> None:
+            self.target()
+
+        def join(self, timeout: float) -> None:
+            del timeout
+
+    calls = 0
+    output = io.StringIO()
+
+    def heartbeat() -> dict[str, Any]:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise RelayTimeoutError("late")
+        return {"ok": True}
+
+    poller = HeartbeatPoller(
+        heartbeat,
+        interval_s=0.1,
+        output=output,
+        stop_event_factory=FakeEvent,
+        thread_factory=FakeThread,
+    )
+
+    poller.start()
+
+    assert calls == 2
+    assert "warning: heartbeat failed: timeout error: late" in output.getvalue()
+
+
+def test_reboot_closes_client_and_reconnects_by_serial() -> None:
+    selector_calls: list[str] = []
+
+    def selector(usb_serial: str) -> RelayUsbDevice:
+        selector_calls.append(usb_serial)
+        return RelayUsbDevice("COM9", usb_serial, "RP2350-Relay-6CH")
+
+    session, output = make_session(port=None, serial="abc", selector=selector)
+    session._connect_from_options(session.options)
+
+    session.handle_line("reboot")
+
+    assert selector_calls == ["abc", "abc"]
+    assert SessionFakeClient.instances[0].closed is True
+    assert SessionFakeClient.instances[1].port == "COM9"
+    assert session.connected is True
+    assert "reboot requested" in output.getvalue()

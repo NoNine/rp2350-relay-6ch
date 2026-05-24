@@ -251,6 +251,7 @@ ZTEST(relay_mgmt, test_group_registered)
 	zassert_equal(group->mg_handlers_count, RP2350_RELAY_6CH_MGMT_CMD_COUNT);
 	zassert_not_null(mgmt_get_handler(group, RP2350_RELAY_6CH_MGMT_CMD_INFO));
 	zassert_not_null(mgmt_get_handler(group, RP2350_RELAY_6CH_MGMT_CMD_BUILD_INFO));
+	zassert_not_null(mgmt_get_handler(group, RP2350_RELAY_6CH_MGMT_CMD_HEARTBEAT));
 }
 
 ZTEST(relay_mgmt, test_info_reports_capabilities)
@@ -297,6 +298,34 @@ ZTEST(relay_mgmt, test_build_info_reports_build_metadata)
 		      0);
 	zassert_true(decode_tstr(response_len, "compiler", &text));
 	zassert_not_equal(text.len, 0U);
+}
+
+ZTEST(relay_mgmt, test_heartbeat_returns_ok_and_does_not_change_state)
+{
+	size_t response_len;
+	bool ok = false;
+	uint32_t received = 0U;
+	uint32_t succeeded = 0U;
+
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_SET, true,
+				    encode_set_request(0U, true));
+	assert_state(response_len, BIT(0), 0U);
+
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_HEARTBEAT, true,
+				    encode_empty_request());
+	zassert_true(decode_bool(response_len, "ok", &ok));
+	zassert_true(ok);
+
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET, false,
+				    encode_empty_request());
+	assert_state(response_len, BIT(0), 0U);
+
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_STATUS, false,
+				    encode_empty_request());
+	zassert_true(decode_u32(response_len, "received", &received));
+	zassert_true(decode_u32(response_len, "succeeded", &succeeded));
+	zassert_equal(received, 4U);
+	zassert_equal(succeeded, 3U);
 }
 
 ZTEST(relay_mgmt, test_get_all_default_off)
@@ -406,6 +435,10 @@ ZTEST(relay_mgmt, test_malformed_empty_request_command_returns_decode_error)
 
 	request_buf[0] = 0xffU;
 	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_BUILD_INFO, false, 1U);
+	assert_error(response_len, RP2350_RELAY_6CH_MGMT_ERR_DECODE);
+
+	request_buf[0] = 0xffU;
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_HEARTBEAT, true, 1U);
 	assert_error(response_len, RP2350_RELAY_6CH_MGMT_ERR_DECODE);
 }
 

@@ -64,7 +64,7 @@ class FakeClient:
             "hardware": "Waveshare RP2350-Relay-6CH",
             "pulse_max_ms": 60000,
             "pulse_min_ms": 10,
-            "protocol_version": 2,
+            "protocol_version": 3,
             "relay_count": 6,
         }
 
@@ -114,6 +114,10 @@ class FakeClient:
         self.calls.append(("reboot", ()))
         return {"reboot": True}
 
+    def heartbeat(self) -> dict[str, Any]:
+        self.calls.append(("heartbeat", ()))
+        return {"ok": True}
+
 
 @pytest.fixture(autouse=True)
 def fake_client(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -161,8 +165,33 @@ def test_info_human_output_lists_all_fields(capsys: pytest.CaptureFixture[str]) 
     assert "hardware: Waveshare RP2350-Relay-6CH" in captured.out
     assert "pulse_max_ms: 60000" in captured.out
     assert "pulse_min_ms: 10" in captured.out
-    assert "protocol_version: 2" in captured.out
+    assert "protocol_version: 3" in captured.out
     assert "relay_count: 6" in captured.out
+
+
+def test_session_parser_accepts_port_and_delegates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: list[Any] = []
+
+    def fake_run_session(args: Any) -> int:
+        seen.append(args)
+        return 0
+
+    monkeypatch.setattr(cli, "run_session", fake_run_session)
+
+    rc = cli.main(["--port", "COM7", "session"])
+
+    assert rc == cli.EXIT_OK
+    assert seen[0].port == "COM7"
+    assert seen[0].command == "session"
+
+
+def test_session_parser_rejects_port_and_serial() -> None:
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["--port", "COM7", "--serial", "abc", "session"])
+
+    assert exc.value.code == cli.EXIT_ARGUMENT
 
 
 def test_build_info_outputs_json_and_uses_client(

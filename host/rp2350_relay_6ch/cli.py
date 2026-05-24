@@ -17,6 +17,7 @@ from rp2350_relay_6ch import (
     RelayValidationError,
 )
 from rp2350_relay_6ch.constants import RELAY_COUNT, RELAY_MASK
+from rp2350_relay_6ch.session import run_session
 
 EXIT_OK = 0
 EXIT_ARGUMENT = 2
@@ -232,7 +233,9 @@ class RelayArgumentParser(argparse.ArgumentParser):
 
 def build_parser() -> argparse.ArgumentParser:
     parser = RelayArgumentParser(description=__doc__)
-    parser.add_argument("--port", help="serial port, for example COM7 or /dev/ttyACM0")
+    selector = parser.add_mutually_exclusive_group()
+    selector.add_argument("--port", help="serial port, for example COM7 or /dev/ttyACM0")
+    selector.add_argument("--serial", help="USB serial number for session device selection")
     parser.add_argument("--baud", type=int, default=115200)
     parser.add_argument("--timeout", type=float, default=2.0)
     parser.add_argument("--retries", type=int, default=1)
@@ -264,10 +267,15 @@ def build_parser() -> argparse.ArgumentParser:
     smoke_parser = subparsers.add_parser("smoke", help="pulse each relay and turn all off")
     smoke_parser.add_argument("--pulse-ms", type=int, default=100)
 
+    subparsers.add_parser("session", help="open an interactive relay session")
+
     return parser
 
 
 def run(args: argparse.Namespace) -> int:
+    if args.command == "session":
+        return run_session(args)
+
     try:
         payload = COMMANDS[args.command](args)
     except RelayValidationError as exc:

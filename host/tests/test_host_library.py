@@ -9,6 +9,7 @@ from rp2350_relay_6ch import RelayClient, SerialSmpTransport, SimulatedPacketTra
 from rp2350_relay_6ch.constants import (
     CMD_BUILD_INFO,
     CMD_GET,
+    CMD_HEARTBEAT,
     CMD_INFO,
     CMD_PULSE,
     CMD_SET,
@@ -158,11 +159,25 @@ def test_smp_package_encodes_serial_frames() -> None:
 
 def test_get_info_returns_decoded_success_response() -> None:
     transport = SimulatedPacketTransport(
-        [response(CMD_INFO, 0, {"protocol_version": 2, "relay_count": 6})]
+        [response(CMD_INFO, 0, {"protocol_version": 3, "relay_count": 6})]
     )
     client = RelayClient(transport)
 
-    assert client.get_info() == {"protocol_version": 2, "relay_count": 6}
+    assert client.get_info() == {"protocol_version": 3, "relay_count": 6}
+
+
+def test_heartbeat_sends_write_request_with_empty_payload() -> None:
+    transport = SimulatedPacketTransport(
+        [response(CMD_HEARTBEAT, 0, {"ok": True}, OP_WRITE_RSP)]
+    )
+    client = RelayClient(transport)
+
+    assert client.heartbeat() == {"ok": True}
+
+    packet = decode_packet(transport.requests[0])
+    assert packet.op == 2
+    assert packet.command == CMD_HEARTBEAT
+    assert request_payload(transport) == {}
 
 
 def test_get_build_info_sends_read_request() -> None:

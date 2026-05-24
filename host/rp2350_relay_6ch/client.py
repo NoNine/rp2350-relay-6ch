@@ -7,6 +7,7 @@ from typing import Any
 from .constants import (
     CMD_BUILD_INFO,
     CMD_GET,
+    CMD_HEARTBEAT,
     CMD_INFO,
     CMD_OFF_ALL,
     CMD_PULSE,
@@ -132,6 +133,9 @@ class RelayClient:
 
     def reboot(self) -> dict[str, Any]:
         return self._request(CMD_REBOOT, OP_WRITE, {})
+
+    def heartbeat(self) -> dict[str, Any]:
+        return self._request(CMD_HEARTBEAT, OP_WRITE, {})
 
     def _request(self, command: int, op: int, payload: dict[str, Any]) -> dict[str, Any]:
         seq = self._next_seq()

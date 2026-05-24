@@ -507,6 +507,28 @@ static int build_info_handler(struct smp_streamer *ctxt)
 	return MGMT_ERR_EOK;
 }
 
+static int heartbeat_handler(struct smp_streamer *ctxt)
+{
+	zcbor_state_t *zsd = ctxt->reader->zs;
+	zcbor_state_t *zse = ctxt->writer->zs;
+	bool ok;
+
+	counter_inc(RELAY_MGMT_COUNTER_RECEIVED);
+
+	if (!validate_request_map(zsd)) {
+		return error_response(zse, RP2350_RELAY_6CH_MGMT_ERR_DECODE);
+	}
+
+	ok = zcbor_tstr_put_lit(zse, "ok") && zcbor_bool_put(zse, true);
+	if (!ok) {
+		return MGMT_ERR_EMSGSIZE;
+	}
+
+	counter_inc(RELAY_MGMT_COUNTER_SUCCEEDED);
+	indicator_record_command(INDICATOR_COMMAND_ACCEPTED);
+	return MGMT_ERR_EOK;
+}
+
 static const struct mgmt_handler relay_mgmt_handlers[] = {
 	[RP2350_RELAY_6CH_MGMT_CMD_INFO] = {
 		.mh_read = info_handler,
@@ -543,6 +565,10 @@ static const struct mgmt_handler relay_mgmt_handlers[] = {
 	[RP2350_RELAY_6CH_MGMT_CMD_BUILD_INFO] = {
 		.mh_read = build_info_handler,
 		.mh_write = NULL,
+	},
+	[RP2350_RELAY_6CH_MGMT_CMD_HEARTBEAT] = {
+		.mh_read = NULL,
+		.mh_write = heartbeat_handler,
 	},
 };
 

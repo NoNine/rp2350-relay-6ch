@@ -158,6 +158,9 @@ rp2350-relay --serial <usb-serial> session
 
 Without `--port` or `--serial`, the session discovers relay controllers and
 asks the operator to choose from a list showing port and USB serial number.
+If no matching controller is connected, the session stays open in disconnected
+mode so you can plug in hardware and run `connect`. Startup `--port` or
+`--serial` failures are also recoverable from the disconnected prompt.
 Run `off-all` before exiting; normal session exit confirms relays are off.
 
 ## Commands

@@ -64,12 +64,19 @@ Selection rules:
 
 - `rp2350-relay session` always shows the matching-device list and asks for a
   numbered selection, even when only one device is present.
-- If no matching devices are found, print a clear error and exit with the
-  argument or transport error code used by the existing CLI error policy.
+- If no matching devices are found at session launch, print a clear message and
+  enter disconnected mode so the operator can plug in hardware and run
+  `connect`.
 - If the operator enters an invalid selection, report it and prompt again until
   a valid selection is made or the operator cancels.
 - `--serial <usb-serial>` filters by exact serial number after VID, PID, and
   product filtering. It connects only when exactly one matching device exists.
+- If a startup `--serial` selector does not match, print the failure, list any
+  currently available matching relay devices, preserve the serial as the
+  preferred reconnect target, and enter disconnected mode.
+- If a startup `--port` cannot be opened or queried, print the typed failure,
+  list any currently available matching relay devices, preserve the port as the
+  preferred reconnect target, and enter disconnected mode.
 - Devices without a reported serial number are shown in the interactive list
   but never match `--serial`.
 
@@ -94,6 +101,9 @@ On successful connection:
 If startup `info` or `status` fails after the serial port opens, print the
 typed error using the existing CLI labels, close the client, and enter
 disconnected mode.
+
+Disconnected startup exits with status `0` if the operator exits without ever
+connecting; the startup failure is handled inside the interactive session.
 
 ## Prompt Grammar
 
@@ -156,7 +166,9 @@ Disconnected state:
 
 `connect` behavior:
 
-- `connect` with no selector runs discovery and shows the numbered device list.
+- `connect` with no selector retries a saved startup `--port` or `--serial`
+  selector first, then falls back to discovery and shows the numbered device
+  list if that retry still fails.
 - `connect --port <serial-port>` directly opens that port.
 - `connect --serial <usb-serial>` uses exact serial-number discovery.
 - `connect` is valid in disconnected mode and may also be used while connected
@@ -164,6 +176,8 @@ Disconnected state:
 
 Disconnected state is entered when:
 
+- Session launch finds no matching device.
+- Session launch cannot find the requested USB serial number.
 - Startup `info` or `status` fails after the serial port opens.
 - `disconnect` or `disconnect --force` closes the current client.
 - `reboot` closes the current client and reconnect by known USB serial number
