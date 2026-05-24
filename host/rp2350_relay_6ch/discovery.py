@@ -17,6 +17,7 @@ class RelayUsbDevice:
     port: str
     serial_number: str | None = None
     product: str | None = None
+    verified_product: bool = False
 
 
 class PortInfo(Protocol):
@@ -28,7 +29,7 @@ class PortInfo(Protocol):
 
 
 def list_relay_devices(ports: Iterable[PortInfo] | None = None) -> list[RelayUsbDevice]:
-    """Return USB CDC ports that identify as the relay controller."""
+    """Return USB CDC ports that are relay controller candidates."""
 
     if ports is None:
         try:
@@ -41,17 +42,27 @@ def list_relay_devices(ports: Iterable[PortInfo] | None = None) -> list[RelayUsb
     devices: list[RelayUsbDevice] = []
     for port in ports:
         product = getattr(port, "product", None)
-        if (
-            getattr(port, "vid", None) == RELAY_USB_VID
-            and getattr(port, "pid", None) == RELAY_USB_PID
-            and product is not None
-            and RELAY_USB_PRODUCT in product
-        ):
+        serial_number = getattr(port, "serial_number", None)
+        if getattr(port, "vid", None) != RELAY_USB_VID:
+            continue
+        if getattr(port, "pid", None) != RELAY_USB_PID:
+            continue
+        if product is not None and RELAY_USB_PRODUCT in product:
             devices.append(
                 RelayUsbDevice(
                     port=str(getattr(port, "device")),
-                    serial_number=getattr(port, "serial_number", None),
+                    serial_number=serial_number,
                     product=product,
+                    verified_product=True,
+                )
+            )
+        elif product is None and serial_number:
+            devices.append(
+                RelayUsbDevice(
+                    port=str(getattr(port, "device")),
+                    serial_number=serial_number,
+                    product=None,
+                    verified_product=False,
                 )
             )
     return devices

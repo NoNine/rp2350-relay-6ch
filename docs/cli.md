@@ -153,7 +153,9 @@ Session mode is a long-lived manual operator workflow for Windows and Linux:
 ```sh
 rp2350-relay session
 rp2350-relay --port <serial-port> session
+rp2350-relay session --port <serial-port>
 rp2350-relay --serial <usb-serial> session
+rp2350-relay session --serial <usb-serial>
 ```
 
 Without `--port` or `--serial`, the session discovers relay controllers and
@@ -162,6 +164,9 @@ If no matching controller is connected, the session stays open in disconnected
 mode so you can plug in hardware and run `connect`. Startup `--port` or
 `--serial` failures are also recoverable from the disconnected prompt.
 Run `off-all` before exiting; normal session exit confirms relays are off.
+Connected sessions use a bracket prompt such as `rp2350-relay[COM7]$`; the
+disconnected prompt is `rp2350-relay[disconnected]$`. The REPL Plus UX contract
+is [REPL Plus CLI UX contract](host-cli-ux-repl-plus.md).
 
 ## Commands
 

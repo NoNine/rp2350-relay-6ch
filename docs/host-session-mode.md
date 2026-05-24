@@ -48,37 +48,62 @@ Use pyserial's `serial.tools.list_ports.comports()` for session-only discovery.
 Discovery inspects USB metadata and must not probe arbitrary serial ports with
 relay protocol commands.
 
-Match relay controllers by:
+Discovery returns relay USB candidates. A candidate becomes a confirmed relay
+controller only after the session opens the serial port and the startup `info`
+and `status` relay protocol requests succeed.
+
+Match relay USB candidates by:
 
 - USB VID `0x2E8A`.
 - USB PID `0x0009`.
-- USB product string containing `RP2350-Relay-6CH`.
+- Verified candidate: USB product string containing `RP2350-Relay-6CH`.
+- Unverified candidate: product string is missing, but a USB serial number is
+  present.
 
-Display matching devices with at least:
+Reject ports with wrong VID or PID. Reject anonymous VID/PID-only ports with no
+product string and no serial number.
+
+Display matching candidates with at least:
 
 - Port, such as `COM7` or `/dev/ttyACM0`.
 - USB serial number, or `unknown` when the host OS does not report one.
 - Product string when available.
+- `status=unverified` when the product string is missing and the candidate was
+  accepted only by VID, PID, and serial number.
+
+Example candidate list:
+
+```text
+Relay USB candidates:
+  1. port=COM19 serial=B905D541EF8C32DB product=unknown status=unverified
+  2. port=/dev/ttyACM0 serial=B905D541EF8C32DB product=RP2350-Relay-6CH SMP CDC
+```
 
 Selection rules:
 
-- `rp2350-relay session` always shows the matching-device list and asks for a
+- `rp2350-relay session` always shows the candidate list and asks for a
   numbered selection, even when only one device is present.
-- If no matching devices are found at session launch, print a clear message and
+- If no matching candidates are found at session launch, print a clear message and
   enter disconnected mode so the operator can plug in hardware and run
   `connect`.
 - If the operator enters an invalid selection, report it and prompt again until
   a valid selection is made or the operator cancels.
-- `--serial <usb-serial>` filters by exact serial number after VID, PID, and
-  product filtering. It connects only when exactly one matching device exists.
+- `--serial <usb-serial>` filters by exact serial number after candidate
+  matching. It connects only when exactly one matching candidate exists.
 - If a startup `--serial` selector does not match, print the failure, list any
-  currently available matching relay devices, preserve the serial as the
+  currently available matching candidates, preserve the serial as the
   preferred reconnect target, and enter disconnected mode.
 - If a startup `--port` cannot be opened or queried, print the typed failure,
-  list any currently available matching relay devices, preserve the port as the
+  list any currently available matching candidates, preserve the port as the
   preferred reconnect target, and enter disconnected mode.
-- Devices without a reported serial number are shown in the interactive list
-  but never match `--serial`.
+- A selected candidate must pass startup `info` and `status` before the session
+  prints a connected banner. A generic Pico 2 or other non-relay firmware may
+  appear as an unverified candidate but must fail safely into disconnected mode
+  if it does not speak the relay protocol.
+- Exact `--port` startup and `connect --port <serial-port>` always open the
+  requested port. If that exact port matches a verified or unverified
+  candidate, attach its serial and product metadata to the session. Never
+  substitute a different discovered port.
 
 USB serial numbers are expected to be unique because the firmware enables
 Zephyr hardware-info support for the RP Pico chip ID and the CDC ACM helper uses
@@ -93,9 +118,11 @@ On successful connection:
 
 - Run `info`.
 - Run `status`.
-- Print a compact startup banner containing port, USB serial when known,
-  hardware, protocol version, relay count, current state mask, channels that
-  are on, and channels that are pulsing.
+- Print a `/status`-style boxed startup summary containing port, USB serial
+  when known, hardware, protocol version, relay count, current state mask,
+  channels that are on, and channels that are pulsing.
+- Keep exact terminal readability and display style aligned with
+  [REPL Plus CLI UX contract](host-cli-ux-repl-plus.md).
 - Do not send `off-all` during startup.
 
 If startup `info` or `status` fails after the serial port opens, print the

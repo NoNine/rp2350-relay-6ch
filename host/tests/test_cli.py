@@ -187,11 +187,117 @@ def test_session_parser_accepts_port_and_delegates(
     assert seen[0].command == "session"
 
 
+def test_session_parser_accepts_session_local_port_and_delegates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: list[Any] = []
+
+    def fake_run_session(args: Any) -> int:
+        seen.append(args)
+        return 0
+
+    monkeypatch.setattr(cli, "run_session", fake_run_session)
+
+    rc = cli.main(["session", "--port", "COM7"])
+
+    assert rc == cli.EXIT_OK
+    assert seen[0].port == "COM7"
+    assert seen[0].command == "session"
+
+
+def test_session_local_options_override_global_options(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: list[Any] = []
+
+    def fake_run_session(args: Any) -> int:
+        seen.append(args)
+        return 0
+
+    monkeypatch.setattr(cli, "run_session", fake_run_session)
+
+    rc = cli.main(
+        [
+            "--port",
+            "COM7",
+            "--baud",
+            "9600",
+            "--timeout",
+            "1.0",
+            "--retries",
+            "1",
+            "session",
+            "--port",
+            "COM8",
+            "--baud",
+            "115200",
+            "--timeout",
+            "3.0",
+            "--retries",
+            "2",
+        ]
+    )
+
+    assert rc == cli.EXIT_OK
+    assert seen[0].port == "COM8"
+    assert seen[0].baud == 115200
+    assert seen[0].timeout == 3.0
+    assert seen[0].retries == 2
+
+
+def test_session_parser_accepts_session_local_serial(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: list[Any] = []
+
+    def fake_run_session(args: Any) -> int:
+        seen.append(args)
+        return 0
+
+    monkeypatch.setattr(cli, "run_session", fake_run_session)
+
+    rc = cli.main(["session", "--serial", "abc"])
+
+    assert rc == cli.EXIT_OK
+    assert seen[0].serial == "abc"
+
+
+def test_session_local_serial_clears_global_port(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: list[Any] = []
+
+    def fake_run_session(args: Any) -> int:
+        seen.append(args)
+        return 0
+
+    monkeypatch.setattr(cli, "run_session", fake_run_session)
+
+    rc = cli.main(["--port", "COM7", "session", "--serial", "abc"])
+
+    assert rc == cli.EXIT_OK
+    assert seen[0].serial == "abc"
+    assert seen[0].port is None
+
+
 def test_session_parser_rejects_port_and_serial() -> None:
     with pytest.raises(SystemExit) as exc:
         cli.main(["--port", "COM7", "--serial", "abc", "session"])
 
     assert exc.value.code == cli.EXIT_ARGUMENT
+
+
+def test_session_help_includes_examples_and_safe_exit_language(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["session", "--help"])
+
+    captured = capsys.readouterr()
+
+    assert exc.value.code == cli.EXIT_OK
+    assert "rp2350-relay session --port COM7" in captured.out
+    assert "Normal exit and disconnect verify all relays are off" in captured.out
 
 
 def test_build_info_outputs_json_and_uses_client(
@@ -253,8 +359,8 @@ def test_get_channel_human_output_reports_on_channel(
 
     assert rc == cli.EXIT_OK
     assert "channel: CH1" in captured.out
-    assert "on: True" in captured.out
-    assert "pulsing: False" in captured.out
+    assert "on: true" in captured.out
+    assert "pulsing: false" in captured.out
     assert FakeClient.instances[0].calls == [("get_relays", (0,))]
 
 
@@ -269,8 +375,8 @@ def test_get_channel_human_output_reports_off_channel(
 
     assert rc == cli.EXIT_OK
     assert "channel: CH1" in captured.out
-    assert "on: False" in captured.out
-    assert "pulsing: False" in captured.out
+    assert "on: false" in captured.out
+    assert "pulsing: false" in captured.out
 
 
 def test_get_channel_human_output_reports_pulsing_channel(
@@ -285,8 +391,34 @@ def test_get_channel_human_output_reports_pulsing_channel(
 
     assert rc == cli.EXIT_OK
     assert "channel: CH1" in captured.out
-    assert "on: True" in captured.out
-    assert "pulsing: True" in captured.out
+    assert "on: true" in captured.out
+    assert "pulsing: true" in captured.out
+
+
+def test_status_human_output_groups_relay_and_transport_fields(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    rc = cli.main(["--port", "COM7", "status"])
+
+    captured = capsys.readouterr()
+
+    assert rc == cli.EXIT_OK
+    assert "relays:\n" in captured.out
+    assert "  state: 0x00" in captured.out
+    assert "  on: none" in captured.out
+    assert "  pulsing: none" in captured.out
+    assert "transport:\n" in captured.out
+    assert "  last_error: 0" in captured.out
+    assert "  request_count: 12" in captured.out
+
+
+def test_status_json_output_is_unchanged(capsys: pytest.CaptureFixture[str]) -> None:
+    rc = cli.main(["--port", "COM7", "--output", "json", "status"])
+
+    captured = capsys.readouterr()
+
+    assert rc == cli.EXIT_OK
+    assert captured.out.strip() == '{"last_error": 0, "pulsing": 0, "request_count": 12, "state": 0}'
 
 
 def test_missing_port_returns_argument_exit(capsys: pytest.CaptureFixture[str]) -> None:

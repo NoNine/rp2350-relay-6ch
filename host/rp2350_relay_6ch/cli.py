@@ -48,11 +48,37 @@ def _format_single_channel(payload: dict[str, Any]) -> str:
     channel = int(payload["channel"])
     fields = [
         f"channel: CH{channel + 1}",
-        f"on: {bool(payload.get('on', False))}",
+        f"on: {str(bool(payload.get('on', False))).lower()}",
     ]
     if "pulsing" in payload:
-        fields.append(f"pulsing: {bool(payload['pulsing'])}")
+        fields.append(f"pulsing: {str(bool(payload['pulsing'])).lower()}")
     return "\n".join(fields)
+
+
+def _format_relay_masks(payload: dict[str, Any]) -> str:
+    state = int(payload.get("state", 0))
+    pulsing = int(payload.get("pulsing", 0))
+    on_channels = _state_channels(state)
+    pulse_channels = _state_channels(pulsing)
+    fields = [
+        f"state: 0x{state:02x}",
+        f"on: {', '.join(on_channels) if on_channels else 'none'}",
+    ]
+    if "pulsing" in payload:
+        fields.append(f"pulsing: {', '.join(pulse_channels) if pulse_channels else 'none'}")
+    return "\n".join(fields)
+
+
+def _format_status(payload: dict[str, Any]) -> str:
+    relay_keys = {"state", "pulsing"}
+    transport = {key: payload[key] for key in sorted(payload) if key not in relay_keys}
+    lines = ["relays:"]
+    lines.extend(f"  {line}" for line in _format_relay_masks(payload).splitlines())
+    if transport:
+        lines.append("")
+        lines.append("transport:")
+        lines.extend(f"  {key}: {value}" for key, value in transport.items())
+    return "\n".join(lines)
 
 
 def _format_human(command: str, payload: dict[str, Any]) -> str:
@@ -63,22 +89,10 @@ def _format_human(command: str, payload: dict[str, Any]) -> str:
         return _format_single_channel(payload)
 
     if command in {"get", "set", "set-all", "pulse", "off-all"}:
-        state = int(payload.get("state", 0))
-        pulsing = int(payload.get("pulsing", 0))
-        on_channels = _state_channels(state)
-        pulse_channels = _state_channels(pulsing)
-        fields = [
-            f"state: 0x{state:02x}",
-            f"on: {', '.join(on_channels) if on_channels else 'none'}",
-        ]
-        if "pulsing" in payload:
-            fields.append(
-                f"pulsing: {', '.join(pulse_channels) if pulse_channels else 'none'}"
-            )
-        return "\n".join(fields)
+        return _format_relay_masks(payload)
 
     if command == "status":
-        return _format_key_values(payload)
+        return _format_status(payload)
 
     if command == "build-info":
         return _format_key_values(payload)
@@ -267,13 +281,47 @@ def build_parser() -> argparse.ArgumentParser:
     smoke_parser = subparsers.add_parser("smoke", help="pulse each relay and turn all off")
     smoke_parser.add_argument("--pulse-ms", type=int, default=100)
 
-    subparsers.add_parser("session", help="open an interactive relay session")
+    session_parser = subparsers.add_parser(
+        "session",
+        help="open an interactive relay session",
+        description="Open a long-lived relay control session.",
+        epilog=(
+            "examples:\n"
+            "  rp2350-relay session\n"
+            "  rp2350-relay --port COM7 session\n"
+            "  rp2350-relay session --port COM7\n\n"
+            "Normal exit and disconnect verify all relays are off. "
+            "Run off-all first or use --force inside the session when you "
+            "intentionally accept unknown or active relay state."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    session_selector = session_parser.add_mutually_exclusive_group()
+    session_selector.add_argument("--port", dest="session_port", metavar="PORT")
+    session_selector.add_argument("--serial", dest="session_serial", metavar="SERIAL")
+    session_parser.add_argument("--baud", dest="session_baud", metavar="BAUD", type=int)
+    session_parser.add_argument("--timeout", dest="session_timeout", metavar="TIMEOUT", type=float)
+    session_parser.add_argument("--retries", dest="session_retries", metavar="RETRIES", type=int)
 
     return parser
 
 
+def _apply_session_overrides(args: argparse.Namespace) -> None:
+    if getattr(args, "session_port", None) is not None:
+        args.port = args.session_port
+        args.serial = None
+    if getattr(args, "session_serial", None) is not None:
+        args.serial = args.session_serial
+        args.port = None
+    for name in ("baud", "timeout", "retries"):
+        value = getattr(args, f"session_{name}", None)
+        if value is not None:
+            setattr(args, name, value)
+
+
 def run(args: argparse.Namespace) -> int:
     if args.command == "session":
+        _apply_session_overrides(args)
         return run_session(args)
 
     try:
@@ -305,3 +353,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     return run(args)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

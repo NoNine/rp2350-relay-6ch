@@ -29,6 +29,10 @@ from rp2350_relay_6ch.discovery import (
 from .constants import RELAY_COUNT
 
 HEARTBEAT_INTERVAL_S = 5.0
+ANSI_GREEN = "\033[32m"
+ANSI_BLUE = "\033[34m"
+ANSI_RESET = "\033[0m"
+STARTUP_BOX_MIN_WIDTH = 60
 
 
 @dataclass
@@ -117,9 +121,7 @@ class RelaySession:
 
         while not self.should_exit:
             try:
-                line = self._read_input(
-                    "rp2350-relay> " if self.connected else "rp2350-relay(disconnected)> "
-                )
+                line = self._read_input(self._prompt(color=self._prompt_color_enabled()))
             except EOFError:
                 self._handle_exit(force=False)
                 break
@@ -173,7 +175,12 @@ class RelaySession:
         if options.port:
             self.preferred_port = options.port
             self.preferred_serial = None
-            if self._open(options.port, usb_serial=None, product=None):
+            device = self._metadata_for_port(options.port)
+            if self._open(
+                options.port,
+                usb_serial=device.serial_number if device else None,
+                product=device.product if device else None,
+            ):
                 return True
             if initial:
                 self._print_available_devices()
@@ -194,7 +201,12 @@ class RelaySession:
                 product=device.product,
             )
         if not initial and not skip_preferred and self.preferred_port:
-            if self._open(self.preferred_port, usb_serial=None, product=None):
+            device = self._metadata_for_port(self.preferred_port)
+            if self._open(
+                self.preferred_port,
+                usb_serial=device.serial_number if device else None,
+                product=device.product if device else None,
+            ):
                 return True
             return self._connect_from_options(
                 SessionOptions(
@@ -234,6 +246,16 @@ class RelaySession:
         if device is None:
             return False
         return self._open(device.port, usb_serial=device.serial_number, product=device.product)
+
+    def _metadata_for_port(self, port: str) -> RelayUsbDevice | None:
+        try:
+            devices = self.discover()
+        except RelayError:
+            return None
+        for device in devices:
+            if device.port == port:
+                return device
+        return None
 
     def _open(self, port: str, *, usb_serial: str | None, product: str | None) -> bool:
         if self.connected:
@@ -291,11 +313,17 @@ class RelaySession:
             print(f"argument error: selection must be 1..{len(devices)}", file=self.output)
 
     def _print_devices(self, devices: Iterable[RelayUsbDevice]) -> None:
-        print("Relay controllers:", file=self.output)
+        print("Relay USB candidates:", file=self.output)
         for index, device in enumerate(devices, start=1):
             serial = device.serial_number or "unknown"
-            product = f" product={device.product}" if device.product else ""
-            print(f"  {index}. port={device.port} serial={serial}{product}", file=self.output)
+            if device.product:
+                product = f"product={device.product}"
+            else:
+                product = "product=unknown status=unverified"
+            print(
+                f"  {index}. port={device.port} serial={serial} {product}",
+                file=self.output,
+            )
 
     def _print_available_devices(self) -> None:
         try:
@@ -323,14 +351,19 @@ class RelaySession:
         pulsing = int(status.get("pulsing", 0))
         serial = self.usb_serial or "unknown"
         print(
-            "connected: "
-            f"port={self.port} serial={serial} "
-            f"hardware={info.get('hardware', 'unknown')} "
-            f"protocol={info.get('protocol_version', 'unknown')} "
-            f"relays={info.get('relay_count', 'unknown')} "
-            f"state=0x{state:02x} "
-            f"on={_format_channels(state)} "
-            f"pulsing={_format_channels(pulsing)}",
+            _format_startup_box(
+                [
+                    ("Connection", "connected"),
+                    ("Port", self.port),
+                    ("Serial", serial),
+                    ("Hardware", info.get("hardware", "unknown")),
+                    ("Protocol", info.get("protocol_version", "unknown")),
+                    ("Relay count", info.get("relay_count", "unknown")),
+                    ("State", f"0x{state:02x}"),
+                    ("On", _format_channels(state)),
+                    ("Pulsing", _format_channels(pulsing)),
+                ]
+            ),
             file=self.output,
         )
 
@@ -493,11 +526,48 @@ class RelaySession:
 
     def _print_help(self) -> None:
         print(
-            "commands: info, build-info, get [channel], set <channel> <on|off>, "
-            "set-all <mask>, pulse <channel> <duration-ms>, off-all, status, "
-            "reboot, connect, disconnect [--force], help, exit [--force], "
-            "quit [--force]",
+            "Inspect:\n"
+            "  status                       show relay state, transport counters, and last error\n"
+            "  get                          show all relay states\n"
+            "  get <channel>                show one relay state\n"
+            "  info                         show controller hardware and protocol information\n"
+            "  build-info                   show firmware build details\n"
+            "\n"
+            "Control:\n"
+            "  set <channel> <on|off>       set one relay\n"
+            "  set-all <mask>               set all relays from a six-bit mask\n"
+            "  pulse <channel> <duration>   pulse one relay for duration in ms\n"
+            "  off-all                      turn every relay off and cancel pulses\n"
+            "\n"
+            "Connection:\n"
+            "  connect                      connect using saved selector or discovery\n"
+            "  connect --port <port>        connect to a serial port\n"
+            "  connect --serial <serial>    connect by USB serial number\n"
+            "  disconnect                   close only when relays are confirmed off\n"
+            "  disconnect --force           close without confirmed all-off state\n"
+            "\n"
+            "Exit:\n"
+            "  exit                         exit only when relays are confirmed off\n"
+            "  quit                         same as exit\n"
+            "  exit --force                 exit without confirmed all-off state\n"
+            "  quit --force                 same as exit --force\n"
+            "\n"
+            "Notes:\n"
+            "  Channels are board labels: 1 is CH1, 6 is CH6.\n"
+            "  Run off-all before disconnecting or exiting.\n"
+            "  Use --force only when you intentionally accept unknown or active relay state.",
             file=self.output,
+        )
+
+    def _prompt(self, *, color: bool = False) -> str:
+        state = str(self.port) if self.connected else "disconnected"
+        return _format_prompt(state, color=color)
+
+    def _prompt_color_enabled(self) -> bool:
+        return (
+            self.input_stream is sys.stdin
+            and self.output is sys.stdout
+            and self.output.isatty()
         )
 
     def _read_input(self, prompt: str) -> str:
@@ -508,6 +578,12 @@ class RelaySession:
         if line == "":
             raise EOFError
         return line.rstrip("\n")
+
+
+def _format_prompt(state: str, *, color: bool = False) -> str:
+    if color:
+        return f"{ANSI_GREEN}rp2350-relay{ANSI_RESET}[{ANSI_BLUE}{state}{ANSI_RESET}]$ "
+    return f"rp2350-relay[{state}]$ "
 
 
 class _PromptArgParser(argparse.ArgumentParser):
@@ -575,6 +651,20 @@ def _parse_on_off_arg(value: str) -> bool:
 def _format_channels(mask: int) -> str:
     channels = [f"CH{channel + 1}" for channel in range(RELAY_COUNT) if mask & (1 << channel)]
     return ", ".join(channels) if channels else "none"
+
+
+def _format_startup_box(rows: list[tuple[str, object]]) -> str:
+    label_width = max(len(label) for label, _value in rows)
+    content_rows = ["  RP2350 Relay Session"]
+    content_rows.append("")
+    content_rows.extend(
+        f"  {label + ':':<{label_width + 1}}  {value}" for label, value in rows
+    )
+    inner_width = max(STARTUP_BOX_MIN_WIDTH, max(len(row) for row in content_rows))
+    lines = [f"╭{'─' * (inner_width + 2)}╮"]
+    lines.extend(f"│ {row:<{inner_width}} │" for row in content_rows)
+    lines.append(f"╰{'─' * (inner_width + 2)}╯")
+    return "\n".join(lines)
 
 
 def _error_label(exc: BaseException) -> str:

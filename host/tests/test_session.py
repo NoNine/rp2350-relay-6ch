@@ -8,7 +8,7 @@ import pytest
 
 from rp2350_relay_6ch.discovery import RelayUsbDevice, list_relay_devices, select_device_by_serial
 from rp2350_relay_6ch.exceptions import RelayTimeoutError, RelayTransportError
-from rp2350_relay_6ch.session import HeartbeatPoller, RelaySession, SessionOptions
+from rp2350_relay_6ch.session import HeartbeatPoller, RelaySession, SessionOptions, _format_prompt
 
 
 @dataclass
@@ -154,7 +154,29 @@ def test_discovery_filters_relay_usb_metadata() -> None:
         ]
     )
 
-    assert devices == [RelayUsbDevice("COM7", "abc", "RP2350-Relay-6CH")]
+    assert devices == [RelayUsbDevice("COM7", "abc", "RP2350-Relay-6CH", True)]
+
+
+def test_discovery_accepts_vid_pid_serial_candidate_without_product() -> None:
+    devices = list_relay_devices(
+        [
+            FakePort("COM7", 0x2E8A, 0x0009, None, "B905D541EF8C32DB"),
+            FakePort("COM8", 0x2E8A, 0x0009, None, None),
+        ]
+    )
+
+    assert devices == [RelayUsbDevice("COM7", "B905D541EF8C32DB", None, False)]
+
+
+def test_discovery_rejects_wrong_vid_pid_even_with_serial() -> None:
+    devices = list_relay_devices(
+        [
+            FakePort("COM7", 0x1234, 0x0009, None, "abc"),
+            FakePort("COM8", 0x2E8A, 0x1234, None, "def"),
+        ]
+    )
+
+    assert devices == []
 
 
 def test_discovery_exact_serial_ignores_serialless_devices() -> None:
@@ -169,6 +191,15 @@ def test_discovery_exact_serial_ignores_serialless_devices() -> None:
     assert device.port == "COM8"
 
 
+def test_discovery_exact_serial_selects_unverified_candidate() -> None:
+    device = select_device_by_serial(
+        "B905D541EF8C32DB",
+        [FakePort("COM7", 0x2E8A, 0x0009, None, "B905D541EF8C32DB")],
+    )
+
+    assert device == RelayUsbDevice("COM7", "B905D541EF8C32DB", None, False)
+
+
 def test_startup_opens_one_client_runs_info_status_and_starts_heartbeat() -> None:
     session, output = make_session(port="COM7")
 
@@ -177,8 +208,62 @@ def test_startup_opens_one_client_runs_info_status_and_starts_heartbeat() -> Non
     assert len(SessionFakeClient.instances) == 1
     assert SessionFakeClient.instances[0].calls == [("get_info", ()), ("get_status", ())]
     assert FakeHeartbeat.instances[0].started is True
-    assert "connected: port=COM7" in output.getvalue()
-    assert "protocol=3" in output.getvalue()
+    text = output.getvalue()
+    assert "╭" in text
+    assert "RP2350 Relay Session" in text
+    assert "Connection:   connected" in text
+    assert "Port:         COM7" in text
+    assert "Protocol:     3" in text
+    assert "State:        0x00" in text
+    assert "Pulsing:      none" in text
+
+
+def test_startup_with_explicit_port_attaches_matching_usb_metadata() -> None:
+    devices = [RelayUsbDevice("COM7", "abc", "RP2350-Relay-6CH")]
+    session, output = make_session(port="COM7", discover=lambda: devices)
+
+    assert session._connect_from_options(session.options) is True
+
+    assert session.usb_serial == "abc"
+    assert session.product == "RP2350-Relay-6CH"
+    assert "Serial:       abc" in output.getvalue()
+    assert SessionFakeClient.instances[0].port == "COM7"
+
+
+def test_startup_with_explicit_port_attaches_unverified_usb_metadata() -> None:
+    devices = [RelayUsbDevice("COM7", "B905D541EF8C32DB", None, False)]
+    session, output = make_session(port="COM7", discover=lambda: devices)
+
+    assert session._connect_from_options(session.options) is True
+
+    assert session.usb_serial == "B905D541EF8C32DB"
+    assert session.product is None
+    assert "Serial:       B905D541EF8C32DB" in output.getvalue()
+    assert SessionFakeClient.instances[0].port == "COM7"
+
+
+def test_explicit_port_metadata_lookup_does_not_substitute_other_port() -> None:
+    devices = [RelayUsbDevice("COM8", "abc", "RP2350-Relay-6CH")]
+    session, output = make_session(port="COM7", discover=lambda: devices)
+
+    assert session._connect_from_options(session.options) is True
+
+    assert session.usb_serial is None
+    assert "Serial:       unknown" in output.getvalue()
+    assert SessionFakeClient.instances[0].port == "COM7"
+
+
+def test_explicit_port_opens_when_metadata_lookup_fails() -> None:
+    def discover() -> list[RelayUsbDevice]:
+        raise RelayTransportError("metadata unavailable")
+
+    session, output = make_session(port="COM7", discover=discover)
+
+    assert session._connect_from_options(session.options) is True
+
+    assert session.usb_serial is None
+    assert "Serial:       unknown" in output.getvalue()
+    assert SessionFakeClient.instances[0].port == "COM7"
 
 
 def test_interactive_selection_is_shown_even_for_one_device() -> None:
@@ -194,9 +279,29 @@ def test_interactive_selection_is_shown_even_for_one_device() -> None:
 
     assert session._connect_from_options(session.options) is True
 
-    assert "Relay controllers:" in output.getvalue()
-    assert "serial=unknown" in output.getvalue()
+    assert "Relay USB candidates:" in output.getvalue()
+    assert "Serial:       unknown" in output.getvalue()
     assert SessionFakeClient.instances[0].port == "COM7"
+
+
+def test_interactive_selection_marks_productless_candidate_unverified() -> None:
+    output = io.StringIO()
+    session = RelaySession(
+        SessionOptions(port=None, serial=None, baud=115200, timeout=2.0, retries=1),
+        input_stream=io.StringIO("1\n"),
+        output=output,
+        client_factory=SessionFakeClient.connect,
+        discover=lambda: [RelayUsbDevice("COM7", "B905D541EF8C32DB", None, False)],
+        heartbeat_factory=lambda client, out: FakeHeartbeat(client, out),
+    )
+
+    assert session._connect_from_options(session.options) is True
+
+    text = output.getvalue()
+    assert "Relay USB candidates:" in text
+    assert "product=unknown status=unverified" in text
+    assert "Port:         COM7" in text
+    assert "Serial:       B905D541EF8C32DB" in text
 
 
 def test_startup_without_matching_devices_enters_disconnected_prompt_and_exits_zero() -> None:
@@ -205,7 +310,7 @@ def test_startup_without_matching_devices_enters_disconnected_prompt_and_exits_z
     assert session.run() == 0
     assert session.connected is False
     assert "no relay USB serial devices found" in output.getvalue()
-    assert "rp2350-relay(disconnected)> " in output.getvalue()
+    assert "rp2350-relay[disconnected]$ " in output.getvalue()
 
 
 def test_missing_startup_serial_lists_available_devices_and_plain_connect_falls_back() -> None:
@@ -229,7 +334,7 @@ def test_missing_startup_serial_lists_available_devices_and_plain_connect_falls_
 
     assert session._connect_from_options(session.options, initial=True) is False
     assert session.preferred_serial == "wanted"
-    assert "Relay controllers:" in output.getvalue()
+    assert "Relay USB candidates:" in output.getvalue()
     assert "serial=available" in output.getvalue()
 
     session.handle_line("connect")
@@ -275,6 +380,40 @@ def test_session_commands_reuse_same_client_and_one_based_channels() -> None:
     assert len(SessionFakeClient.instances) == 1
 
 
+def test_connected_prompt_includes_port() -> None:
+    session, _output = make_session(port="COM7")
+    session._connect_from_options(session.options)
+
+    assert session._prompt() == "rp2350-relay[COM7]$ "
+
+
+def test_disconnected_prompt_uses_bracket_style() -> None:
+    session, _output = make_session(port=None)
+
+    assert session._prompt() == "rp2350-relay[disconnected]$ "
+
+
+def test_colored_prompt_uses_green_name_blue_state_and_plain_dollar() -> None:
+    assert _format_prompt("COM7", color=True) == (
+        "\033[32mrp2350-relay\033[0m[\033[34mCOM7\033[0m]$ "
+    )
+
+
+def test_help_output_is_grouped_and_mentions_safe_exit() -> None:
+    session, output = make_session(port=None)
+
+    session.handle_line("help")
+
+    text = output.getvalue()
+    assert "Inspect:" in text
+    assert "Control:" in text
+    assert "Connection:" in text
+    assert "Exit:" in text
+    assert "Notes:" in text
+    assert "Run off-all before disconnecting or exiting." in text
+    assert "Use --force only when you intentionally accept unknown or active relay state." in text
+
+
 def test_disconnect_refuses_when_relay_is_on_and_force_closes_without_off_all() -> None:
     session, output = make_session(port="COM7")
     session._connect_from_options(session.options)
@@ -300,6 +439,17 @@ def test_disconnected_mode_rejects_relay_commands_and_allows_connect() -> None:
 
     assert "not connected" in output.getvalue()
     assert session.connected is True
+
+
+def test_connect_port_attaches_matching_usb_metadata() -> None:
+    devices = [RelayUsbDevice("COM7", "abc", "RP2350-Relay-6CH")]
+    session, output = make_session(port=None, discover=lambda: devices)
+
+    session.handle_line("connect --port COM7")
+
+    assert session.connected is True
+    assert session.usb_serial == "abc"
+    assert "Serial:       abc" in output.getvalue()
 
 
 def test_transport_failure_enters_disconnected_state() -> None:
@@ -378,3 +528,28 @@ def test_reboot_closes_client_and_reconnects_by_serial() -> None:
     assert SessionFakeClient.instances[1].port == "COM9"
     assert session.connected is True
     assert "reboot requested" in output.getvalue()
+
+
+def test_reboot_after_explicit_port_reconnects_by_attached_serial() -> None:
+    selector_calls: list[str] = []
+
+    def selector(usb_serial: str) -> RelayUsbDevice:
+        selector_calls.append(usb_serial)
+        return RelayUsbDevice("COM9", usb_serial, "RP2350-Relay-6CH")
+
+    devices = [RelayUsbDevice("COM7", "abc", "RP2350-Relay-6CH")]
+    session, output = make_session(
+        port="COM7",
+        discover=lambda: devices,
+        selector=selector,
+    )
+    session._connect_from_options(session.options)
+
+    session.handle_line("reboot")
+
+    assert selector_calls == ["abc"]
+    assert SessionFakeClient.instances[0].closed is True
+    assert SessionFakeClient.instances[1].port == "COM9"
+    assert session.connected is True
+    assert "Port:         COM9" in output.getvalue()
+    assert "Serial:       abc" in output.getvalue()
