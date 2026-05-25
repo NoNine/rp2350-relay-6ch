@@ -86,7 +86,7 @@ class SessionFakeClient:
 
     def get_build_info(self) -> dict[str, Any]:
         self.calls.append(("get_build_info", ()))
-        return {"app_version": "0.7.0"}
+        return {"app_version": "0.8.0"}
 
     def get_relays(self, channel: int | None = None) -> dict[str, Any]:
         self.calls.append(("get_relays", (channel,)))

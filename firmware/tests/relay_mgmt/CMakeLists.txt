@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.20.0)
 set(KCONFIG_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../../Kconfig)
 
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
-project(rp2350_relay_6ch_relay_mgmt_tests VERSION 0.7.0)
+project(rp2350_relay_6ch_relay_mgmt_tests VERSION 0.8.0)
 
 find_package(Git QUIET)
 set(RP2350_RELAY_6CH_GIT_COMMIT "unknown")

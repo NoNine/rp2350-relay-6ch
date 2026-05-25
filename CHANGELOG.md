@@ -7,6 +7,75 @@ release assets. The section shape is inspired by Adafruit CircuitPython release
 notes: highlights, install/assets, verification, known limitations, and safety
 notes.
 
+## 0.8.0 - 2026-05-25
+
+Cross-platform session mode release for the current relay CLI and firmware
+line.
+
+- Tag: `v0.8.0`
+- Commit: the `v0.8.0` tag target.
+
+### Highlights
+
+- Added cross-platform `rp2350-relay session` mode for long-lived manual relay
+  operation on Windows and Linux.
+- Added interactive USB relay discovery, explicit serial-port selection, and
+  USB serial-number selection for session startup and reconnect workflows.
+- Added prompt history, completion, safe disconnect/exit checks, and one-client
+  command serialization for session mode.
+- Added host executable build tooling for bundled operator CLI artifacts.
+- Reduced background heartbeat noise to concise session status lines.
+- Added a one-time `heartbeat: restored` notice after heartbeat polling
+  recovers from a failure streak.
+- Recorded Phase 8a session-mode verification.
+- Added repository implementation-discipline guidance for minimal changes,
+  existing component reuse, and avoiding unnecessary abstractions.
+
+### Install / Assets
+
+- Install the host CLI from the GitHub Release wheel:
+  `rp2350_relay_6ch-0.8.0-py3-none-any.whl`.
+- Flash one of the matching firmware artifacts from the same release:
+  `rp2350_relay_6ch-0.8.0-waveshare.uf2` or
+  `rp2350_relay_6ch-0.8.0-pico2.uf2`.
+- Optional platform executable artifacts may be attached when useful:
+  `rp2350_relay_6ch-0.8.0-linux-x64` or
+  `rp2350_relay_6ch-0.8.0-windows-x64.exe`.
+- The source distribution `rp2350_relay_6ch-0.8.0.tar.gz` may be available as
+  an additional artifact.
+
+### Verification
+
+- Phase 8a verification recorded PASS for the automated host gate and
+  operator-reported hardware session smoke test.
+- Host tests passed with `scripts/test-host.sh`: `87 passed`.
+- Built the host wheel with `python -m build --wheel`.
+- Verified the rebuilt wheel contains `heartbeat: restored` and the concise
+  heartbeat transport status text.
+- Wheel build output included the existing setuptools deprecation warning from
+  environment configuration.
+
+### Known Limitations
+
+- Linux production daemon mode remains planned but not implemented.
+- MCUboot-compatible firmware upload, test-image, confirm-image, and rollback
+  workflows remain planned but not implemented.
+- Communication-loss firmware safety actions remain planned but not
+  implemented.
+- Pico 2 and Pico 2 W DIY builds require explicit relay overlays and external
+  relay driver hardware.
+- RS485 and wireless host communication are not v1 control paths.
+- Application-layer authentication is not implemented; this release assumes
+  trusted local USB access.
+
+### Safety Notes
+
+- Keep hazardous relay-side loads disconnected during bring-up.
+- Confirm all relays are off after flashing, reset, smoke tests, and teardown.
+- Session mode safe exit checks are host-side checks of reported relay state;
+  they do not measure contact closure, load voltage, load current, or external
+  equipment health.
+
 ## 0.7.0 - 2026-05-24
 
 Local status indicator release for the current relay CLI and firmware line.
