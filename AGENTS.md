@@ -63,6 +63,15 @@ Do not retrofit completed phase plans for new direction changes. Treat completed
 `docs/phase-*-plan.md` files as historical records unless the user explicitly
 asks to correct or revise them.
 
+## Implementation Discipline
+
+Make the smallest change that satisfies the requested behavior while keeping
+the repository buildable and testable. Prefer existing project patterns,
+components, helpers, wrapper scripts, and Zephyr or Python library APIs where
+practical. Do not introduce new components, abstractions, protocols, or helper
+layers unless they remove real complexity, match an established project
+pattern, or are required by the requested behavior.
+
 ## Scope Discipline
 
 Treat discussion documents as idea exploration, not implementation approval.

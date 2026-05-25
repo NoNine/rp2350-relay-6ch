@@ -15,6 +15,7 @@ from rp2350_relay_6ch.session import (
     RelaySession,
     RelaySessionCompleter,
     SessionOptions,
+    _format_heartbeat_error,
     _format_prompt,
 )
 import rp2350_relay_6ch.session as session_module
@@ -589,7 +590,9 @@ def test_transport_failure_enters_disconnected_state() -> None:
     assert "transport error: lost" in output.getvalue()
 
 
-def test_heartbeat_failure_warns_without_stopping_poller() -> None:
+def run_fake_heartbeat_poller(outcomes: list[RelayTimeoutError | dict[str, Any]]) -> str:
+    poll_count = len(outcomes)
+
     class FakeEvent:
         def __init__(self) -> None:
             self.waits = 0
@@ -600,7 +603,7 @@ def test_heartbeat_failure_warns_without_stopping_poller() -> None:
         def wait(self, timeout: float) -> bool:
             del timeout
             self.waits += 1
-            return self.waits > 2
+            return self.waits > poll_count
 
     class FakeThread:
         def __init__(self, *, target: Any, daemon: bool) -> None:
@@ -613,15 +616,13 @@ def test_heartbeat_failure_warns_without_stopping_poller() -> None:
         def join(self, timeout: float) -> None:
             del timeout
 
-    calls = 0
     output = io.StringIO()
 
     def heartbeat() -> dict[str, Any]:
-        nonlocal calls
-        calls += 1
-        if calls == 1:
-            raise RelayTimeoutError("late")
-        return {"ok": True}
+        outcome = outcomes.pop(0)
+        if isinstance(outcome, RelayTimeoutError):
+            raise outcome
+        return outcome
 
     poller = HeartbeatPoller(
         heartbeat,
@@ -632,9 +633,49 @@ def test_heartbeat_failure_warns_without_stopping_poller() -> None:
     )
 
     poller.start()
+    assert outcomes == []
+    return output.getvalue()
 
-    assert calls == 2
-    assert "warning: heartbeat failed: timeout error: late" in output.getvalue()
+
+def test_heartbeat_success_from_start_stays_silent() -> None:
+    output = run_fake_heartbeat_poller([{"ok": True}, {"ok": True}])
+
+    assert output == ""
+
+
+def test_heartbeat_failure_warns_without_stopping_poller() -> None:
+    output = run_fake_heartbeat_poller([RelayTimeoutError("late"), {"ok": True}])
+
+    assert "heartbeat: no response" in output
+    assert "heartbeat: restored" in output
+    assert "late" not in output
+
+
+def test_heartbeat_restored_prints_once_after_failure_streak() -> None:
+    output = run_fake_heartbeat_poller(
+        [
+            RelayTimeoutError("first"),
+            RelayTimeoutError("second"),
+            {"ok": True},
+            {"ok": True},
+        ]
+    )
+
+    assert output.count("heartbeat: no response") == 2
+    assert output.count("heartbeat: restored") == 1
+
+
+def test_heartbeat_transport_failure_uses_concise_status_message() -> None:
+    output = _format_heartbeat_error(
+        RelayTransportError(
+            "[Errno 2] could not open port /dev/ttyACM0: "
+            "[Errno 2] No such file or directory: '/dev/ttyACM0'"
+        )
+    )
+
+    assert output == "heartbeat: serial link unavailable"
+    assert "/dev/ttyACM0" not in output
+    assert "No such file or directory" not in output
 
 
 def test_reboot_closes_client_and_reconnects_by_serial() -> None:

@@ -15,6 +15,7 @@ from prompt_toolkit import prompt as prompt_toolkit_prompt
 from prompt_toolkit.completion import Completer, Completion
 from prompt_toolkit.formatted_text import ANSI
 from prompt_toolkit.history import InMemoryHistory
+from prompt_toolkit.patch_stdout import patch_stdout
 
 from rp2350_relay_6ch import (
     RelayClient,
@@ -83,6 +84,7 @@ class HeartbeatPoller:
         self._stop = stop_event_factory()
         self._thread = thread_factory(target=self._run, daemon=True)
         self._lock = lock
+        self._failed = False
 
     def start(self) -> None:
         self._thread.start()
@@ -100,7 +102,12 @@ class HeartbeatPoller:
                     with self._lock:
                         self._heartbeat()
             except RelayError as exc:
-                print(f"warning: heartbeat failed: {_error_label(exc)}: {exc}", file=self._output)
+                print(_format_heartbeat_error(exc), file=self._output)
+                self._failed = True
+            else:
+                if self._failed:
+                    print("heartbeat: restored", file=self._output)
+                    self._failed = False
 
 
 class RelaySessionCompleter(Completer):
@@ -642,11 +649,12 @@ class RelaySession:
     def _read_input(self, prompt: str) -> str:
         if self.input_stream is sys.stdin and self.output is sys.stdout:
             if self._prompt_toolkit_enabled():
-                return prompt_toolkit_prompt(
-                    ANSI(prompt),
-                    completer=self.completer,
-                    history=self.history,
-                )
+                with patch_stdout():
+                    return prompt_toolkit_prompt(
+                        ANSI(prompt),
+                        completer=self.completer,
+                        history=self.history,
+                    )
             return input(prompt)
         print(prompt, end="", file=self.output, flush=True)
         line = self.input_stream.readline()
@@ -790,3 +798,11 @@ def _format_error(exc: RelayError) -> str:
     if isinstance(exc, RelayDeviceError):
         return f"device error: group={exc.group} rc={exc.rc}: {exc}"
     return f"{_error_label(exc)}: {exc}"
+
+
+def _format_heartbeat_error(exc: RelayError) -> str:
+    if isinstance(exc, RelayTimeoutError):
+        return "heartbeat: no response"
+    if isinstance(exc, RelayTransportError):
+        return "heartbeat: serial link unavailable"
+    return f"heartbeat: {_error_label(exc)}"

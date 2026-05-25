@@ -222,11 +222,13 @@ automatic reconnect in Phase 8a.
 
 While connected:
 
-- Heartbeat failures print warnings only.
+- Heartbeat failures print concise status warnings only.
 - Heartbeat does not enter disconnected mode, rediscover USB devices, or switch
   the session to a new serial port.
 - If the host OS reuses the same serial port after reinsert, a later heartbeat
-  or foreground command may work through the existing client again.
+  or foreground command may work through the existing client again. If a
+  heartbeat succeeds after one or more heartbeat failures, print
+  `heartbeat: restored` once for that failure streak.
 - If the host OS assigns a different serial port after reinsert, heartbeat keeps
   trying the old port until the operator reconnects.
 
@@ -267,7 +269,10 @@ Session behavior:
 
 - Poll `heartbeat` every 5 seconds while connected.
 - Do not print successful background heartbeat polls.
-- Print warnings for heartbeat failures.
+- Print concise status warnings for heartbeat failures.
+- After one or more heartbeat failures, print `heartbeat: restored` once when a
+  later heartbeat succeeds. Do not repeat restored messages while heartbeat
+  remains healthy.
 - Keep the same client connected after a heartbeat failure; the next foreground
   command uses that client and succeeds or fails normally.
 - Do not expose `heartbeat` as a one-shot CLI command or session prompt command
@@ -375,8 +380,8 @@ Automated tests should cover:
 - Validation, timeout, transport, protocol, and device errors continuing the
   session where appropriate.
 - Transport failure moving the session into disconnected mode.
-- Background heartbeat polling while connected, including silent success and
-  warning-only failure behavior.
+- Background heartbeat polling while connected, including silent healthy polls,
+  concise failure status, and one-time restored status after a failure streak.
 - Disconnected-mode command restrictions.
 - `connect`, `connect --port`, and `connect --serial`.
 - `exit`, `quit`, and `disconnect` blocking when relay state is on, pulsing, or
