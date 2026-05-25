@@ -139,40 +139,10 @@ system reboots.
 
 ## Release Artifact Notes
 
-Release maintainers build the wheel from the repository root:
-
-```sh
-python -m pip install build
-python -m build
-```
-
-Optionally build each platform executable on the matching operating system. On
-Windows, run from PowerShell:
-
-```powershell
-python -m pip install -e ".[release]"
-python scripts\build_host_executable.py
-```
-
-On Linux, run:
-
-```sh
-python -m pip install -e '.[release]'
-scripts/build-host-executable.sh
-```
-
-Attach at least the generated `dist/*.whl` file and renamed firmware images to
-the GitHub Release:
-
-- `build/firmware/zephyr/zephyr.uf2` as
-  `rp2350_relay_6ch-<version>-waveshare.uf2`
-- `build/firmware-pico2/zephyr/zephyr.uf2` as
-  `rp2350_relay_6ch-<version>-pico2.uf2`
-
-Optional executable artifacts may also be attached:
-
-- `dist/rp2350_relay_6ch-<version>-linux-x64`
-- `dist/rp2350_relay_6ch-<version>-windows-x64.exe`
+Release maintainers should use the fixed workflow in
+[Release workflow](release.md). Every GitHub Release must include the host CLI
+wheel, Waveshare UF2, and Pico 2 UF2 from the same version tag. Optional
+platform executables may also be attached when useful.
 
 ## Common Options
 
