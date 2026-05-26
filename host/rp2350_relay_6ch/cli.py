@@ -44,15 +44,20 @@ def _state_channels(state: int) -> list[str]:
     return [f"CH{channel + 1}" for channel in range(RELAY_COUNT) if state & (1 << channel)]
 
 
+def _format_key_value_rows(rows: list[tuple[str, object]]) -> str:
+    key_width = max(len(key) for key, _value in rows)
+    return "\n".join(f"{key + ':':<{key_width + 1}}  {value}" for key, value in rows)
+
+
 def _format_single_channel(payload: dict[str, Any]) -> str:
     channel = int(payload["channel"])
     fields = [
-        f"channel: CH{channel + 1}",
-        f"on: {str(bool(payload.get('on', False))).lower()}",
+        ("channel", f"CH{channel + 1}"),
+        ("on", str(bool(payload.get("on", False))).lower()),
     ]
     if "pulsing" in payload:
-        fields.append(f"pulsing: {str(bool(payload['pulsing'])).lower()}")
-    return "\n".join(fields)
+        fields.append(("pulsing", str(bool(payload["pulsing"])).lower()))
+    return _format_key_value_rows(fields)
 
 
 def _format_relay_masks(payload: dict[str, Any]) -> str:
@@ -61,12 +66,12 @@ def _format_relay_masks(payload: dict[str, Any]) -> str:
     on_channels = _state_channels(state)
     pulse_channels = _state_channels(pulsing)
     fields = [
-        f"state: 0x{state:02x}",
-        f"on: {', '.join(on_channels) if on_channels else 'none'}",
+        ("state", f"0x{state:02x}"),
+        ("on", ", ".join(on_channels) if on_channels else "none"),
     ]
     if "pulsing" in payload:
-        fields.append(f"pulsing: {', '.join(pulse_channels) if pulse_channels else 'none'}")
-    return "\n".join(fields)
+        fields.append(("pulsing", ", ".join(pulse_channels) if pulse_channels else "none"))
+    return _format_key_value_rows(fields)
 
 
 def _format_status(payload: dict[str, Any]) -> str:
@@ -77,7 +82,9 @@ def _format_status(payload: dict[str, Any]) -> str:
     if transport:
         lines.append("")
         lines.append("transport:")
-        lines.extend(f"  {key}: {value}" for key, value in transport.items())
+        lines.extend(
+            f"  {line}" for line in _format_key_value_rows(list(transport.items())).splitlines()
+        )
     return "\n".join(lines)
 
 
@@ -107,10 +114,7 @@ def _format_human(command: str, payload: dict[str, Any]) -> str:
 
 
 def _format_key_values(payload: dict[str, Any]) -> str:
-    lines = []
-    for key in sorted(payload):
-        lines.append(f"{key}: {payload[key]}")
-    return "\n".join(lines)
+    return _format_key_value_rows([(key, payload[key]) for key in sorted(payload)])
 
 
 def _emit(args: argparse.Namespace, payload: dict[str, Any]) -> None:

@@ -161,12 +161,12 @@ def test_info_human_output_lists_all_fields(capsys: pytest.CaptureFixture[str]) 
     captured = capsys.readouterr()
 
     assert rc == cli.EXIT_OK
-    assert "capabilities: 31" in captured.out
-    assert "hardware: Waveshare RP2350-Relay-6CH" in captured.out
-    assert "pulse_max_ms: 60000" in captured.out
-    assert "pulse_min_ms: 10" in captured.out
-    assert "protocol_version: 3" in captured.out
-    assert "relay_count: 6" in captured.out
+    assert "capabilities:      31" in captured.out
+    assert "hardware:          Waveshare RP2350-Relay-6CH" in captured.out
+    assert "pulse_max_ms:      60000" in captured.out
+    assert "pulse_min_ms:      10" in captured.out
+    assert "protocol_version:  3" in captured.out
+    assert "relay_count:       6" in captured.out
 
 
 def test_session_parser_accepts_port_and_delegates(
@@ -318,8 +318,8 @@ def test_build_info_human_output_lists_fields(capsys: pytest.CaptureFixture[str]
     captured = capsys.readouterr()
 
     assert rc == cli.EXIT_OK
-    assert "app_version: 0.6.0" in captured.out
-    assert "git_dirty: False" in captured.out
+    assert "app_version:      0.6.0" in captured.out
+    assert "git_dirty:        False" in captured.out
 
 
 def test_set_converts_one_based_channel_to_zero_based() -> None:
@@ -344,9 +344,9 @@ def test_get_all_human_output_names_enabled_relays(
     captured = capsys.readouterr()
 
     assert rc == cli.EXIT_OK
-    assert "state: 0x21" in captured.out
-    assert "on: CH1, CH6" in captured.out
-    assert "pulsing: none" in captured.out
+    assert "state:    0x21" in captured.out
+    assert "on:       CH1, CH6" in captured.out
+    assert "pulsing:  none" in captured.out
     assert FakeClient.instances[0].calls == [("get_relays", (None,))]
 
 
@@ -358,9 +358,9 @@ def test_get_channel_human_output_reports_on_channel(
     captured = capsys.readouterr()
 
     assert rc == cli.EXIT_OK
-    assert "channel: CH1" in captured.out
-    assert "on: true" in captured.out
-    assert "pulsing: false" in captured.out
+    assert "channel:  CH1" in captured.out
+    assert "on:       true" in captured.out
+    assert "pulsing:  false" in captured.out
     assert FakeClient.instances[0].calls == [("get_relays", (0,))]
 
 
@@ -374,9 +374,9 @@ def test_get_channel_human_output_reports_off_channel(
     captured = capsys.readouterr()
 
     assert rc == cli.EXIT_OK
-    assert "channel: CH1" in captured.out
-    assert "on: false" in captured.out
-    assert "pulsing: false" in captured.out
+    assert "channel:  CH1" in captured.out
+    assert "on:       false" in captured.out
+    assert "pulsing:  false" in captured.out
 
 
 def test_get_channel_human_output_reports_pulsing_channel(
@@ -390,9 +390,37 @@ def test_get_channel_human_output_reports_pulsing_channel(
     captured = capsys.readouterr()
 
     assert rc == cli.EXIT_OK
-    assert "channel: CH1" in captured.out
-    assert "on: true" in captured.out
-    assert "pulsing: true" in captured.out
+    assert "channel:  CH1" in captured.out
+    assert "on:       true" in captured.out
+    assert "pulsing:  true" in captured.out
+
+
+@pytest.mark.parametrize(
+    ("argv", "expected"),
+    [
+        (["--port", "COM7", "set", "1", "on"], "state:  0x01\non:     CH1\n"),
+        (["--port", "COM7", "set-all", "0x21"], "state:  0x21\non:     CH1, CH6\n"),
+        (
+            ["--port", "COM7", "pulse", "1", "100"],
+            "state:    0x01\non:       CH1\npulsing:  CH1\n",
+        ),
+        (
+            ["--port", "COM7", "off-all"],
+            "state:    0x00\non:       none\npulsing:  none\n",
+        ),
+    ],
+)
+def test_relay_commands_human_output_aligns_key_values(
+    argv: list[str],
+    expected: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    rc = cli.main(argv)
+
+    captured = capsys.readouterr()
+
+    assert rc == cli.EXIT_OK
+    assert captured.out == expected
 
 
 def test_status_human_output_groups_relay_and_transport_fields(
@@ -404,12 +432,12 @@ def test_status_human_output_groups_relay_and_transport_fields(
 
     assert rc == cli.EXIT_OK
     assert "relays:\n" in captured.out
-    assert "  state: 0x00" in captured.out
-    assert "  on: none" in captured.out
-    assert "  pulsing: none" in captured.out
+    assert "  state:    0x00" in captured.out
+    assert "  on:       none" in captured.out
+    assert "  pulsing:  none" in captured.out
     assert "transport:\n" in captured.out
-    assert "  last_error: 0" in captured.out
-    assert "  request_count: 12" in captured.out
+    assert "  last_error:     0" in captured.out
+    assert "  request_count:  12" in captured.out
 
 
 def test_status_json_output_is_unchanged(capsys: pytest.CaptureFixture[str]) -> None:
