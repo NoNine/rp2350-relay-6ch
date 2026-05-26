@@ -9,20 +9,25 @@ notes.
 
 ## 0.8.5 - 2026-05-26
 
-Daemon follow-up release for the Phase 8b host tooling line.
+Linux daemon and CLI reliability release for the current relay host tooling
+line.
 
 - Tag: `v0.8.5`
 - Commit: the `v0.8.5` tag target.
 
 ### Highlights
 
-- Made `rp2350-relayctl daemon-status` human-readable by default while
-  preserving explicit JSON output.
-- Added daemon-only heartbeat polling so `rp2350-relayd` checks idle devices
-  regularly through the existing firmware heartbeat command.
-- Updated daemon-status formatter coverage and daemon heartbeat tests.
-- Documented the CLI UX rule requiring human formatter coverage for new
-  operator-facing one-shot commands.
+- Added Linux `rp2350-relayd` daemon mode for one local daemon to own one relay
+  controller through a Unix socket.
+- Added `rp2350-relayctl` daemon-client commands for short-lived relay control
+  through the daemon.
+- Added `daemon-status` for daemon connection state, with human-readable output
+  by default and JSON available on request.
+- Added daemon heartbeat polling while idle, with reconnect recovery after
+  heartbeat transport failures.
+- Fixed a session-mode reboot reconnect race.
+- Aligned human key/value CLI output for more consistent operator-readable
+  one-shot command output.
 - Recorded Phase 8b daemon-mode verification.
 
 ### Install / Assets

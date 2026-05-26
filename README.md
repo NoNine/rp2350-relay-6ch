@@ -23,30 +23,85 @@ Product photos show the Wi-Fi version, `RP2350-Relay-6CH-W`.
 
 ## Architecture
 
+The host side has two common control paths: cross-platform direct host control
+without a daemon, and Linux daemon-based host control.
+
+In the diagrams, `Python relay API` names the role used by Python automation.
+The concrete class depends on the control path: direct host control uses
+`RelayClient`, while daemon-based host control uses `RelayDaemonClient`.
+Inside daemon mode, `RelayClient` is internal to `rp2350-relayd`.
+
+### Direct Host Control Without Daemon
+
 ```mermaid
 flowchart LR
   operator["Operator"]
   automation["External Python script / automation"]
 
   subgraph host["Host Side"]
-    cli["CLI + scripts"]
-    api["Python relay API"]
+    oneshot_cli["rp2350-relay CLI\nOne-shot commands"]
+    session_cli["rp2350-relay CLI\nInteractive session"]
+    direct_api["Python relay API\nRelayClient"]
   end
 
   protocol["USB command channel\nSMP frames + CBOR payloads"]
 
   subgraph device["Device Side"]
     zephyr["Zephyr-based relay firmware\nrunning on RP2350B MCU"]
-    safety["Safety behavior\ndefault off, validation, pulse limits"]
+    safety["Relay safety logic\ndefault off, validation, pulse limits"]
     relays["Six relay outputs\nCH1-CH6"]
   end
 
   loads["External circuits / loads"]
 
-  operator --> cli
-  cli --> api
-  automation --> api
-  api <--> protocol
+  operator --> oneshot_cli
+  operator --> session_cli
+  automation --> direct_api
+
+  oneshot_cli --> direct_api
+  session_cli --> direct_api
+  direct_api <--> protocol
+
+  protocol <--> zephyr
+  zephyr --> safety
+  safety --> relays
+  relays --> loads
+```
+
+### Linux Daemon-Based Host Control
+
+```mermaid
+flowchart LR
+  operator["Operator"]
+  automation["External Python script / automation"]
+
+  subgraph host["Host Side"]
+    relayctl["rp2350-relayctl\nclient CLI"]
+    daemon_api["Python relay API\nRelayDaemonClient"]
+    socket["Local Unix socket\nNDJSON daemon protocol"]
+    daemon["rp2350-relayd\nlocal daemon"]
+    direct_api["RelayClient\ninternal to rp2350-relayd"]
+  end
+
+  protocol["USB command channel\nSMP frames + CBOR payloads"]
+
+  subgraph device["Device Side"]
+    zephyr["Zephyr-based relay firmware\nrunning on RP2350B MCU"]
+    safety["Relay safety logic\ndefault off, validation, pulse limits"]
+    relays["Six relay outputs\nCH1-CH6"]
+  end
+
+  loads["External circuits / loads"]
+
+  operator --> relayctl
+  automation --> daemon_api
+
+  relayctl <--> socket
+  daemon_api <--> socket
+  socket <--> daemon
+  daemon --> direct_api
+  direct_api <--> protocol
+
   protocol <--> zephyr
   zephyr --> safety
   safety --> relays
@@ -67,6 +122,10 @@ Implemented:
   device errors.
 - CLI utility for manual control, JSON output, scripted checks, and hardware
   smoke tests.
+- Interactive `rp2350-relay session` mode with discovery, reconnect handling,
+  and safer long-lived manual operation.
+- Linux `rp2350-relayd` daemon mode with `rp2350-relayctl` client commands,
+  daemon status reporting, and background heartbeat polling.
 - Local WS2812 RGB status indication and bounded buzzer feedback, including
   one long beep after the controller reaches ready state.
 - Host-side tests with simulated transports and firmware tests for relay and
@@ -219,7 +278,8 @@ rp2350-relay --port <serial-port> status
 rp2350-relay --port <serial-port> --output json status
 ```
 
-See [docs/cli.md](docs/cli.md) for the full command list and exit codes.
+See [docs/cli.md](docs/cli.md) for the full command list, session mode, Linux
+daemon mode, JSON output, and exit codes.
 
 ## Repository Layout
 
