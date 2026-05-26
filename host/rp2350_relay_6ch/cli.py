@@ -88,6 +88,28 @@ def _format_status(payload: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _format_daemon_status(payload: dict[str, Any]) -> str:
+    fields = [
+        ("connected", _format_human_value(payload.get("connected"))),
+        ("selector_type", _format_human_value(payload.get("selector_type"))),
+        ("selector_value", _format_human_value(payload.get("selector_value"))),
+        ("current_port", _format_human_value(payload.get("current_port"))),
+        ("socket_path", _format_human_value(payload.get("socket_path"))),
+        ("reconnect_attempts", _format_human_value(payload.get("reconnect_attempts"))),
+        ("last_error", _format_human_value(payload.get("last_error"))),
+        ("daemon_version", _format_human_value(payload.get("daemon_version"))),
+    ]
+    return _format_key_value_rows(fields)
+
+
+def _format_human_value(value: object) -> object:
+    if value is None:
+        return "none"
+    if isinstance(value, bool):
+        return str(value).lower()
+    return value
+
+
 def _format_human(command: str, payload: dict[str, Any]) -> str:
     if command == "info":
         return _format_key_values(payload)
@@ -100,6 +122,9 @@ def _format_human(command: str, payload: dict[str, Any]) -> str:
 
     if command == "status":
         return _format_status(payload)
+
+    if command == "daemon-status":
+        return _format_daemon_status(payload)
 
     if command == "build-info":
         return _format_key_values(payload)

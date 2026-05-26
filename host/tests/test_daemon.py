@@ -20,6 +20,7 @@ from rp2350_relay_6ch.discovery import RelayUsbDevice
 from rp2350_relay_6ch.exceptions import (
     RelayDeviceError,
     RelayProtocolError,
+    RelayTimeoutError,
     RelayTransportError,
     RelayValidationError,
 )
@@ -29,6 +30,7 @@ class FakeRelayClient:
     instances: list["FakeRelayClient"] = []
     failing_ports: set[str] = set()
     fail_info: Exception | None = None
+    heartbeat_failure: Exception | None = None
     command_delay = 0.0
 
     def __init__(self, port: str, **kwargs: Any) -> None:
@@ -94,12 +96,19 @@ class FakeRelayClient:
         self.calls.append(("reboot", ()))
         return {"reboot": True}
 
+    def heartbeat(self) -> dict[str, Any]:
+        self.calls.append(("heartbeat", ()))
+        if self.heartbeat_failure is not None:
+            raise self.heartbeat_failure
+        return {"ok": True}
+
 
 @pytest.fixture(autouse=True)
 def reset_fakes() -> None:
     FakeRelayClient.instances = []
     FakeRelayClient.failing_ports = set()
     FakeRelayClient.fail_info = None
+    FakeRelayClient.heartbeat_failure = None
     FakeRelayClient.command_delay = 0.0
 
 
@@ -110,12 +119,14 @@ def make_daemon(
     selector_value: str = "COM7",
     wait_device: bool = False,
     serial_selector: Any | None = None,
+    heartbeat_interval: float = 5.0,
 ) -> RelayDaemon:
     config = DaemonConfig(
         selector_type=selector_type,
         selector_value=selector_value,
         socket_path=str(tmp_path / "relay.sock"),
         reconnect_interval=0.05,
+        heartbeat_interval=heartbeat_interval,
         wait_device=wait_device,
     )
     return RelayDaemon(
@@ -151,6 +162,110 @@ def test_initial_connect_runs_info_then_status_without_off_all(tmp_path: Any) ->
 
     assert daemon.connected is True
     assert FakeRelayClient.instances[0].calls == [("get_info", ()), ("get_status", ())]
+
+
+def test_heartbeat_succeeds_silently_while_connected(tmp_path: Any) -> None:
+    daemon = make_daemon(tmp_path)
+    daemon._initial_connect()
+
+    daemon._heartbeat_once()
+
+    assert daemon.connected is True
+    assert daemon.last_error is None
+    assert FakeRelayClient.instances[0].calls == [
+        ("get_info", ()),
+        ("get_status", ()),
+        ("heartbeat", ()),
+    ]
+
+
+def test_heartbeat_does_not_run_while_disconnected(tmp_path: Any) -> None:
+    daemon = make_daemon(tmp_path, wait_device=True)
+    daemon._mark_disconnected("lost")
+
+    daemon._heartbeat_once()
+
+    assert FakeRelayClient.instances == []
+    assert daemon.get_daemon_status()["last_error"] == "lost"
+
+
+def test_heartbeat_failure_closes_client_and_marks_disconnected(tmp_path: Any) -> None:
+    daemon = make_daemon(tmp_path)
+    daemon._initial_connect()
+    FakeRelayClient.heartbeat_failure = RelayTimeoutError("late")
+
+    daemon._heartbeat_once()
+
+    assert daemon.connected is False
+    assert daemon.current_port is None
+    assert daemon.last_error == "late"
+    assert FakeRelayClient.instances[0].closed is True
+    assert FakeRelayClient.instances[0].calls[-1] == ("heartbeat", ())
+
+
+def test_heartbeat_waits_for_active_command(tmp_path: Any) -> None:
+    daemon = make_daemon(tmp_path)
+    daemon._initial_connect()
+    order: list[str] = []
+    release_command = threading.Event()
+    command_started = threading.Event()
+    client = FakeRelayClient.instances[0]
+
+    def set_relay(channel: int, on: bool) -> dict[str, Any]:
+        client.calls.append(("set_relay", (channel, on)))
+        order.append("command-start")
+        command_started.set()
+        assert release_command.wait(timeout=1.0)
+        order.append("command-end")
+        return {"state": 1 if on else 0, "pulsing": 0}
+
+    def heartbeat() -> dict[str, Any]:
+        client.calls.append(("heartbeat", ()))
+        order.append("heartbeat")
+        return {"ok": True}
+
+    client.set_relay = set_relay  # type: ignore[method-assign]
+    client.heartbeat = heartbeat  # type: ignore[method-assign]
+    request = parse_request_line(
+        b'{"id":"1","command":"set","args":{"channel":0,"on":true}}',
+        1,
+    )
+
+    command_thread = threading.Thread(target=lambda: daemon._handle_request(request))
+    command_thread.start()
+    assert command_started.wait(timeout=1.0)
+    heartbeat_thread = threading.Thread(target=daemon._heartbeat_once)
+    heartbeat_thread.start()
+    time.sleep(0.05)
+
+    assert order == ["command-start"]
+
+    release_command.set()
+    command_thread.join(timeout=1.0)
+    heartbeat_thread.join(timeout=1.0)
+
+    assert order == ["command-start", "command-end", "heartbeat"]
+
+
+def test_heartbeat_loop_runs_and_stops_on_shutdown(tmp_path: Any) -> None:
+    daemon = make_daemon(tmp_path, heartbeat_interval=0.01)
+    daemon._initial_connect()
+    daemon._bind_socket()
+    daemon._start_threads()
+    deadline = time.monotonic() + 1.0
+    client = FakeRelayClient.instances[0]
+
+    while ("heartbeat", ()) not in client.calls and time.monotonic() < deadline:
+        time.sleep(0.01)
+
+    assert ("heartbeat", ()) in client.calls
+
+    daemon.shutdown()
+    heartbeat_count = client.calls.count(("heartbeat", ()))
+    time.sleep(0.05)
+
+    assert client.calls.count(("heartbeat", ())) == heartbeat_count
+    assert client.calls[-1] == ("off_all", ())
 
 
 def test_readiness_protocol_mismatch_is_configuration_error(tmp_path: Any) -> None:

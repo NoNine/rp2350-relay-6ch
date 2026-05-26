@@ -12,9 +12,9 @@ the implementation lands.
   mode. Diagnostics and simple checks remain supported through direct serial
   tooling, for example `rp2350-relay --port COM7 info`.
 - The daemon is independent from firmware communication-loss safety.
-- Do not add firmware heartbeat commands, communication-loss timeout commands,
-  reboot-on-silence behavior, daemon authentication, audit logs, network APIs,
-  or new relay protocol fields.
+- Do not add new firmware heartbeat commands, communication-loss timeout
+  commands, reboot-on-silence behavior, daemon authentication, audit logs,
+  network APIs, or new relay protocol fields.
 - Treat direct serial diagnostics as an escape hatch. Operators should stop the
   daemon before using `rp2350-relay --port ...` against the same device.
 
@@ -86,6 +86,9 @@ rp2350-relayd (--port /dev/ttyACM0 | --serial <usb-serial>) \
   order complete request frames are accepted across all client sockets.
 - Query `info` and then `status` on startup and after reconnect. These
   readiness queries must not change relay outputs.
+- Poll the existing relay-management `heartbeat` command every 5 seconds while
+  connected. This is host link-health detection only: successful polls are
+  silent, and heartbeat failures do not change relay outputs.
 - Keep relay state as commanded when no local client is connected.
 - On clean shutdown, make a best-effort `off-all` attempt, then exit even if
   the command fails.
@@ -102,6 +105,11 @@ rp2350-relayd (--port /dev/ttyACM0 | --serial <usb-serial>) \
 
 - Treat `RelayTransportError`, serial open failures, and disconnected serial
   devices as daemon device-disconnected state.
+- Treat heartbeat timeout or transport failure as daemon
+  device-disconnected state: close the daemon's current serial client, clear
+  `current_port`, set `last_error`, and let the normal reconnect loop recover.
+  Do not close daemon IPC client sockets or run `off-all` because of heartbeat
+  failure.
 - Reject mirrored device commands while disconnected with a daemon transport
   error response. Do not queue device commands across reconnect.
 - Continue serving `daemon-status` while disconnected so clients can report the

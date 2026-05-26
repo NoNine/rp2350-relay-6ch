@@ -111,6 +111,28 @@ def test_relayctl_outputs_json(capsys: pytest.CaptureFixture[str]) -> None:
     assert FakeDaemonClient.instances[0].calls == [("get_daemon_status", ())]
 
 
+def test_relayctl_daemon_status_defaults_to_human_output(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    rc = relayctl.main(["--socket", "/tmp/relay.sock", "daemon-status"])
+
+    captured = capsys.readouterr()
+
+    assert rc == relayctl.EXIT_OK
+    assert captured.out == (
+        "connected:           false\n"
+        "selector_type:       serial\n"
+        "selector_value:      abc\n"
+        "current_port:        none\n"
+        "socket_path:         /tmp/relay.sock\n"
+        "reconnect_attempts:  1\n"
+        "last_error:          missing\n"
+        "daemon_version:      0.8.0\n"
+    )
+    assert "{" not in captured.out
+    assert FakeDaemonClient.instances[0].calls == [("get_daemon_status", ())]
+
+
 def test_relayctl_rejects_direct_serial_options() -> None:
     with pytest.raises(SystemExit) as exc:
         relayctl.main(["--socket", "/tmp/relay.sock", "--port", "COM7", "info"])

@@ -231,6 +231,11 @@ One-shot commands must remain compact, result-focused, and script-friendly.
 They must not print a session prompt or connection banner. `--output json`
 must remain unchanged.
 
+Every operator-facing one-shot command whose default output is
+`--output human` must have an intentional human formatter. Do not rely on a
+generic JSON fallback for normal operator commands. JSON is the explicit
+machine-readable mode selected with `--output json`.
+
 One-shot `status`:
 
 ```text
@@ -276,6 +281,21 @@ $ rp2350-relay --port COM7 off-all
 state: 0x00
 on: none
 pulsing: none
+```
+
+Daemon one-shot status:
+
+```text
+$ rp2350-relayctl --socket "$SOCKET" daemon-status
+
+connected:           true
+selector_type:       port
+selector_value:      /dev/ttyACM0
+current_port:        /dev/ttyACM0
+socket_path:         /run/user/1000/rp2350-relay/bench-a.sock
+reconnect_attempts:  0
+last_error:          none
+daemon_version:      0.8.0
 ```
 
 Errors remain terse and stderr-oriented:
@@ -324,6 +344,8 @@ Automated tests should cover:
 - Safe close still refuses when relay state is on, pulsing, or unknown.
 - One-shot JSON output remains unchanged.
 - One-shot human output remains plain, compact, and copyable.
+- Every new operator-facing one-shot command has tests for default human output
+  and explicit `--output json` output.
 
 Manual no-hardware checks:
 

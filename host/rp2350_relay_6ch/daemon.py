@@ -40,6 +40,7 @@ from .exceptions import (
 )
 
 MAX_FRAME_BYTES = 4096
+HEARTBEAT_INTERVAL_S = 5.0
 EXIT_OK = 0
 EXIT_ARGUMENT = 2
 EXIT_TRANSPORT = 3
@@ -69,6 +70,7 @@ class DaemonConfig:
     timeout: float = 2.0
     retries: int = 1
     reconnect_interval: float = 1.0
+    heartbeat_interval: float = HEARTBEAT_INTERVAL_S
     wait_device: bool = False
 
 
@@ -329,6 +331,7 @@ class RelayDaemon:
             (self._parser_loop, "relay-daemon-parser"),
             (self._worker_loop, "relay-daemon-worker"),
             (self._reconnect_loop, "relay-daemon-reconnect"),
+            (self._heartbeat_loop, "relay-daemon-heartbeat"),
         ):
             thread = threading.Thread(target=target, name=name, daemon=True)
             thread.start()
@@ -427,6 +430,21 @@ class RelayDaemon:
             except RelayError as exc:
                 self._mark_disconnected(str(exc), count_attempt=True)
                 LOG.info("reconnect attempt failed: %s", exc)
+
+    def _heartbeat_loop(self) -> None:
+        while not self._stop.wait(self.config.heartbeat_interval):
+            self._heartbeat_once()
+
+    def _heartbeat_once(self) -> None:
+        with self._command_lock:
+            client = self.client
+            if client is None or not self.connected:
+                return
+            try:
+                client.heartbeat()
+            except RelayError as exc:
+                LOG.warning("heartbeat failed: %s", exc)
+                self._mark_disconnected(str(exc))
 
     def _bind_socket(self) -> None:
         _prepare_socket_path(self.config.socket_path)
