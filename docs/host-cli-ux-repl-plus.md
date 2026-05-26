@@ -295,7 +295,7 @@ current_port:        /dev/ttyACM0
 socket_path:         /run/user/1000/rp2350-relay/bench-a.sock
 reconnect_attempts:  0
 last_error:          none
-daemon_version:      0.8.0
+daemon_version:      0.8.5
 ```
 
 Errors remain terse and stderr-oriented:

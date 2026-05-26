@@ -72,6 +72,11 @@ practical. Do not introduce new components, abstractions, protocols, or helper
 layers unless they remove real complexity, match an established project
 pattern, or are required by the requested behavior.
 
+Before committing or handing off changes, review the diff for incidental churn.
+Do not update tests, docs, fixtures, or examples solely to mirror a version bump
+unless they assert released package metadata or represent current user-facing
+output. Prefer deriving expected versions from the authoritative declaration.
+
 ## Scope Discipline
 
 Treat discussion documents as idea exploration, not implementation approval.

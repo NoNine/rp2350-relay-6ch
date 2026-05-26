@@ -7,6 +7,67 @@ release assets. The section shape is inspired by Adafruit CircuitPython release
 notes: highlights, install/assets, verification, known limitations, and safety
 notes.
 
+## 0.8.5 - 2026-05-26
+
+Daemon follow-up release for the Phase 8b host tooling line.
+
+- Tag: `v0.8.5`
+- Commit: the `v0.8.5` tag target.
+
+### Highlights
+
+- Made `rp2350-relayctl daemon-status` human-readable by default while
+  preserving explicit JSON output.
+- Added daemon-only heartbeat polling so `rp2350-relayd` checks idle devices
+  regularly through the existing firmware heartbeat command.
+- Updated daemon-status formatter coverage and daemon heartbeat tests.
+- Documented the CLI UX rule requiring human formatter coverage for new
+  operator-facing one-shot commands.
+- Recorded Phase 8b daemon-mode verification.
+
+### Install / Assets
+
+- Install the host CLI from the GitHub Release wheel:
+  `rp2350_relay_6ch-0.8.5-py3-none-any.whl`.
+- Flash one of the matching firmware artifacts from the same release:
+  `rp2350_relay_6ch-0.8.5-waveshare.uf2` or
+  `rp2350_relay_6ch-0.8.5-pico2.uf2`.
+- Optional platform executable artifacts may be attached when useful:
+  `rp2350_relay_6ch-0.8.5-linux-x64` or
+  `rp2350_relay_6ch-0.8.5-windows-x64.exe`.
+- The source distribution `rp2350_relay_6ch-0.8.5.tar.gz` may be available as
+  an additional artifact.
+
+### Verification
+
+- Phase 8b verification recorded PASS for the automated host gate and
+  operator-reported daemon hardware smoke test.
+- Host tests passed with `scripts/test-host.sh`: `126 passed`.
+- Built the host wheel with `python -m build --wheel`.
+- Verified the rebuilt wheel contains daemon entry points, heartbeat polling,
+  and daemon-status human formatting.
+
+### Known Limitations
+
+- MCUboot-compatible firmware upload, test-image, confirm-image, and rollback
+  workflows remain planned but not implemented.
+- Communication-loss firmware safety actions remain planned but not
+  implemented.
+- Pico 2 and Pico 2 W DIY builds require explicit relay overlays and external
+  relay driver hardware.
+- RS485 and wireless host communication are not v1 control paths.
+- Application-layer authentication is not implemented; this release assumes
+  trusted local USB or local Unix socket access.
+
+### Safety Notes
+
+- Keep hazardous relay-side loads disconnected during bring-up.
+- Confirm all relays are off after flashing, reset, smoke tests, daemon
+  reconnect checks, and teardown.
+- Daemon health checks are host-side checks through the firmware heartbeat
+  command; they do not measure contact closure, load voltage, load current, or
+  external equipment health.
+
 ## 0.8.0 - 2026-05-25
 
 Cross-platform session mode release for the current relay CLI and firmware

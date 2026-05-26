@@ -205,7 +205,7 @@ pulsing masks, or last-known relay-output cache fields:
     "socket_path": "/run/user/1000/rp2350-relay/bench-a.sock",
     "reconnect_attempts": 7,
     "last_error": "no relay device found with USB serial E6614C311F4B8B2F",
-    "daemon_version": "0.8.0"
+    "daemon_version": "0.8.5"
   }
 }
 ```
