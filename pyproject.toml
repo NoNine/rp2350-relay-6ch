@@ -22,6 +22,8 @@ release = [
 
 [project.scripts]
 rp2350-relay = "rp2350_relay_6ch.cli:main"
+rp2350-relayd = "rp2350_relay_6ch.daemon:main"
+rp2350-relayctl = "rp2350_relay_6ch.relayctl:main"
 
 [tool.setuptools]
 package-dir = {"" = "host"}

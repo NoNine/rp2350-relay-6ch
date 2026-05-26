@@ -1,6 +1,7 @@
 """Host tooling package for the RP2350 relay controller."""
 
 from .client import RelayClient
+from .daemon_client import RelayDaemonClient
 from .exceptions import (
     RelayDeviceError,
     RelayError,
@@ -13,6 +14,7 @@ from .transport import SerialSmpTransport, SimulatedPacketTransport
 
 __all__ = [
     "RelayClient",
+    "RelayDaemonClient",
     "RelayDeviceError",
     "RelayError",
     "RelayProtocolError",

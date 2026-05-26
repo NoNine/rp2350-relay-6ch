@@ -37,6 +37,34 @@ with RelayClient.connect("COM31", timeout_s=2.0, retries=1) as client:
 The `rp2350-relay session` CLI uses the same direct connection model for
 long-lived manual operation. It does not add a separate Python client API.
 
+## Daemon Client
+
+On Linux, `RelayDaemonClient` connects to a running `rp2350-relayd` Unix socket
+instead of opening the serial port directly:
+
+```python
+from rp2350_relay_6ch import RelayDaemonClient
+
+with RelayDaemonClient.connect(
+    "/run/user/1000/rp2350-relay/bench-a.sock",
+    timeout_s=2.0,
+) as relay:
+    relay.set_relay(0, True)
+    relay.off_all()
+```
+
+The daemon client exposes the same relay methods as `RelayClient`, with
+zero-based channel numbers in Python. It also exposes `get_daemon_status()` for
+daemon process and reconnect state:
+
+```python
+status = relay.get_daemon_status()
+```
+
+Daemon-client timeouts cover connecting to the Unix socket and waiting for the
+daemon response. Firmware request timeout and retry behavior are configured on
+the daemon process.
+
 ## API
 
 The client methods return decoded response dictionaries from the firmware:

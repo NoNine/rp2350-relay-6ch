@@ -183,6 +183,75 @@ is [REPL Plus CLI UX contract](host-cli-ux-repl-plus.md). USB removal and
 reinsert recovery semantics are defined in
 [Host session mode](host-session-mode.md#usb-removal-and-recovery).
 
+## Linux Daemon Mode
+
+`rp2350-relayd` is a Linux-only foreground daemon that owns one relay
+controller and serves local clients over an explicit Unix socket. Use it when
+automation should issue short-lived commands without opening the serial port for
+each operation.
+
+Start one daemon per relay controller:
+
+```sh
+SOCKET="$XDG_RUNTIME_DIR/rp2350-relay/bench-a.sock"
+rp2350-relayd --serial <usb-serial> --socket "$SOCKET" --wait-device
+```
+
+Development and bench setups may use an exact port instead of USB serial:
+
+```sh
+rp2350-relayd --port /dev/ttyACM0 --socket "$SOCKET"
+```
+
+The daemon requires exactly one device selector, `--port` or `--serial`, and a
+socket path. It creates the socket parent directory with user-only permissions
+and binds the socket for the current user. Stop the daemon before using
+`rp2350-relay --port ...` against the same device.
+
+Use `rp2350-relayctl` for daemon-client commands:
+
+```sh
+rp2350-relayctl --socket "$SOCKET" daemon-status
+rp2350-relayctl --socket "$SOCKET" info
+rp2350-relayctl --socket "$SOCKET" status
+rp2350-relayctl --socket "$SOCKET" pulse 1 100
+rp2350-relayctl --socket "$SOCKET" off-all
+```
+
+`rp2350-relayctl` accepts `--socket`, `--timeout`, and `--output human|json`.
+It does not accept direct serial options such as `--port` or `--baud`.
+`daemon-status` reports daemon state and exits successfully while the daemon is
+running, even if the relay controller is disconnected.
+
+Example systemd user service:
+
+```ini
+[Unit]
+Description=RP2350 Relay daemon
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/rp2350-relayd \
+  --serial E6614C311F4B8B2F \
+  --socket %t/rp2350-relay/bench-a.sock \
+  --wait-device
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
+```
+
+Operator commands:
+
+```sh
+systemctl --user start rp2350-relayd
+systemctl --user stop rp2350-relayd
+systemctl --user status rp2350-relayd
+journalctl --user -u rp2350-relayd
+```
+
 ## Commands
 
 ```sh
@@ -205,6 +274,7 @@ Use JSON output for scripts:
 
 ```sh
 rp2350-relay --port <serial-port> --output json status
+rp2350-relayctl --socket "$SOCKET" --output json daemon-status
 ```
 
 ## Hardware Smoke Test
@@ -227,3 +297,5 @@ use CLI command responses and `status` output as the source of truth.
 - `4`: timeout.
 - `5`: malformed or mismatched protocol response.
 - `6`: device-side relay management error.
+
+`rp2350-relayctl` uses the same exit codes for daemon-client commands.
