@@ -7,6 +7,9 @@ daemon is independently useful before firmware communication-loss safety: it
 owns the USB CDC serial device, serializes relay commands, handles reconnects,
 and exposes a local API for short-lived CLI and Python clients.
 
+Each daemon instance owns one relay controller. Multiple relay controllers on
+one Linux host use multiple daemon instances with distinct explicit sockets.
+
 Phase 8a covers cross-platform direct manual session mode separately. Linux
 production automation uses daemon ownership.
 
@@ -27,8 +30,10 @@ Those safety features can be planned later as an extension to daemon mode.
 - Add `rp2350-relayd` as the foreground-capable daemon process.
 - Add `rp2350-relayctl` as the short-lived daemon-client CLI.
 - Add `RelayDaemonClient` beside the existing direct `RelayClient`.
-- Use newline-delimited JSON over a same-user Unix domain socket.
-- Provide a `systemd --user` unit for production operation.
+- Select the daemon-owned controller by exactly one selector: `--port` or
+  exact USB `--serial`.
+- Use newline-delimited JSON over an explicit same-user Unix domain socket.
+- Provide a `systemd --user` unit example for production operation.
 
 ## Deliverables
 
@@ -38,6 +43,9 @@ Those safety features can be planned later as an extension to daemon mode.
 - Implementer-facing daemon contract in [Host daemon mode](host-daemon-mode.md).
 - Operator-facing CLI and host-library documentation updates.
 - Daemon smoke-test procedure under `docs/testing/`.
+- Examples-only static instance guidance using explicit serial numbers and
+  socket paths; no named-instance CLI, environment-file parsing, or TOML
+  configuration in Phase 8b.
 
 ## Acceptance Checks
 
@@ -51,10 +59,19 @@ Expected results:
 
 - Existing direct host library and CLI tests still pass.
 - Daemon tests cover NDJSON parsing, malformed requests, response formatting,
-  typed error mapping, and command serialization.
+  typed error mapping, persistent connections, frame limits, and command
+  serialization.
 - Client tests cover Python daemon client calls and `rp2350-relayctl` command
   behavior without hardware.
-- Startup tests confirm the daemon queries state without sending `off-all`.
+- Selector tests cover explicit `--port`, exact `--serial`, duplicate serial
+  rejection, missing serial with `--wait-device`, and serial rediscovery after
+  USB renumbering.
+- Startup tests confirm the daemon queries `info` then `status` without sending
+  `off-all`.
+- Socket tests cover required explicit socket paths, permissions,
+  already-running detection, path-in-use detection, and stale socket cleanup.
+- `daemon-status` tests confirm daemon state is available while disconnected
+  and does not include relay-state cache fields.
 - No-client tests confirm relay state is not changed when the last client
   disconnects.
 - Shutdown tests confirm a best-effort `off-all` is attempted.
@@ -67,11 +84,13 @@ Expected results:
 Manual Linux smoke check, when hardware is available:
 
 ```sh
-rp2350-relayd --port /dev/ttyACM0
-rp2350-relayctl info
-rp2350-relayctl status
-rp2350-relayctl pulse 1 100
-rp2350-relayctl off-all
+SOCKET="$XDG_RUNTIME_DIR/rp2350-relay/bench-a.sock"
+rp2350-relayd --serial <usb-serial> --socket "$SOCKET" --wait-device
+rp2350-relayctl --socket "$SOCKET" daemon-status
+rp2350-relayctl --socket "$SOCKET" info
+rp2350-relayctl --socket "$SOCKET" status
+rp2350-relayctl --socket "$SOCKET" pulse 1 100
+rp2350-relayctl --socket "$SOCKET" off-all
 ```
 
 Expected results:

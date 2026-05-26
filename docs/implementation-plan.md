@@ -392,14 +392,13 @@ Implementation scope:
 - Use `docs/phase-8b-plan.md` as the authoritative Phase 8b implementation plan
   for the daemon lifecycle, local IPC, client API, CLI behavior, reconnect
   handling, shutdown policy, and tests.
-- Add `rp2350-relayd` as a long-running foreground-capable daemon that owns the
-  USB CDC serial port, serializes relay commands, caches recent status, and
-  handles reconnect after device reboot or USB reset.
+- Add `rp2350-relayd` as a long-running foreground-capable daemon that owns one
+  selected relay controller, serializes relay commands, and handles reconnect
+  after device reboot or USB reset.
 - Add `rp2350-relayctl` as the short-lived daemon-client CLI while keeping
   `rp2350-relay` as the direct serial diagnostic CLI.
 - Add a Python daemon client API alongside the existing direct `RelayClient`.
-- Use newline-delimited JSON over a same-user Unix domain socket under
-  `$XDG_RUNTIME_DIR`, falling back to `/run/user/$UID`.
+- Use newline-delimited JSON over an explicit same-user Unix domain socket.
 - Ship a `systemd --user` unit for production operation.
 - Do not require firmware heartbeat, communication-loss timeout commands, or
   new firmware protocol fields in this phase.
