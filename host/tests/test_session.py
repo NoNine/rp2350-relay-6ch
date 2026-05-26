@@ -53,6 +53,7 @@ class SessionFakeClient:
     fail_status = False
     relay_state = 0
     relay_pulsing = 0
+    status_uptimes: list[int | None] = []
 
     def __init__(self, port: str, **kwargs: Any) -> None:
         self.port = port
@@ -82,7 +83,12 @@ class SessionFakeClient:
         self.calls.append(("get_status", ()))
         if self.fail_status:
             raise RelayTransportError("lost")
-        return {"state": self.relay_state, "pulsing": self.relay_pulsing}
+        status = {"state": self.relay_state, "pulsing": self.relay_pulsing}
+        if self.status_uptimes:
+            uptime = self.status_uptimes.pop(0)
+            if uptime is not None:
+                status["uptime_ms"] = uptime
+        return status
 
     def get_build_info(self) -> dict[str, Any]:
         self.calls.append(("get_build_info", ()))
@@ -130,6 +136,7 @@ def reset_fakes() -> None:
     SessionFakeClient.fail_status = False
     SessionFakeClient.relay_state = 0
     SessionFakeClient.relay_pulsing = 0
+    SessionFakeClient.status_uptimes = []
     FakeHeartbeat.instances = []
 
 
@@ -679,6 +686,7 @@ def test_heartbeat_transport_failure_uses_concise_status_message() -> None:
 
 
 def test_reboot_closes_client_and_reconnects_by_serial() -> None:
+    SessionFakeClient.status_uptimes = [10_000, 10_700, 11_000, 250]
     selector_calls: list[str] = []
 
     def selector(usb_serial: str) -> RelayUsbDevice:
@@ -690,14 +698,18 @@ def test_reboot_closes_client_and_reconnects_by_serial() -> None:
 
     session.handle_line("reboot")
 
-    assert selector_calls == ["abc", "abc"]
+    assert selector_calls == ["abc", "abc", "abc"]
     assert SessionFakeClient.instances[0].closed is True
-    assert SessionFakeClient.instances[1].port == "COM9"
+    assert SessionFakeClient.instances[1].closed is True
+    assert SessionFakeClient.instances[2].port == "COM9"
     assert session.connected is True
     assert "reboot requested" in output.getvalue()
+    assert output.getvalue().count("Connection:   connected") == 2
+    assert len(FakeHeartbeat.instances) == 2
 
 
 def test_reboot_after_explicit_port_reconnects_by_attached_serial() -> None:
+    SessionFakeClient.status_uptimes = [10_000, 250]
     selector_calls: list[str] = []
 
     def selector(usb_serial: str) -> RelayUsbDevice:
@@ -720,3 +732,22 @@ def test_reboot_after_explicit_port_reconnects_by_attached_serial() -> None:
     assert session.connected is True
     assert "Port:         COM9" in output.getvalue()
     assert "Serial:       abc" in output.getvalue()
+
+
+def test_reboot_reconnect_accepts_missing_uptime_after_settle_delay() -> None:
+    SessionFakeClient.status_uptimes = [None, None]
+    sleeps: list[float] = []
+
+    def selector(usb_serial: str) -> RelayUsbDevice:
+        return RelayUsbDevice("COM9", usb_serial, "RP2350-Relay-6CH")
+
+    session, _output = make_session(port=None, serial="abc", selector=selector)
+    session.sleep = sleeps.append
+    session._connect_from_options(session.options)
+
+    session.handle_line("reboot")
+
+    assert sleeps == [session_module.REBOOT_RECONNECT_SETTLE_S]
+    assert SessionFakeClient.instances[0].closed is True
+    assert SessionFakeClient.instances[1].port == "COM9"
+    assert session.connected is True

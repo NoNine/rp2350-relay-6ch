@@ -35,6 +35,8 @@ from rp2350_relay_6ch.discovery import (
 from .constants import RELAY_COUNT
 
 HEARTBEAT_INTERVAL_S = 5.0
+REBOOT_RECONNECT_SETTLE_S = 1.0
+REBOOT_RECONNECT_ATTEMPTS = 6
 ANSI_GREEN = "\033[32m"
 ANSI_BLUE = "\033[34m"
 ANSI_RESET = "\033[0m"
@@ -65,6 +67,13 @@ class SessionOptions:
     baud: int
     timeout: float
     retries: int
+
+
+@dataclass
+class _ConnectionProbe:
+    client: RelayClient
+    info: dict[str, Any]
+    status: dict[str, Any]
 
 
 class HeartbeatPoller:
@@ -337,6 +346,20 @@ class RelaySession:
         if self.connected:
             print("already connected: run 'disconnect' first", file=self.output)
             return True
+        probe = self._probe_connection(port, quiet=False)
+        if probe is None:
+            self._enter_disconnected()
+            return False
+
+        self._adopt_connection(
+            probe,
+            port=port,
+            usb_serial=usb_serial,
+            product=product,
+        )
+        return True
+
+    def _probe_connection(self, port: str, *, quiet: bool) -> _ConnectionProbe | None:
         try:
             client = self.client_factory(
                 port,
@@ -348,22 +371,48 @@ class RelaySession:
                 info = client.get_info()
                 status = client.get_status()
         except RelayError as exc:
-            print(f"{_error_label(exc)}: {exc}", file=self.output)
+            if not quiet:
+                print(f"{_error_label(exc)}: {exc}", file=self.output)
             try:
                 client.close()  # type: ignore[name-defined]
             except Exception:
                 pass
-            self._enter_disconnected()
-            return False
+            return None
 
-        self.client = client
+        return _ConnectionProbe(client=client, info=info, status=status)
+
+    def _adopt_connection(
+        self,
+        probe: _ConnectionProbe,
+        *,
+        port: str,
+        usb_serial: str | None,
+        product: str | None,
+    ) -> None:
+        self.client = probe.client
         self.connected = True
         self.port = port
         self.usb_serial = usb_serial
         self.product = product
         self._start_heartbeat()
-        self._print_banner(info, status)
-        return True
+        self._print_banner(probe.info, probe.status)
+
+    def _close_probe(self, probe: _ConnectionProbe) -> None:
+        try:
+            probe.client.close()
+        except Exception:
+            pass
+
+    def _is_reboot_reconnect_fresh(
+        self,
+        pre_reboot_status: dict[str, Any],
+        post_reboot_status: dict[str, Any],
+    ) -> bool:
+        pre_uptime = _status_uptime_ms(pre_reboot_status)
+        post_uptime = _status_uptime_ms(post_reboot_status)
+        if pre_uptime is None or post_uptime is None:
+            return True
+        return post_uptime < pre_uptime
 
     def _select_interactive_device(self) -> RelayUsbDevice | None:
         devices = self.discover()
@@ -483,23 +532,33 @@ class RelaySession:
             raise RelayValidationError("reboot takes no arguments")
         client = self._require_client()
         with self._lock:
+            pre_reboot_status = client.get_status()
             payload = client.reboot()
         print("reboot requested", file=self.output)
         reboot_serial = self.usb_serial
         self._close_current(force=True, warn=False)
         if reboot_serial:
-            for _ in range(6):
+            self.sleep(REBOOT_RECONNECT_SETTLE_S)
+            for _ in range(REBOOT_RECONNECT_ATTEMPTS):
                 try:
                     device = self.serial_selector(reboot_serial)
                 except RelayError:
                     self.sleep(1.0)
                     continue
-                if self._open(
-                    device.port,
-                    usb_serial=device.serial_number,
-                    product=device.product,
-                ):
+                probe = self._probe_connection(device.port, quiet=True)
+                if probe is None:
+                    self.sleep(1.0)
+                    continue
+                if self._is_reboot_reconnect_fresh(pre_reboot_status, probe.status):
+                    self._adopt_connection(
+                        probe,
+                        port=device.port,
+                        usb_serial=device.serial_number,
+                        product=device.product,
+                    )
                     return
+                self._close_probe(probe)
+                self.sleep(1.0)
             print("reboot reconnect failed; run 'connect' to reconnect", file=self.output)
         else:
             print("reboot closed the connection; run 'connect' to reconnect", file=self.output)
@@ -757,6 +816,15 @@ def _parse_on_off_arg(value: str) -> bool:
         return _parse_on_off(value)
     except argparse.ArgumentTypeError as exc:
         raise RelayValidationError(str(exc)) from exc
+
+
+def _status_uptime_ms(status: dict[str, Any]) -> int | None:
+    uptime = status.get("uptime_ms")
+    if isinstance(uptime, bool):
+        return None
+    if isinstance(uptime, int):
+        return uptime
+    return None
 
 
 def _format_channels(mask: int) -> str:
