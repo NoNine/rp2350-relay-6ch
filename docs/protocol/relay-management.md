@@ -15,6 +15,7 @@ Firmware tests continue to exercise the management group handlers on
 
 - Group ID: `64`
 - Protocol version: `3`
+- Planned event-capable protocol version: `4`
 - Hardware name: `Waveshare RP2350-Relay-6CH`
 - Relay channel indexes: zero-based, `0` through `5`
 - Relay state masks: bit `0` is `CH1`, bit `5` is `CH6`
@@ -33,6 +34,12 @@ Firmware tests continue to exercise the management group handlers on
 | 7 | `reboot` | Write | Request controlled reboot when Zephyr reboot support is enabled. |
 | 8 | `build_info` | Read | Return firmware build identity and traceability metadata. |
 | 9 | `heartbeat` | Write | Return a no-op liveness acknowledgement for host session polling. |
+| 10 | `event` | Device-originated `Write Response` | Planned best-effort asynchronous event frame in protocol version `4`. |
+
+Protocol version `3` is request/response only. Protocol version `4` is planned
+to add device-originated event frames over the same USB CDC SMP serial route.
+Until version `4` is implemented, hosts must treat `event` as unavailable and
+use normal command responses and reconnect/status checks.
 
 ## Error Codes
 
@@ -196,6 +203,37 @@ Response:
 In Phase 8a, `heartbeat` is a no-op liveness command for host session polling.
 It does not change relay state, enforce communication-loss timeout, expose
 heartbeat health state, call `off_all`, or schedule a reboot.
+
+### Planned `event`
+
+`event` is reserved for best-effort device-originated notifications in planned
+protocol version `4`. It is not a host request command, and hosts must not send
+`Read` or `Write` requests to command ID `10`.
+
+Event frame convention:
+
+| SMP field | Value |
+| --- | --- |
+| Group | `64` |
+| Command ID | `10` |
+| Operation | `Write Response` |
+| Sequence | `0xff` |
+| Payload | CBOR map |
+
+Initial event payload:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `event` | text | Event name, initially `reset_executing`. |
+| `reason` | text | Event reason, initially `reboot_command`. |
+| `uptime_ms` | uint | Best-effort Zephyr uptime when the event was emitted. |
+
+Event delivery is advisory. Events may be missed because of USB reset, host
+serial buffering, transport errors, or older firmware. Hosts must confirm
+critical state through normal request/response commands such as `status` after
+reconnect. The first planned event, `reset_executing`, means firmware is about
+to perform the scheduled reset; it does not replace post-reboot freshness
+validation.
 
 ## Relay Pulse Bounds
 

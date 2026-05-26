@@ -60,6 +60,23 @@ client.off_all()
 client.reboot()
 ```
 
+## Planned Device Events
+
+The current host package is request/response only. A future event-capable
+protocol version is planned in
+[Relay Management Protocol](protocol/relay-management.md#planned-event) using
+best-effort device-originated SMP event frames.
+
+When implemented, the host library should expose events first so session mode,
+daemon mode, and direct library consumers share one transport foundation. The
+serial transport will need one persistent reader that demultiplexes normal
+responses from event frames. Existing synchronous `RelayClient` command methods
+should remain compatible, while event-capable consumers use a callback or
+nonblocking drain API for advisory events.
+
+Event delivery will remain best effort. Library users must confirm critical
+state with normal commands such as `get_status()` after reconnect.
+
 ## Exceptions
 
 Import typed exceptions from the package root:

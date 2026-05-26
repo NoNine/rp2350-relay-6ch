@@ -78,6 +78,8 @@ Planned:
 - Host library and CLI firmware image upload, test-image, and confirm-image
   workflows.
 - Firmware signing, flashing, and release helper scripts.
+- Best-effort device-originated SMP event frames for future lifecycle, fault,
+  and monitoring notifications.
 
 ## Current Status
 
@@ -238,6 +240,7 @@ docs/       Requirements, hardware notes, phase plans, protocol, and tests
 - [Implementation plan](docs/implementation-plan.md)
 - [Relay management protocol](docs/protocol/relay-management.md)
 - [Host library](docs/host-library.md)
+- [Device-originated SMP events discussion](docs/discussions/device-originated-smp-events.md)
 - [CLI utility](docs/cli.md)
 - [Status indicators](docs/status-indicators.md)
 - [Test procedures](docs/testing/test-procedures.md)

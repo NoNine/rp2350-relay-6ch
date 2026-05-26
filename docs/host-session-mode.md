@@ -331,6 +331,14 @@ Reconnect after reboot:
   disconnected mode.
 - Do not queue relay-control commands across reboot or reconnect.
 
+Future event-capable firmware and host-library versions may deliver the planned
+`reset_executing` device event described in
+[Relay Management Protocol](protocol/relay-management.md#planned-event). When
+available, session mode may print `reset executing` and suppress expected
+heartbeat noise during the intentional reset window. The event is advisory;
+session reconnect must still confirm the new boot through normal startup
+`info` and `status` behavior.
+
 If `reboot` returns a typed error, print it and keep the existing session state
 unless the underlying transport error already closed the client.
 
