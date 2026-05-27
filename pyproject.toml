@@ -32,6 +32,9 @@ package-dir = {"" = "host"}
 where = ["host"]
 exclude = ["tests*"]
 
+[tool.setuptools.package-data]
+rp2350_relay_6ch = ["assets/*"]
+
 [tool.pytest.ini_options]
 testpaths = ["host/tests"]
 pythonpath = ["host"]

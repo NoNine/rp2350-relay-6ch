@@ -98,3 +98,127 @@ manual hardware verification.
 - Hardware results were reported by the human operator.
 - The report records only commands that were run locally or reported as run
   during Phase 8b verification.
+
+## Addendum: Systemd Named-Instance Verification
+
+Date: 2026-05-27
+Hardware: RP2350 relay controller on `/dev/ttyACM0` reported by operator
+Commit: `1e5ceb6` plus working-tree troubleshooting documentation updates
+Interfaces: USB CDC ACM SMP through `rp2350-relayd`, Unix socket IPC, and
+`systemd --user`
+Result: PASS
+
+### Commands Run
+
+Local wheel preparation:
+
+- `${ZEPHYR_VENV:-${ZEPHYR_WORKSPACE:-$HOME/zephyrproject}/.venv}/bin/python -m build --wheel`
+- `sha256sum dist/rp2350_relay_6ch-0.8.5-py3-none-any.whl`
+- Wheel content inspection for
+  `dist/rp2350_relay_6ch-0.8.5-py3-none-any.whl`
+
+Operator-reported install and CLI checks on a separate Linux PC:
+
+- `sha256sum ./rp2350_relay_6ch-0.8.5-py3-none-any.whl`
+- `python3 -m pipx install --force ./rp2350_relay_6ch-0.8.5-py3-none-any.whl`
+- `type -a rp2350-relayctl`
+- `rp2350-relayctl --help`
+- `rp2350-relayctl systemd install --print-unit`
+
+Operator-reported direct and foreground-daemon hardware checks:
+
+- `ls -l /dev/ttyACM* /dev/ttyUSB* 2>/dev/null || true`
+- `rp2350-relay --port /dev/ttyACM0 info`
+- `rp2350-relay --port /dev/ttyACM0 status`
+- `rp2350-relay --port /dev/ttyACM0 off-all`
+- `rp2350-relayd --port /dev/ttyACM0 --socket "$SOCKET"`
+- `rp2350-relayctl --socket "$SOCKET" daemon-status`
+- `rp2350-relayctl --socket "$SOCKET" info`
+- `rp2350-relayctl --socket "$SOCKET" status`
+- `rp2350-relayctl --socket "$SOCKET" pulse 1 100`
+- `rp2350-relayctl --socket "$SOCKET" off-all`
+
+Operator-reported named-instance and systemd checks:
+
+- Created `~/.config/rp2350-relay/config.toml` for `bench-a`
+- `rp2350-relayd --instance bench-a`
+- `rp2350-relayctl --instance bench-a daemon-status`
+- `rp2350-relayctl --instance bench-a status`
+- `rp2350-relayctl --instance bench-a pulse 1 100`
+- `rp2350-relayctl --instance bench-a off-all`
+- `rp2350-relayctl systemd install --force`
+- `systemctl --user daemon-reload`
+- `systemctl --user cat rp2350-relayd@bench-a`
+- `rp2350-relayctl systemd doctor --instance bench-a`
+- `systemctl --user start rp2350-relayd@bench-a`
+- `systemctl --user status rp2350-relayd@bench-a --no-pager`
+- `rp2350-relayctl --instance bench-a daemon-status`
+- `rp2350-relayctl --instance bench-a info`
+- `rp2350-relayctl --instance bench-a status`
+- `rp2350-relayctl --instance bench-a pulse 1 100`
+- `rp2350-relayctl --instance bench-a off-all`
+
+Operator-reported troubleshooting and teardown checks:
+
+- `groups`
+- `ls -l /dev/ttyACM0`
+- `systemctl --user stop rp2350-relayd@bench-a`
+- `loginctl terminate-user "$USER"`
+- `systemctl --user show rp2350-relayd@bench-a -p ActiveState -p SubState -p Result -p NRestarts`
+- `journalctl --user -u rp2350-relayd@bench-a --no-pager -n 80`
+- `systemctl --user stop rp2350-relayd@bench-a`
+- `rp2350-relayctl --instance bench-a daemon-status`
+
+### Results
+
+- Wheel build passed and produced
+  `dist/rp2350_relay_6ch-0.8.5-py3-none-any.whl`.
+- Wheel SHA256:
+  `1590dec8770f67cbb6731f8b60e14cfb30575e7c6cd5a2e8af7e7aded9aa15d7`.
+- Wheel inspection confirmed `config.py`, `systemd.py`, the systemd unit
+  template, the sample TOML config, and console-script entry points.
+- Installed `rp2350-relayctl --help` on the operator PC included
+  `--instance`, `--config`, and the `systemd` subcommand.
+- Direct CLI sanity checks passed on `/dev/ttyACM0`.
+- Foreground daemon checks passed with an explicit socket.
+- Named-instance foreground daemon checks passed.
+- `rp2350-relayctl systemd install --print-unit` showed an absolute Python
+  `ExecStart` using `python -m rp2350_relay_6ch.daemon --instance %i`.
+- `rp2350-relayctl systemd doctor --instance bench-a` passed.
+- Systemd user service checks passed after refreshing the user session.
+- Relay commands through the systemd-managed daemon passed.
+- Final `off-all` and service stop were reported PASS by the operator.
+
+### Troubleshooting Observed
+
+- Initial `rp2350-relayctl --instance bench-a daemon-status` under systemd
+  reported `connected: false` with `last_error` containing permission denied
+  for `/dev/ttyACM0`.
+- The operator confirmed the user belonged to `dialout`.
+- The key recovery commands were:
+
+  ```sh
+  systemctl --user stop rp2350-relayd@bench-a
+  loginctl terminate-user "$USER"
+  ```
+
+- After logging back in and restarting the user service, daemon status reported
+  connected and relay commands succeeded.
+- `journalctl --user -u rp2350-relayd@bench-a --no-pager -n 80` reported no
+  user journal files. Log inspection was skipped and replaced with
+  `systemctl --user show` state checks.
+
+### Coverage
+
+- Verified by operator hardware smoke: pipx wheel install, direct CLI access,
+  foreground daemon control, named-instance daemon control, generated systemd
+  unit install, systemd doctor, systemd service startup, relay commands through
+  the systemd daemon, permission/session troubleshooting, and clean teardown.
+- Not changed in this addendum: firmware protocol fields, firmware
+  communication-loss safety actions, network control, audit logs, and relay
+  persistent-state behavior.
+
+### Safety Notes
+
+- The operator ran final `off-all` before stopping the service.
+- No relay was reported left energized after verification.

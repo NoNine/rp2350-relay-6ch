@@ -101,6 +101,37 @@ def test_relayctl_uses_socket_timeout_and_one_based_channels(
     assert FakeDaemonClient.instances[0].calls == [("set_relay", (5, True))]
 
 
+def test_relayctl_uses_named_instance_socket(
+    tmp_path: Any,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        """
+[instances.bench-a]
+serial = "abc"
+socket = "/tmp/bench-a.sock"
+""",
+        encoding="utf-8",
+    )
+
+    rc = relayctl.main(
+        [
+            "--instance",
+            "bench-a",
+            "--config",
+            str(config_path),
+            "status",
+        ]
+    )
+
+    capsys.readouterr()
+
+    assert rc == relayctl.EXIT_OK
+    assert FakeDaemonClient.instances[0].socket_path == "/tmp/bench-a.sock"
+    assert FakeDaemonClient.instances[0].calls == [("get_status", ())]
+
+
 def test_relayctl_outputs_json(capsys: pytest.CaptureFixture[str]) -> None:
     rc = relayctl.main(["--socket", "/tmp/relay.sock", "--output", "json", "daemon-status"])
 
@@ -141,8 +172,14 @@ def test_relayctl_rejects_direct_serial_options() -> None:
 
 
 def test_relayctl_requires_socket() -> None:
+    rc = relayctl.main(["info"])
+
+    assert rc == relayctl.EXIT_ARGUMENT
+
+
+def test_relayctl_rejects_socket_and_instance() -> None:
     with pytest.raises(SystemExit) as exc:
-        relayctl.main(["info"])
+        relayctl.main(["--socket", "/tmp/relay.sock", "--instance", "bench-a", "info"])
 
     assert exc.value.code == relayctl.EXIT_ARGUMENT
 
@@ -156,3 +193,40 @@ def test_relayctl_maps_transport_exit(capsys: pytest.CaptureFixture[str]) -> Non
 
     assert rc == relayctl.EXIT_TRANSPORT
     assert "transport error: unavailable" in captured.err
+
+
+def test_relayctl_systemd_install_prints_generated_unit(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(
+        relayctl,
+        "install_user_unit",
+        lambda **kwargs: "ExecStart=/tmp/python -m rp2350_relay_6ch.daemon --instance %i",
+    )
+
+    rc = relayctl.main(["systemd", "install", "--print-unit"])
+
+    captured = capsys.readouterr()
+
+    assert rc == relayctl.EXIT_OK
+    assert "ExecStart=/tmp/python" in captured.out
+
+
+def test_relayctl_systemd_doctor_outputs_messages(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    class Result:
+        ok = True
+        messages = ["unit: ok", "instance bench-a: ok"]
+
+    monkeypatch.setattr(relayctl, "systemd_doctor", lambda instance=None: Result())
+
+    rc = relayctl.main(["systemd", "doctor", "--instance", "bench-a"])
+
+    captured = capsys.readouterr()
+
+    assert rc == relayctl.EXIT_OK
+    assert "unit: ok" in captured.out
+    assert "instance bench-a: ok" in captured.out

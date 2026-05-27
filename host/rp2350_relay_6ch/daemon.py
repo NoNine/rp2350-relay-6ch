@@ -20,6 +20,7 @@ from typing import Any
 
 from . import __version__
 from .client import RelayClient
+from .config import resolve_instance_config
 from .constants import (
     HARDWARE_NAME,
     PROTOCOL_VERSION,
@@ -676,25 +677,65 @@ class RelayDaemonArgumentParser(argparse.ArgumentParser):
 
 def build_parser() -> argparse.ArgumentParser:
     parser = RelayDaemonArgumentParser(description=__doc__)
-    selector = parser.add_mutually_exclusive_group(required=True)
+    parser.add_argument("--instance", help="named relay instance from TOML config")
+    parser.add_argument("--config", help="TOML config path for --instance")
+    selector = parser.add_mutually_exclusive_group()
     selector.add_argument("--port", help="exact serial port, for example /dev/ttyACM0")
     selector.add_argument("--serial", help="USB serial number for relay device selection")
-    parser.add_argument("--socket", required=True, help="Unix-domain socket path")
-    parser.add_argument("--baud", type=int, default=115200)
-    parser.add_argument("--timeout", type=float, default=2.0)
-    parser.add_argument("--retries", type=int, default=1)
-    parser.add_argument("--reconnect-interval", type=float, default=1.0)
-    parser.add_argument("--wait-device", action="store_true")
-    parser.add_argument("--log-level", default="INFO")
+    parser.add_argument("--socket", help="Unix-domain socket path")
+    parser.add_argument("--baud", type=int)
+    parser.add_argument("--timeout", type=float)
+    parser.add_argument("--retries", type=int)
+    parser.add_argument("--reconnect-interval", type=float)
+    parser.add_argument("--wait-device", action="store_true", default=None)
+    parser.add_argument("--log-level")
     return parser
 
 
 def config_from_args(args: argparse.Namespace) -> DaemonConfig:
-    if args.timeout <= 0:
+    if args.instance:
+        resolved = resolve_instance_config(
+            instance=args.instance,
+            config_path=args.config,
+            overrides={
+                "port": args.port,
+                "serial": args.serial,
+                "socket": args.socket,
+                "baud": args.baud,
+                "timeout": args.timeout,
+                "retries": args.retries,
+                "reconnect_interval": args.reconnect_interval,
+                "wait_device": args.wait_device,
+                "log_level": args.log_level,
+            },
+        )
+        return DaemonConfig(
+            selector_type=resolved.selector_type,
+            selector_value=resolved.selector_value,
+            socket_path=resolved.socket_path,
+            baud=resolved.baud,
+            timeout=resolved.timeout,
+            retries=resolved.retries,
+            reconnect_interval=resolved.reconnect_interval,
+            wait_device=resolved.wait_device,
+        )
+
+    if not args.port and not args.serial:
+        raise RelayValidationError("--instance or exactly one of --port/--serial is required")
+    if not args.socket:
+        raise RelayValidationError("--socket is required")
+
+    baud = 115200 if args.baud is None else args.baud
+    timeout = 2.0 if args.timeout is None else args.timeout
+    retries = 1 if args.retries is None else args.retries
+    reconnect_interval = 1.0 if args.reconnect_interval is None else args.reconnect_interval
+    wait_device = False if args.wait_device is None else args.wait_device
+
+    if timeout <= 0:
         raise RelayValidationError("--timeout must be positive")
-    if args.retries < 0:
+    if retries < 0:
         raise RelayValidationError("--retries must be non-negative")
-    if args.reconnect_interval <= 0:
+    if reconnect_interval <= 0:
         raise RelayValidationError("--reconnect-interval must be positive")
     if args.port:
         selector_type = "port"
@@ -706,17 +747,37 @@ def config_from_args(args: argparse.Namespace) -> DaemonConfig:
         selector_type=selector_type,
         selector_value=selector_value,
         socket_path=args.socket,
-        baud=args.baud,
-        timeout=args.timeout,
-        retries=args.retries,
-        reconnect_interval=args.reconnect_interval,
-        wait_device=args.wait_device,
+        baud=baud,
+        timeout=timeout,
+        retries=retries,
+        reconnect_interval=reconnect_interval,
+        wait_device=wait_device,
     )
 
 
 def run(args: argparse.Namespace) -> int:
+    log_level = args.log_level or "INFO"
+    if args.instance:
+        try:
+            log_level = resolve_instance_config(
+                instance=args.instance,
+                config_path=args.config,
+                overrides={
+                    "port": args.port,
+                    "serial": args.serial,
+                    "socket": args.socket,
+                    "baud": args.baud,
+                    "timeout": args.timeout,
+                    "retries": args.retries,
+                    "reconnect_interval": args.reconnect_interval,
+                    "wait_device": args.wait_device,
+                    "log_level": args.log_level,
+                },
+            ).log_level
+        except RelayValidationError:
+            pass
     logging.basicConfig(
-        level=getattr(logging, str(args.log_level).upper(), logging.INFO),
+        level=getattr(logging, str(log_level).upper(), logging.INFO),
         format="%(levelname)s:%(name)s:%(message)s",
     )
     try:

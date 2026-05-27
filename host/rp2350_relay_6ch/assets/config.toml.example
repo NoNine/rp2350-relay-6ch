@@ -1,0 +1,9 @@
+[instances.bench-a]
+serial = "E6614C311F4B8B2F"
+socket = "${XDG_RUNTIME_DIR}/rp2350-relay/bench-a.sock"
+wait_device = true
+baud = 115200
+timeout = 2.0
+retries = 1
+reconnect_interval = 1.0
+log_level = "INFO"

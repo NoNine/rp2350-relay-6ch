@@ -271,43 +271,59 @@ rp2350-relayctl --socket <path> [--timeout 2.0] \
   errors, `3` for daemon unavailable or transport errors, `4` for timeouts,
   `5` for protocol errors, and `6` for device-side relay management errors.
 
-## Systemd User Unit
+## Named Instances and Systemd User Unit
 
-Install the example unit at `~/.config/systemd/user/rp2350-relayd.service`.
+For production operation, named instances live in one TOML file at
+`${XDG_CONFIG_HOME:-~/.config}/rp2350-relay/config.toml`:
 
-```ini
-[Unit]
-Description=RP2350 Relay daemon
-After=default.target
-
-[Service]
-Type=simple
-ExecStart=%h/.local/bin/rp2350-relayd \
-  --serial E6614C311F4B8B2F \
-  --socket %t/rp2350-relay/bench-a.sock \
-  --wait-device
-Restart=on-failure
-RestartSec=2
-
-[Install]
-WantedBy=default.target
+```toml
+[instances.bench-a]
+serial = "E6614C311F4B8B2F"
+socket = "${XDG_RUNTIME_DIR}/rp2350-relay/bench-a.sock"
+wait_device = true
 ```
 
-Document these operator commands during implementation:
+The daemon and daemon-client CLI accept `--instance bench-a`. Explicit CLI
+values override environment variables, which override TOML values. Supported
+environment overrides use the `RP2350_RELAY_*` prefix, including
+`RP2350_RELAY_CONFIG`, `RP2350_RELAY_INSTANCE`, `RP2350_RELAY_PORT`,
+`RP2350_RELAY_SERIAL`, `RP2350_RELAY_SOCKET`, and timing/log settings.
+
+Install the generated template unit with:
 
 ```sh
-systemctl --user start rp2350-relayd
-systemctl --user stop rp2350-relayd
-systemctl --user status rp2350-relayd
-journalctl --user -u rp2350-relayd
+rp2350-relayctl systemd install
+```
+
+The helper writes `~/.config/systemd/user/rp2350-relayd@.service` and a sample
+config file if missing. The generated unit uses the absolute Python interpreter
+from the environment that ran the helper:
+
+```ini
+ExecStart=/path/to/python -m rp2350_relay_6ch.daemon --instance %i
+```
+
+This supports `pipx`, conda, and venv installs without relying on shell
+activation or systemd's inherited `PATH`. Operators can pass
+`--python /path/to/env/bin/python` to select a specific environment.
+
+Document these operator commands:
+
+```sh
+systemctl --user daemon-reload
+systemctl --user start rp2350-relayd@bench-a
+systemctl --user stop rp2350-relayd@bench-a
+systemctl --user status rp2350-relayd@bench-a
+journalctl --user -u rp2350-relayd@bench-a
+rp2350-relayctl systemd doctor --instance bench-a
 ```
 
 Do not recommend lingering in Phase 8b. Operators can start the user service
 from their normal session.
 
-For multiple relay controllers, create multiple explicit unit files or copy
-this unit with a different serial number and socket path. Phase 8b does not add
-named-instance CLI options, environment-file parsing, or TOML configuration.
+For multiple relay controllers, add multiple TOML instances and start multiple
+template units such as `rp2350-relayd@bench-a.service` and
+`rp2350-relayd@bench-b.service`.
 
 ## Tests
 

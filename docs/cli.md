@@ -42,9 +42,12 @@ device, retry with appropriate USB permissions or `sudo`.
 
 ### CLI Wheel
 
-Use the wheel for the primary operator install path.
+Use the wheel for the primary operator install path. The wheel requires
+Python 3.12 or newer in the environment that installs it.
 
-Windows PowerShell:
+`pipx` is the shortest path when Python 3.12 or newer is already available.
+
+Windows PowerShell with `pipx`:
 
 ```powershell
 python -m pip install --user pipx
@@ -53,7 +56,7 @@ python -m pipx install .\rp2350_relay_6ch-<version>-py3-none-any.whl
 rp2350-relay --port <serial-port> info
 ```
 
-Linux shell:
+Linux shell with `pipx`:
 
 ```sh
 python3 -m pip install --user pipx
@@ -67,6 +70,26 @@ Upgrade after downloading a newer wheel with:
 
 ```sh
 pipx install --force ./rp2350_relay_6ch-<version>-py3-none-any.whl
+```
+
+If the Linux system Python is older than 3.12 and cannot be upgraded, use conda
+to provide an operator-local Python 3.12 environment:
+
+```sh
+conda create -n rp2350-relay python=3.12
+conda activate rp2350-relay
+python -m pip install ./rp2350_relay_6ch-<version>-py3-none-any.whl
+rp2350-relay --port <serial-port> info
+```
+
+If a separate Python 3.12 or newer binary is already available, a local venv is
+also supported:
+
+```sh
+/path/to/python3.12 -m venv ~/.venvs/rp2350-relay
+. ~/.venvs/rp2350-relay/bin/activate
+python -m pip install ./rp2350_relay_6ch-<version>-py3-none-any.whl
+rp2350-relay --port <serial-port> info
 ```
 
 Run a smoke test after installing the CLI and flashing the matching firmware:
@@ -136,6 +159,13 @@ sudo chmod a+rw /dev/ttyACM0
 
 The `chmod` workaround is reset when the board is unplugged, reconnected, or the
 system reboots.
+
+Daemon mode uses the same Linux device-node permissions as direct CLI mode. If
+a `systemd --user` daemon reports permission denied for `/dev/ttyACM*` even
+after group changes, fully log out and back in so the user service manager has
+the updated group membership. The daemon smoke test includes the exact
+inspection and session-refresh commands in
+[Daemon smoke test](testing/daemon-smoke-test.md).
 
 ## Release Artifact Notes
 
@@ -208,6 +238,24 @@ socket path. It creates the socket parent directory with user-only permissions
 and binds the socket for the current user. Stop the daemon before using
 `rp2350-relay --port ...` against the same device.
 
+For production, define named instances in
+`~/.config/rp2350-relay/config.toml`:
+
+```toml
+[instances.bench-a]
+serial = "E6614C311F4B8B2F"
+socket = "${XDG_RUNTIME_DIR}/rp2350-relay/bench-a.sock"
+wait_device = true
+```
+
+Then start and target the daemon by instance name:
+
+```sh
+rp2350-relayd --instance bench-a
+rp2350-relayctl --instance bench-a daemon-status
+rp2350-relayctl --instance bench-a status
+```
+
 Use `rp2350-relayctl` for daemon-client commands:
 
 ```sh
@@ -218,38 +266,34 @@ rp2350-relayctl --socket "$SOCKET" pulse 1 100
 rp2350-relayctl --socket "$SOCKET" off-all
 ```
 
-`rp2350-relayctl` accepts `--socket`, `--timeout`, and `--output human|json`.
-It does not accept direct serial options such as `--port` or `--baud`.
+`rp2350-relayctl` accepts `--socket` or `--instance`, plus `--timeout` and
+`--output human|json`. It does not accept direct serial options such as
+`--port` or `--baud`.
 `daemon-status` reports daemon state and exits successfully while the daemon is
 running, even if the relay controller is disconnected.
 
-Example systemd user service:
-
-```ini
-[Unit]
-Description=RP2350 Relay daemon
-After=default.target
-
-[Service]
-Type=simple
-ExecStart=%h/.local/bin/rp2350-relayd \
-  --serial E6614C311F4B8B2F \
-  --socket %t/rp2350-relay/bench-a.sock \
-  --wait-device
-Restart=on-failure
-RestartSec=2
-
-[Install]
-WantedBy=default.target
-```
-
-Operator commands:
+Install the systemd user-service template from the same Python environment that
+should run the daemon:
 
 ```sh
-systemctl --user start rp2350-relayd
-systemctl --user stop rp2350-relayd
-systemctl --user status rp2350-relayd
-journalctl --user -u rp2350-relayd
+rp2350-relayctl systemd install
+systemctl --user daemon-reload
+systemctl --user start rp2350-relayd@bench-a
+```
+
+The generated unit uses an absolute Python interpreter, for example
+`/home/user/.local/share/pipx/venvs/rp2350-relay-6ch/bin/python -m
+rp2350_relay_6ch.daemon --instance %i`. If using conda or venv, run
+`rp2350-relayctl systemd install` after activating that environment, or pass
+`--python /path/to/env/bin/python`.
+
+Useful systemd commands:
+
+```sh
+systemctl --user stop rp2350-relayd@bench-a
+systemctl --user status rp2350-relayd@bench-a
+journalctl --user -u rp2350-relayd@bench-a
+rp2350-relayctl systemd doctor --instance bench-a
 ```
 
 ## Commands

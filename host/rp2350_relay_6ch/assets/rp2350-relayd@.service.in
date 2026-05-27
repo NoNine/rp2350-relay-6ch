@@ -1,0 +1,14 @@
+[Unit]
+Description=RP2350 Relay daemon (%i)
+After=default.target
+
+[Service]
+Type=simple
+Environment=RP2350_RELAY_CONFIG={config}
+EnvironmentFile=-%h/.config/rp2350-relay/%i.env
+ExecStart={python} -m rp2350_relay_6ch.daemon --instance %i
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

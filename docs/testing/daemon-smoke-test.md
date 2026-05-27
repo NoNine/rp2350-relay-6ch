@@ -12,10 +12,14 @@ relay energized at teardown.
 - Identify the relay controller USB serial number or exact serial port.
 - Stop other tools that may already own the serial device.
 
-Set the daemon socket once:
+For the production instance path, create or update
+`~/.config/rp2350-relay/config.toml`:
 
-```sh
-export SOCKET="${XDG_RUNTIME_DIR}/rp2350-relay/bench-a.sock"
+```toml
+[instances.bench-a]
+serial = "<usb-serial>"
+socket = "${XDG_RUNTIME_DIR}/rp2350-relay/bench-a.sock"
+wait_device = true
 ```
 
 ## Checks
@@ -23,19 +27,20 @@ export SOCKET="${XDG_RUNTIME_DIR}/rp2350-relay/bench-a.sock"
 1. Start the daemon in a terminal:
 
    ```sh
-   rp2350-relayd --serial <usb-serial> --socket "$SOCKET" --wait-device
+   rp2350-relayd --instance bench-a
    ```
 
    For a bench-only exact-port check:
 
    ```sh
+   SOCKET="${XDG_RUNTIME_DIR}/rp2350-relay/bench-a.sock"
    rp2350-relayd --port /dev/ttyACM0 --socket "$SOCKET"
    ```
 
 2. In another terminal, confirm daemon status:
 
    ```sh
-   rp2350-relayctl --socket "$SOCKET" daemon-status
+   rp2350-relayctl --instance bench-a daemon-status
    ```
 
    Confirm the response includes `connected`, `selector_type`,
@@ -45,27 +50,35 @@ export SOCKET="${XDG_RUNTIME_DIR}/rp2350-relay/bench-a.sock"
 3. Query firmware identity and relay status through the daemon:
 
    ```sh
-   rp2350-relayctl --socket "$SOCKET" info
-   rp2350-relayctl --socket "$SOCKET" status
+   rp2350-relayctl --instance bench-a info
+   rp2350-relayctl --instance bench-a status
    ```
 
 4. Pulse `CH1` and turn all relays off:
 
    ```sh
-   rp2350-relayctl --socket "$SOCKET" pulse 1 100
-   rp2350-relayctl --socket "$SOCKET" off-all
+   rp2350-relayctl --instance bench-a pulse 1 100
+   rp2350-relayctl --instance bench-a off-all
    ```
 
 5. Confirm JSON output for scripts:
 
    ```sh
-   rp2350-relayctl --socket "$SOCKET" --output json daemon-status
-   rp2350-relayctl --socket "$SOCKET" --output json status
+   rp2350-relayctl --instance bench-a --output json daemon-status
+   rp2350-relayctl --instance bench-a --output json status
    ```
 
-6. Stop the daemon with `Ctrl+C` or `systemctl --user stop rp2350-relayd` when
-   running under the example user service. Confirm all relays are off after
-   shutdown.
+6. Install and check the systemd user unit:
+
+   ```sh
+   rp2350-relayctl systemd install
+   systemctl --user daemon-reload
+   rp2350-relayctl systemd doctor --instance bench-a
+   ```
+
+7. Stop the foreground daemon with `Ctrl+C`, or stop the service with
+   `systemctl --user stop rp2350-relayd@bench-a` when running under systemd.
+   Confirm all relays are off after shutdown.
 
 ## Expected Results
 
@@ -76,3 +89,46 @@ export SOCKET="${XDG_RUNTIME_DIR}/rp2350-relay/bench-a.sock"
 - `daemon-status` succeeds while the daemon is running.
 - The daemon owns the serial port while running.
 - All relays are off after `off-all` and after clean daemon shutdown.
+
+## Troubleshooting
+
+If `rp2350-relayctl --instance bench-a daemon-status` reports
+`connected: false` and `last_error` includes permission denied for the serial
+device, inspect the device node and user session:
+
+```sh
+ls -l /dev/ttyACM0
+getfacl /dev/ttyACM0 2>/dev/null || true
+groups
+systemctl --user show-environment | grep -E 'USER|XDG_RUNTIME_DIR|PATH' || true
+```
+
+Use the actual serial device path if it is not `/dev/ttyACM0`.
+
+For a temporary manual-test workaround, grant access to the current device node
+and restart the user service:
+
+```sh
+sudo chmod a+rw /dev/ttyACM0
+systemctl --user restart rp2350-relayd@bench-a
+sleep 2
+rp2350-relayctl --instance bench-a daemon-status
+```
+
+The `chmod` workaround is reset when the board is unplugged, reconnected, or the
+system reboots. For the permanent fix, ensure the operator user is in the
+serial-port group, usually `dialout`, then fully log out and back in before
+restarting the user service. If the user was added to `dialout` after the
+current login session started, the user systemd manager may still have the old
+group set until the session is restarted.
+
+To force a fresh user manager session after stopping the daemon, run:
+
+```sh
+systemctl --user stop rp2350-relayd@bench-a
+loginctl terminate-user "$USER"
+```
+
+`loginctl terminate-user "$USER"` logs out the current user and terminates that
+user's running sessions. Save shell work first, then log back in and restart
+the daemon service.

@@ -382,6 +382,11 @@ Deliverables:
 - Cross-platform session usage documentation.
 - Cross-platform session smoke-test procedure under `docs/testing/`.
 
+Status:
+
+- Phase 8a complete. Verification is recorded in
+  `docs/testing/phase-8a-verification.md`.
+
 ## Phase 8b: Host Daemon Mode
 
 Purpose: add the production Linux host-control architecture before firmware
@@ -399,7 +404,9 @@ Implementation scope:
   `rp2350-relay` as the direct serial diagnostic CLI.
 - Add a Python daemon client API alongside the existing direct `RelayClient`.
 - Use newline-delimited JSON over an explicit same-user Unix domain socket.
-- Ship a `systemd --user` unit for production operation.
+- Add named instances from a global TOML config for production operation.
+- Ship a generated `systemd --user` template unit and systemd install/doctor
+  helpers.
 - Do not require firmware heartbeat, communication-loss timeout commands, or
   new firmware protocol fields in this phase.
 
@@ -422,6 +429,12 @@ Deliverables:
 - Daemon, daemon client, and daemon-client CLI under the host tooling package.
 - User service/unit documentation and daemon usage documentation.
 - Daemon smoke-test procedure under `docs/testing/`.
+
+Status:
+
+- Phase 8b complete for Linux daemon mode, named instances, and
+  `systemd --user` operation. Verification is recorded in
+  `docs/testing/phase-8b-verification.md`.
 
 ## Phase 9: Firmware Upgrade Foundation
 

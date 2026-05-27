@@ -200,7 +200,7 @@ checkout or Zephyr workspace is required.
    picotool load -x rp2350_relay_6ch-<version>-waveshare.uf2
    ```
 
-3. Install the CLI wheel.
+3. Install the CLI wheel. The wheel requires Python 3.12 or newer.
 
    Windows PowerShell:
 
@@ -217,6 +217,12 @@ checkout or Zephyr workspace is required.
    python3 -m pipx ensurepath
    python3 -m pipx install ./rp2350_relay_6ch-<version>-py3-none-any.whl
    ```
+
+   If Linux system Python is older than 3.12 and cannot be upgraded, use a
+   conda environment with Python 3.12, then install the wheel with
+   `python -m pip install ./rp2350_relay_6ch-<version>-py3-none-any.whl`.
+   A venv created from any available Python 3.12 or newer binary is also
+   supported.
 
 4. Verify the board from the machine connected to the USB device port:
 

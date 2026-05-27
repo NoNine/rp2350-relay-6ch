@@ -14,6 +14,8 @@ from rp2350_relay_6ch.daemon import (
     DaemonConfig,
     RelayDaemon,
     _prepare_socket_path,
+    build_parser,
+    config_from_args,
     parse_request_line,
 )
 from rp2350_relay_6ch.discovery import RelayUsbDevice
@@ -153,6 +155,39 @@ def test_parse_request_validation_errors() -> None:
 def test_parse_request_accepts_string_and_integer_ids() -> None:
     assert parse_request_line(b'{"id":"abc","command":"info"}', 1).request_id == "abc"
     assert parse_request_line(b'{"id":7,"command":"status"}', 2).request_id == 7
+
+
+def test_config_from_args_resolves_named_instance(tmp_path: Any) -> None:
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        """
+[instances.bench-a]
+serial = "abc"
+socket = "/tmp/bench-a.sock"
+wait_device = true
+timeout = 3.5
+""",
+        encoding="utf-8",
+    )
+    args = build_parser().parse_args(["--instance", "bench-a", "--config", str(config_path)])
+
+    config = config_from_args(args)
+
+    assert config.selector_type == "serial"
+    assert config.selector_value == "abc"
+    assert config.socket_path == "/tmp/bench-a.sock"
+    assert config.wait_device is True
+    assert config.timeout == 3.5
+
+
+def test_config_from_args_keeps_raw_selector_flow() -> None:
+    args = build_parser().parse_args(["--port", "/dev/ttyACM0", "--socket", "/tmp/relay.sock"])
+
+    config = config_from_args(args)
+
+    assert config.selector_type == "port"
+    assert config.selector_value == "/dev/ttyACM0"
+    assert config.socket_path == "/tmp/relay.sock"
 
 
 def test_initial_connect_runs_info_then_status_without_off_all(tmp_path: Any) -> None:

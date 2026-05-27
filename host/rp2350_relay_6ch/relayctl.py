@@ -18,6 +18,7 @@ from .cli import (
     _parse_on_off,
     _parse_state,
 )
+from .config import resolve_socket_for_instance
 from .daemon_client import RelayDaemonClient
 from .exceptions import (
     RelayDeviceError,
@@ -27,10 +28,21 @@ from .exceptions import (
     RelayTransportError,
     RelayValidationError,
 )
+from .systemd import doctor as systemd_doctor
+from .systemd import install_user_unit
 
 
 def _client(args: argparse.Namespace) -> RelayDaemonClient:
-    return RelayDaemonClient.connect(args.socket, timeout_s=args.timeout)
+    if not args.socket and not args.instance:
+        raise RelayValidationError("--socket or --instance is required")
+    socket_path = args.socket
+    if args.instance:
+        socket_path = resolve_socket_for_instance(
+            instance=args.instance,
+            config_path=args.config,
+            socket_override=args.socket,
+        )
+    return RelayDaemonClient.connect(socket_path, timeout_s=args.timeout)
 
 
 def cmd_info(args: argparse.Namespace) -> dict[str, Any]:
@@ -83,6 +95,20 @@ def cmd_daemon_status(args: argparse.Namespace) -> dict[str, Any]:
         return client.get_daemon_status()
 
 
+def cmd_systemd_install(args: argparse.Namespace) -> dict[str, Any]:
+    output = install_user_unit(
+        force=args.force,
+        python_path=args.python,
+        print_unit=args.print_unit,
+    )
+    return {"message": output}
+
+
+def cmd_systemd_doctor(args: argparse.Namespace) -> dict[str, Any]:
+    result = systemd_doctor(instance=args.instance)
+    return {"ok": result.ok, "messages": result.messages}
+
+
 COMMANDS = {
     "info": cmd_info,
     "build-info": cmd_build_info,
@@ -94,6 +120,8 @@ COMMANDS = {
     "status": cmd_status,
     "reboot": cmd_reboot,
     "daemon-status": cmd_daemon_status,
+    "systemd-install": cmd_systemd_install,
+    "systemd-doctor": cmd_systemd_doctor,
 }
 
 
@@ -105,7 +133,10 @@ class RelayCtlArgumentParser(argparse.ArgumentParser):
 
 def build_parser() -> argparse.ArgumentParser:
     parser = RelayCtlArgumentParser(description=__doc__)
-    parser.add_argument("--socket", required=True, help="relay daemon Unix socket path")
+    target = parser.add_mutually_exclusive_group()
+    target.add_argument("--socket", help="relay daemon Unix socket path")
+    target.add_argument("--instance", help="named relay instance from TOML config")
+    parser.add_argument("--config", help="TOML config path for --instance")
     parser.add_argument("--timeout", type=float, default=2.0)
     parser.add_argument("--output", choices=("human", "json"), default="human")
 
@@ -131,10 +162,30 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("status", help="print relay controller status")
     subparsers.add_parser("reboot", help="request a firmware reboot")
     subparsers.add_parser("daemon-status", help="print daemon process status")
+
+    systemd_parser = subparsers.add_parser(
+        "systemd",
+        help="install or check daemon systemd user service files",
+    )
+    systemd_subparsers = systemd_parser.add_subparsers(dest="systemd_command", required=True)
+
+    systemd_install = systemd_subparsers.add_parser("install", help="install systemd user templates")
+    systemd_install.add_argument("--force", action="store_true")
+    systemd_install.add_argument("--python", help="Python interpreter for the generated unit")
+    systemd_install.add_argument("--print-unit", action="store_true")
+
+    systemd_doctor_parser = systemd_subparsers.add_parser(
+        "doctor",
+        help="check systemd user service configuration",
+    )
+    systemd_doctor_parser.add_argument("--instance", help="named instance to validate")
     return parser
 
 
 def run(args: argparse.Namespace) -> int:
+    if args.command == "systemd":
+        args.command = f"systemd-{args.systemd_command}"
+
     try:
         payload = COMMANDS[args.command](args)
     except RelayValidationError as exc:
@@ -156,7 +207,12 @@ def run(args: argparse.Namespace) -> int:
         print(f"relay error: {exc}", file=sys.stderr)
         return EXIT_PROTOCOL
 
-    _emit(args, payload)
+    if args.command == "systemd-install":
+        print(payload["message"])
+    elif args.command == "systemd-doctor":
+        print("\n".join(str(message) for message in payload["messages"]))
+    else:
+        _emit(args, payload)
     return EXIT_OK
 
 

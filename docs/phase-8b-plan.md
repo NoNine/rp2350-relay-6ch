@@ -32,8 +32,10 @@ Those safety features can be planned later as an extension to daemon mode.
 - Add `RelayDaemonClient` beside the existing direct `RelayClient`.
 - Select the daemon-owned controller by exactly one selector: `--port` or
   exact USB `--serial`.
+- Add named daemon instances using one global TOML config for production
+  systemd operation.
 - Use newline-delimited JSON over an explicit same-user Unix domain socket.
-- Provide a `systemd --user` unit example for production operation.
+- Provide a generated `systemd --user` template unit for production operation.
 
 ## Deliverables
 
@@ -43,9 +45,9 @@ Those safety features can be planned later as an extension to daemon mode.
 - Implementer-facing daemon contract in [Host daemon mode](host-daemon-mode.md).
 - Operator-facing CLI and host-library documentation updates.
 - Daemon smoke-test procedure under `docs/testing/`.
-- Examples-only static instance guidance using explicit serial numbers and
-  socket paths; no named-instance CLI, environment-file parsing, or TOML
-  configuration in Phase 8b.
+- Named-instance CLI support for `rp2350-relayd --instance` and
+  `rp2350-relayctl --instance`.
+- Systemd install and doctor helpers under `rp2350-relayctl systemd`.
 
 ## Acceptance Checks
 
@@ -78,6 +80,8 @@ Expected results:
 - Reconnect tests simulate serial failure and recovery without concurrent
   command races.
 - CLI tests confirm `rp2350-relayctl` rejects direct serial options.
+- Config and systemd tests cover TOML instance resolution, environment and CLI
+  override precedence, generated unit content, and systemd doctor checks.
 - Compatibility tests confirm existing direct `RelayClient` and `rp2350-relay`
   behavior still passes unchanged.
 
@@ -91,6 +95,18 @@ rp2350-relayctl --socket "$SOCKET" info
 rp2350-relayctl --socket "$SOCKET" status
 rp2350-relayctl --socket "$SOCKET" pulse 1 100
 rp2350-relayctl --socket "$SOCKET" off-all
+```
+
+Production instance smoke checks may use:
+
+```sh
+rp2350-relayd --instance bench-a
+rp2350-relayctl --instance bench-a daemon-status
+rp2350-relayctl --instance bench-a status
+rp2350-relayctl --instance bench-a off-all
+rp2350-relayctl systemd install
+systemctl --user daemon-reload
+rp2350-relayctl systemd doctor --instance bench-a
 ```
 
 Expected results:
