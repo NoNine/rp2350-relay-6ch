@@ -19,4 +19,14 @@ config RP2350_RELAY_6CH_BUZZER_FEEDBACK
 	  enables this in prj.conf so hardware smoke tests can verify the
 	  buzzer path; release or quiet-site builds can disable it explicitly.
 
+config RP2350_RELAY_6CH_DISPLAY
+	bool "Enable optional OLED local status display"
+	select DISPLAY if !ZTEST
+	default n
+	help
+	  Enable the optional 128x64 SSD1306-compatible OLED local status
+	  display when a zephyr,display device is present. Missing display
+	  hardware is treated as an optional add-on absence, not a controller
+	  fault.
+
 source "Kconfig.zephyr"

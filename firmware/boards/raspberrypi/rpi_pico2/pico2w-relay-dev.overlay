@@ -5,11 +5,16 @@
  */
 
 #include <freq.h>
+#include <zephyr/dt-bindings/i2c/i2c.h>
 #include <zephyr/dt-bindings/led/led.h>
 #include <zephyr/dt-bindings/pinctrl/rpi-pico-rp2350a-pinctrl.h>
 #include <zephyr/dt-bindings/pwm/pwm.h>
 
 / {
+	chosen {
+		zephyr,display = &ssd1306;
+	};
+
 	aliases {
 		led-strip = &rgb_led;
 	};
@@ -60,6 +65,14 @@
 			pinmux = <PIO1_P8>;
 		};
 	};
+
+	i2c1_display_default: i2c1_display_default {
+		group1 {
+			pinmux = <I2C1_SDA_P10>, <I2C1_SCL_P11>;
+			input-enable;
+			input-schmitt-enable;
+		};
+	};
 };
 
 &pwm {
@@ -87,5 +100,27 @@
 			frequency = <DT_FREQ_K(800)>;
 			status = "okay";
 		};
+	};
+};
+
+&i2c1 {
+	clock-frequency = <I2C_BITRATE_STANDARD>;
+	pinctrl-0 = <&i2c1_display_default>;
+	pinctrl-names = "default";
+	status = "okay";
+
+	ssd1306: ssd1306@3d {
+		compatible = "solomon,ssd1306";
+		reg = <0x3d>;
+		width = <128>;
+		height = <64>;
+		segment-offset = <0>;
+		page-offset = <0>;
+		display-offset = <0>;
+		multiplex-ratio = <63>;
+		segment-remap;
+		com-invdir;
+		prechargep = <0x22>;
+		softreset-on;
 	};
 };

@@ -3,6 +3,7 @@
  */
 
 #include <zephyr/ztest.h>
+#include <zephyr/drivers/display.h>
 
 #include <rp2350_relay_6ch/indicator.h>
 
@@ -19,6 +20,8 @@ static void indicator_before(void *fixture)
 {
 	ARG_UNUSED(fixture);
 
+	indicator_test_configure_display(false, false, 0U, 0U, 0U,
+					 false, false, false);
 	indicator_test_reset();
 }
 
@@ -254,4 +257,269 @@ ZTEST(indicator, test_buzzer_feedback_mapping_when_enabled)
 	indicator_set_reboot_pending(true);
 	snap = snapshot();
 	zassert_equal(snap.buzzer, INDICATOR_BUZZER_REBOOT_PENDING);
+}
+
+ZTEST(indicator, test_display_unsupported_without_configured_device)
+{
+	struct indicator_test_snapshot snap = snapshot();
+
+	zassert_equal(snap.display_state, INDICATOR_DISPLAY_UNSUPPORTED);
+	zassert_equal(snap.display_mode, INDICATOR_DISPLAY_MODE_BOOT);
+	zassert_equal(snap.display_write_count, 0U);
+}
+
+ZTEST(indicator, test_display_not_detected_is_not_fault)
+{
+	struct indicator_test_snapshot snap;
+
+	indicator_test_configure_display(true, false, 128U, 64U,
+					 PIXEL_FORMAT_MONO01, false, false, false);
+	indicator_test_reset();
+	snap = snapshot();
+
+	zassert_equal(snap.display_state, INDICATOR_DISPLAY_NOT_DETECTED);
+	zassert_equal(snap.rgb, INDICATOR_RGB_BOOTING);
+	zassert_false(snap.degraded);
+	zassert_false(snap.fault);
+	zassert_equal(snap.display_write_count, 0U);
+}
+
+ZTEST(indicator, test_display_post_success_and_ready_render)
+{
+	struct indicator_test_snapshot snap;
+
+	indicator_test_configure_display(true, true, 128U, 64U,
+					 PIXEL_FORMAT_MONO01, false, false, false);
+	indicator_test_reset();
+	indicator_set_ready(true);
+	snap = snapshot();
+
+	zassert_equal(snap.display_state, INDICATOR_DISPLAY_READY);
+	zassert_equal(snap.display_mode, INDICATOR_DISPLAY_MODE_READY);
+	zassert_equal(snap.display_detail, INDICATOR_DISPLAY_DETAIL_OK);
+	zassert_equal(snap.display_filled_mask, 0U);
+	zassert_equal(snap.display_pulse_mask, 0U);
+	zassert_equal(snap.display_post_write_count, 1U);
+	zassert_true(snap.display_write_count > 0U);
+	zassert_true(indicator_test_display_pixel_is_set(100U, 56U));
+}
+
+ZTEST(indicator, test_display_glyphs_cover_fixed_label_vocabulary)
+{
+	const char required[] = "0123456:*ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+	for (size_t idx = 0U; idx < ARRAY_SIZE(required) - 1U; idx++) {
+		zassert_true(indicator_test_display_glyph_supported(required[idx]),
+			     "missing OLED glyph for %c", required[idx]);
+	}
+}
+
+ZTEST(indicator, test_display_draws_static_usb_annunciator)
+{
+	indicator_test_configure_display(true, true, 128U, 64U,
+					 PIXEL_FORMAT_MONO01, false, false, false);
+	indicator_test_reset();
+	indicator_set_ready(true);
+	(void)snapshot();
+
+	zassert_true(indicator_test_display_pixel_is_set(0U, 1U));
+	zassert_true(indicator_test_display_pixel_is_set(4U, 1U));
+	zassert_true(indicator_test_display_pixel_is_set(8U, 1U));
+}
+
+ZTEST(indicator, test_display_rejects_bad_geometry)
+{
+	struct indicator_test_snapshot snap;
+
+	indicator_test_configure_display(true, true, 128U, 32U,
+					 PIXEL_FORMAT_MONO01, false, false, false);
+	indicator_test_reset();
+	snap = snapshot();
+
+	zassert_equal(snap.display_state, INDICATOR_DISPLAY_FAILED);
+	zassert_equal(snap.display_post_write_count, 0U);
+	zassert_equal(snap.display_write_count, 0U);
+	zassert_false(snap.degraded);
+	zassert_false(snap.fault);
+}
+
+ZTEST(indicator, test_display_rejects_blanking_failure)
+{
+	struct indicator_test_snapshot snap;
+
+	indicator_test_configure_display(true, true, 128U, 64U,
+					 PIXEL_FORMAT_MONO01, true, false, false);
+	indicator_test_reset();
+	snap = snapshot();
+
+	zassert_equal(snap.display_state, INDICATOR_DISPLAY_FAILED);
+	zassert_equal(snap.display_post_write_count, 0U);
+	zassert_equal(snap.display_write_count, 0U);
+}
+
+ZTEST(indicator, test_display_rejects_post_write_failure)
+{
+	struct indicator_test_snapshot snap;
+
+	indicator_test_configure_display(true, true, 128U, 64U,
+					 PIXEL_FORMAT_MONO01, false, true, false);
+	indicator_test_reset();
+	snap = snapshot();
+
+	zassert_equal(snap.display_state, INDICATOR_DISPLAY_FAILED);
+	zassert_equal(snap.display_post_write_count, 0U);
+	zassert_equal(snap.display_write_count, 0U);
+}
+
+ZTEST(indicator, test_display_render_failure_fails_until_reboot)
+{
+	struct indicator_test_snapshot snap;
+	uint16_t writes_before;
+
+	indicator_test_configure_display(true, true, 128U, 64U,
+					 PIXEL_FORMAT_MONO01, false, false, false);
+	indicator_test_reset();
+	snap = snapshot();
+	zassert_equal(snap.display_state, INDICATOR_DISPLAY_READY);
+	writes_before = snap.display_write_count;
+
+	indicator_test_set_display_render_failure(true);
+	indicator_set_ready(true);
+	snap = snapshot();
+	zassert_equal(snap.display_state, INDICATOR_DISPLAY_FAILED);
+	zassert_equal(snap.display_write_count, writes_before);
+
+	indicator_test_set_display_render_failure(false);
+	indicator_set_relay_state(BIT(0), 0U);
+	snap = snapshot();
+	zassert_equal(snap.display_state, INDICATOR_DISPLAY_FAILED);
+	zassert_equal(snap.display_write_count, writes_before);
+}
+
+ZTEST(indicator, test_display_relay_cells_and_pulse_detail)
+{
+	struct indicator_test_snapshot snap;
+
+	indicator_test_configure_display(true, true, 128U, 64U,
+					 PIXEL_FORMAT_MONO01, false, false, false);
+	indicator_test_reset();
+	indicator_set_ready(true);
+	indicator_set_relay_state(BIT(0) | BIT(5), BIT(1));
+	snap = snapshot();
+
+	zassert_equal(snap.display_state, INDICATOR_DISPLAY_READY);
+	zassert_equal(snap.display_mode, INDICATOR_DISPLAY_MODE_ACTIVE);
+	zassert_equal(snap.display_detail, INDICATOR_DISPLAY_DETAIL_P2);
+	zassert_equal(snap.display_filled_mask, BIT(0) | BIT(1) | BIT(5));
+	zassert_equal(snap.display_pulse_mask, BIT(1));
+}
+
+ZTEST(indicator, test_display_active_overrides_accepted_command_transient)
+{
+	struct indicator_test_snapshot snap;
+
+	indicator_test_configure_display(true, true, 128U, 64U,
+					 PIXEL_FORMAT_MONO01, false, false, false);
+	indicator_test_reset();
+	indicator_set_ready(true);
+	indicator_set_relay_state(BIT(0), 0U);
+	indicator_record_command(INDICATOR_COMMAND_ACCEPTED);
+	snap = snapshot();
+
+	zassert_equal(snap.rgb, INDICATOR_RGB_ACCEPTED);
+	zassert_equal(snap.display_mode, INDICATOR_DISPLAY_MODE_ACTIVE);
+	zassert_equal(snap.display_detail, INDICATOR_DISPLAY_DETAIL_OK);
+	zassert_equal(snap.display_filled_mask, BIT(0));
+	zassert_equal(snap.display_pulse_mask, 0U);
+}
+
+ZTEST(indicator, test_display_pulse_detail_overrides_accepted_command_transient)
+{
+	struct indicator_test_snapshot snap;
+
+	indicator_test_configure_display(true, true, 128U, 64U,
+					 PIXEL_FORMAT_MONO01, false, false, false);
+	indicator_test_reset();
+	indicator_set_ready(true);
+	indicator_set_relay_state(0U, BIT(1));
+	indicator_record_command(INDICATOR_COMMAND_ACCEPTED);
+	snap = snapshot();
+
+	zassert_equal(snap.rgb, INDICATOR_RGB_ACCEPTED);
+	zassert_equal(snap.display_mode, INDICATOR_DISPLAY_MODE_ACTIVE);
+	zassert_equal(snap.display_detail, INDICATOR_DISPLAY_DETAIL_P2);
+	zassert_equal(snap.display_filled_mask, BIT(1));
+	zassert_equal(snap.display_pulse_mask, BIT(1));
+}
+
+ZTEST(indicator, test_display_reverses_labels_in_filled_relay_cells)
+{
+	indicator_test_configure_display(true, true, 128U, 64U,
+					 PIXEL_FORMAT_MONO01, false, false, false);
+	indicator_test_reset();
+	indicator_set_relay_state(BIT(0), 0U);
+	(void)snapshot();
+
+	zassert_true(indicator_test_display_pixel_is_set(2U, 16U));
+	zassert_false(indicator_test_display_pixel_is_set(10U, 25U));
+	zassert_true(indicator_test_display_pixel_is_set(9U, 25U));
+}
+
+ZTEST(indicator, test_display_draws_visible_pulse_mark)
+{
+	indicator_test_configure_display(true, true, 128U, 64U,
+					 PIXEL_FORMAT_MONO01, false, false, false);
+	indicator_test_reset();
+	indicator_set_relay_state(0U, BIT(0));
+	(void)snapshot();
+
+	zassert_true(indicator_test_display_pixel_is_set(2U, 16U));
+	zassert_false(indicator_test_display_pixel_is_set(7U, 35U));
+	zassert_false(indicator_test_display_pixel_is_set(10U, 31U));
+	zassert_false(indicator_test_display_pixel_is_set(13U, 34U));
+	zassert_true(indicator_test_display_pixel_is_set(8U, 31U));
+}
+
+ZTEST(indicator, test_display_multiple_pulses_render_p_star)
+{
+	struct indicator_test_snapshot snap;
+
+	indicator_test_configure_display(true, true, 128U, 64U,
+					 PIXEL_FORMAT_MONO01, false, false, false);
+	indicator_test_reset();
+	indicator_set_relay_state(0U, BIT(0) | BIT(3));
+	snap = snapshot();
+
+	zassert_equal(snap.display_mode, INDICATOR_DISPLAY_MODE_ACTIVE);
+	zassert_equal(snap.display_detail, INDICATOR_DISPLAY_DETAIL_P_STAR);
+	zassert_equal(snap.display_filled_mask, BIT(0) | BIT(3));
+}
+
+ZTEST(indicator, test_display_attention_reboot_and_fault_priority)
+{
+	struct indicator_test_snapshot snap;
+
+	indicator_test_configure_display(true, true, 128U, 64U,
+					 PIXEL_FORMAT_MONO01, false, false, false);
+	indicator_test_reset();
+	indicator_set_ready(true);
+	indicator_record_command(INDICATOR_COMMAND_REJECTED);
+	snap = snapshot();
+	zassert_equal(snap.display_mode, INDICATOR_DISPLAY_MODE_ATTN);
+	zassert_equal(snap.display_detail, INDICATOR_DISPLAY_DETAIL_E_ARG);
+
+	indicator_record_command(INDICATOR_COMMAND_BUSY);
+	snap = snapshot();
+	zassert_equal(snap.display_mode, INDICATOR_DISPLAY_MODE_ATTN);
+	zassert_equal(snap.display_detail, INDICATOR_DISPLAY_DETAIL_E_BUSY);
+
+	indicator_set_reboot_pending(true);
+	snap = snapshot();
+	zassert_equal(snap.display_mode, INDICATOR_DISPLAY_MODE_REBOOT);
+	zassert_equal(snap.display_detail, INDICATOR_DISPLAY_DETAIL_HOLD);
+
+	indicator_set_fault(true);
+	snap = snapshot();
+	zassert_equal(snap.display_mode, INDICATOR_DISPLAY_MODE_FAULT);
+	zassert_equal(snap.display_detail, INDICATOR_DISPLAY_DETAIL_E_IO);
 }

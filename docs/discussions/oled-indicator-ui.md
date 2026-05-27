@@ -7,6 +7,10 @@ one 128x64 OLED local indicator to the relay controller. It does not change
 the authoritative PRD, implementation plan, phase scope, or verification
 status unless those documents are updated explicitly.
 
+Authoritative standalone OLED requirements are maintained in
+[`docs/oled-indicator.md`](../oled-indicator.md). Keep this discussion as
+historical design context rather than duplicating implementation rules here.
+
 ## Summary
 
 Add one 128x64 SSD1306-compatible I2C display as a local status surface, first
@@ -29,7 +33,7 @@ small LCDs preserve hierarchy under tight pixel limits.
 ## Hardware direction
 
 The first target should be a 3.3 V, 128x64, SSD1306-compatible I2C OLED at
-address `0x3c`.
+address `0x3d`.
 
 For the Pico 2 development fixture:
 
@@ -217,7 +221,7 @@ When promoted from discussion to implementation:
 - Add a Kconfig option such as `CONFIG_RP2350_RELAY_6CH_DISPLAY`.
 - Enable Zephyr `DISPLAY`, `SSD1306`, and character framebuffer support only
   when the display feature is selected.
-- Add `ssd1306@3c` under `&i2c1` in the Pico relay development overlay and set
+- Add `ssd1306@3d` under `&i2c1` in the Pico relay development overlay and set
   `zephyr,display = &ssd1306`.
 - Override the Pico default `i2c1` pinctrl for the fixture so GP10/GP11 are
   used instead of GP6/GP7.
@@ -257,6 +261,56 @@ Hardware checks:
 - Disconnecting or omitting the display does not prevent relay firmware from
   booting and responding to host commands.
 
+## POST and failure-model discussion
+
+After the initial UI discussion, the OLED work was explicitly treated as a
+standalone task rather than part of any implementation phase. The follow-up
+contract was written in `docs/oled-indicator.md` so the implementation rules
+would have one authoritative home. This discussion note remains historical
+context for how those rules were chosen.
+
+The first failure-model question was whether display hardware detection or a
+power-on self test could be meaningful. The conclusion was that a useful POST
+can be designed, but it must be named narrowly. For an SSD1306-compatible OLED
+over I2C, firmware can verify that the configured Zephyr display device is
+ready and that command/data writes are acknowledged. It cannot prove that OLED
+pixels are visibly lit, that the panel glass is intact, or that an operator can
+read the screen.
+
+The discussion settled on treating the OLED as an optional add-on even when
+display-capable firmware is built. A missing OLED at boot should therefore be
+handled as `not_detected`, not as a controller degraded or fault condition.
+That distinction keeps a display-capable firmware image usable on fixtures
+where the add-on is not installed.
+
+The POST write was clarified to avoid implying a visible splash screen or
+manual checklist. The intended diagnostic write is one small page-aligned
+`display_write()` call: an 8-pixel-high fixed bit pattern, such as an 8x8 or
+16x8 buffer at `(0, 0)`. A successful return means the display command/data
+write path acknowledged the operation. Normal rendering should overwrite the
+diagnostic pixels on the next update, with no boot delay and no operator
+confirmation step.
+
+Failure recovery was also narrowed. The selected model is fail until reboot:
+if POST fails, or if a later render write fails, firmware records the display
+backend as failed, logs once or rate-limits logs, and skips future OLED writes
+until the next boot. Retry-on-every-render was rejected because repeated I2C
+failures could add latency and noisy logs. Hot-plug recovery was left out of
+the first implementation.
+
+The discussion briefly considered making display health host-visible through
+the normal `status` response. That idea was deferred. Adding polling-only
+fields for an optional local indicator would expand the protocol and host API
+before the project has the planned device-originated asynchronous event path.
+The preferred future direction is to report display or indicator failures
+through async events, such as `indicator_fault` or a display-specific event
+payload, once that event foundation is implemented and promoted.
+
+Until then, display POST state and display write failures remain internal to
+the firmware indicator backend and visible only through logs and local
+behavior. They must not affect relay control, `off-all`, pulse teardown,
+reboot handling, or host RPC responses.
+
 ## Related repo docs
 
 - `docs/status-indicators.md` remains the operator-facing source for RGB LED
@@ -270,7 +324,7 @@ Hardware checks:
 
 - This remains a local display feature, not a control interface.
 - The first display module is SSD1306-compatible, 128x64, I2C, 3.3 V, address
-  `0x3c`.
+  `0x3d`.
 - The Pico 2 display pin choice is GP10/GP11 unless future fixture wiring
   explicitly changes it.
 - Compact LCD influence is limited to information architecture: fixed zones,

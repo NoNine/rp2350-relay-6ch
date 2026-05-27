@@ -37,15 +37,55 @@ enum indicator_buzzer_pattern {
 	INDICATOR_BUZZER_BOOT_READY,
 };
 
+enum indicator_display_state {
+	INDICATOR_DISPLAY_UNSUPPORTED,
+	INDICATOR_DISPLAY_NOT_DETECTED,
+	INDICATOR_DISPLAY_READY,
+	INDICATOR_DISPLAY_FAILED,
+};
+
+enum indicator_display_mode {
+	INDICATOR_DISPLAY_MODE_OFF,
+	INDICATOR_DISPLAY_MODE_BOOT,
+	INDICATOR_DISPLAY_MODE_READY,
+	INDICATOR_DISPLAY_MODE_ACTIVE,
+	INDICATOR_DISPLAY_MODE_ATTN,
+	INDICATOR_DISPLAY_MODE_FAULT,
+	INDICATOR_DISPLAY_MODE_REBOOT,
+};
+
+enum indicator_display_detail {
+	INDICATOR_DISPLAY_DETAIL_NONE,
+	INDICATOR_DISPLAY_DETAIL_OK,
+	INDICATOR_DISPLAY_DETAIL_P1,
+	INDICATOR_DISPLAY_DETAIL_P2,
+	INDICATOR_DISPLAY_DETAIL_P3,
+	INDICATOR_DISPLAY_DETAIL_P4,
+	INDICATOR_DISPLAY_DETAIL_P5,
+	INDICATOR_DISPLAY_DETAIL_P6,
+	INDICATOR_DISPLAY_DETAIL_P_STAR,
+	INDICATOR_DISPLAY_DETAIL_E_ARG,
+	INDICATOR_DISPLAY_DETAIL_E_BUSY,
+	INDICATOR_DISPLAY_DETAIL_E_IO,
+	INDICATOR_DISPLAY_DETAIL_HOLD,
+};
+
 struct indicator_test_snapshot {
 	enum indicator_rgb_pattern rgb;
 	enum indicator_buzzer_pattern buzzer;
+	enum indicator_display_state display_state;
+	enum indicator_display_mode display_mode;
+	enum indicator_display_detail display_detail;
 	bool ready;
 	bool degraded;
 	bool fault;
 	bool reboot_pending;
 	uint8_t relay_state_mask;
 	uint8_t pulse_mask;
+	uint8_t display_filled_mask;
+	uint8_t display_pulse_mask;
+	uint16_t display_post_write_count;
+	uint16_t display_write_count;
 };
 
 void indicator_init(void);
@@ -61,6 +101,15 @@ void indicator_test_reset(void);
 void indicator_test_get_snapshot(struct indicator_test_snapshot *snapshot);
 void indicator_test_force_render(void);
 void indicator_test_advance(uint32_t ms);
+bool indicator_test_display_pixel_is_set(uint8_t x, uint8_t y);
+bool indicator_test_display_glyph_supported(char c);
+void indicator_test_configure_display(bool supported, bool ready,
+				      uint16_t width, uint16_t height,
+				      uint32_t pixel_formats,
+				      bool blanking_fails,
+				      bool post_write_fails,
+				      bool render_write_fails);
+void indicator_test_set_display_render_failure(bool render_write_fails);
 #endif
 
 #ifdef __cplusplus
