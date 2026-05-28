@@ -145,3 +145,52 @@ loginctl terminate-user "$USER"
 `loginctl terminate-user "$USER"` logs out the current user and terminates that
 user's running sessions. Save shell work first, then log back in and restart
 the daemon service.
+
+### Systemd logs and journal permissions
+
+For a systemd-managed daemon, read recent logs with:
+
+```sh
+journalctl --user-unit=rp2350-relayd@bench-a.service -n 50 --no-pager
+```
+
+Follow live logs with:
+
+```sh
+journalctl --user-unit=rp2350-relayd@bench-a.service -f
+```
+
+If the command reports `No journal files were opened due to insufficient
+permissions`, check the system-wide journal for the operator user's systemd
+manager instead:
+
+```sh
+sudo journalctl -u user@$(id -u).service --grep=rp2350_relay_6ch -n 100 --no-pager
+sudo journalctl -u user@$(id -u).service --grep="heartbeat failed" -n 100 --no-pager
+```
+
+If the service uses a different operator account, run `id -u <operator-user>`
+and replace `$(id -u)` with that numeric user ID.
+
+When logs appear empty, first confirm the instance is active and that
+`daemon-status` is reaching the expected socket:
+
+```sh
+systemctl --user status rp2350-relayd@bench-a.service
+systemctl --user show rp2350-relayd@bench-a.service \
+  -p ActiveState -p SubState -p MainPID -p ExecMainStatus
+rp2350-relayctl --instance bench-a daemon-status
+```
+
+Successful heartbeat checks are intentionally silent. A heartbeat failure is
+logged only after the daemon was connected and an idle heartbeat command fails.
+If the daemon is already disconnected, use `daemon-status` `last_error` and
+reconnect log entries instead of expecting repeated heartbeat-failure logs.
+
+For permanent non-`sudo` journal access on systems that restrict user journal
+files, add the operator user to the journal-reading group, then fully log out
+and back in:
+
+```sh
+sudo usermod -aG systemd-journal "$USER"
+```

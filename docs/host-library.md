@@ -37,6 +37,53 @@ with RelayClient.connect("COM31", timeout_s=2.0, retries=1) as client:
 The `rp2350-relay session` CLI uses the same direct connection model for
 long-lived manual operation. It does not add a separate Python client API.
 
+## Device Discovery
+
+Python scripts can discover relay USB candidates with the discovery helpers:
+
+```python
+from rp2350_relay_6ch.discovery import list_relay_devices
+
+for device in list_relay_devices():
+    print(
+        device.port,
+        device.serial_number,
+        device.product,
+        device.verified_product,
+    )
+```
+
+`list_relay_devices()` returns `RelayUsbDevice` records with:
+
+- `port`: OS serial device path, such as `COM31` or `/dev/ttyACM0`.
+- `serial_number`: USB serial number when the host OS reports it.
+- `product`: USB product string when available.
+- `verified_product`: `True` when the product string identifies the relay
+  controller.
+
+Discovery inspects USB metadata only. It does not open ports or send relay
+protocol commands, so treat returned devices as candidates until the script
+opens the port and verifies `get_info()` and `get_status()`.
+
+To target a known controller by USB serial number:
+
+```python
+from rp2350_relay_6ch import RelayClient
+from rp2350_relay_6ch.discovery import select_device_by_serial
+
+device = select_device_by_serial("E6614C311F4B8B2F")
+
+with RelayClient.connect(device.port, timeout_s=2.0, retries=1) as relay:
+    info = relay.get_info()
+    status = relay.get_status()
+    relay.pulse_relay(0, 100)
+    relay.off_all()
+```
+
+`select_device_by_serial()` raises `RelayValidationError` when no relay
+candidate matches the serial number or when multiple candidates report the same
+serial number.
+
 ## Daemon Client
 
 On Linux, `RelayDaemonClient` connects to a running `rp2350-relayd` Unix socket
@@ -64,6 +111,95 @@ status = relay.get_daemon_status()
 Daemon-client timeouts cover connecting to the Unix socket and waiting for the
 daemon response. Firmware request timeout and retry behavior are configured on
 the daemon process.
+
+## Heartbeat Polling
+
+`RelayClient.heartbeat()` sends a no-op liveness request. Direct Python
+automation that needs link-health polling should call it on a regular
+background interval and serialize heartbeat calls with foreground commands that
+share the same serial client.
+
+```python
+import threading
+
+from rp2350_relay_6ch import RelayClient, RelayError
+from rp2350_relay_6ch.discovery import select_device_by_serial
+
+stop = threading.Event()
+lock = threading.Lock()
+
+
+def heartbeat_loop(relay: RelayClient) -> None:
+    while not stop.wait(5.0):
+        try:
+            with lock:
+                relay.heartbeat()
+        except RelayError as exc:
+            print(f"heartbeat: {exc}")
+
+
+device = select_device_by_serial("E6614C311F4B8B2F")
+
+with RelayClient.connect(device.port, timeout_s=2.0, retries=1) as relay:
+    thread = threading.Thread(target=heartbeat_loop, args=(relay,), daemon=True)
+    thread.start()
+    try:
+        with lock:
+            relay.get_info()
+            relay.pulse_relay(0, 100)
+    finally:
+        stop.set()
+        thread.join(timeout=6.0)
+        with lock:
+            relay.off_all()
+```
+
+When using `RelayDaemonClient`, do not implement a direct serial heartbeat
+loop. The daemon owns the serial port, polls heartbeat internally, and exposes
+connection state through `get_daemon_status()`.
+
+## Multiple Devices
+
+A direct Python script may control multiple relay controllers by opening one
+`RelayClient` per serial port. Do not open the same serial port from multiple
+clients or processes at the same time.
+
+```python
+from rp2350_relay_6ch import RelayClient
+from rp2350_relay_6ch.discovery import list_relay_devices
+
+clients = []
+try:
+    for device in list_relay_devices():
+        client = RelayClient.connect(device.port, timeout_s=2.0, retries=1)
+        client.get_info()
+        client.get_status()
+        clients.append((device, client))
+
+    clients[0][1].set_relay(0, True)
+    clients[1][1].pulse_relay(2, 100)
+finally:
+    for _device, client in clients:
+        try:
+            client.off_all()
+        finally:
+            client.close()
+```
+
+On Linux, production multi-device operation should use one daemon instance per
+physical relay controller, each with a distinct Unix socket. Python clients then
+connect to the target daemon socket:
+
+```python
+from rp2350_relay_6ch import RelayDaemonClient
+from rp2350_relay_6ch.config import resolve_socket_for_instance
+
+socket_path = resolve_socket_for_instance(instance="bench-a")
+
+with RelayDaemonClient.connect(socket_path, timeout_s=2.0) as relay:
+    relay.get_daemon_status()
+    relay.pulse_relay(0, 100)
+```
 
 ## API
 

@@ -308,6 +308,10 @@ journalctl --user -u rp2350-relayd@bench-a
 rp2350-relayctl systemd doctor --instance bench-a
 ```
 
+If user-journal access is restricted or heartbeat logs are unclear, use the
+log troubleshooting notes in
+[Daemon smoke test](testing/daemon-smoke-test.md#systemd-logs-and-journal-permissions).
+
 ## Commands
 
 ```sh

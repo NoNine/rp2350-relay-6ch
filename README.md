@@ -21,52 +21,145 @@ an explicit six-relay devicetree overlay maps `CH1` through `CH6`; see
 
 Product photos show the Wi-Fi version, `RP2350-Relay-6CH-W`.
 
+## Operator And Automation Experience
+
+RP2350 Relay 6CH is a complete host-control stack for Waveshare
+RP2350-Relay-6CH boards and Pico 2 relay builds. It gives operators an
+interactive terminal workflow, gives Linux deployments a local daemon and
+`systemd --user` service path, and gives automation authors a Python library
+for custom test rigs, lab benches, and local control tools.
+
+The main control surfaces are:
+
+- `rp2350-relay session` for cross-platform manual operation. It supports USB
+  discovery, long-lived serial ownership, reconnect-oriented operation, and
+  safer teardown behavior for bench use.
+- `rp2350-relayd` with `rp2350-relayctl` for Linux service-style operation. One
+  daemon owns one relay controller, exposes a local Unix socket, supports named
+  instances, reports daemon status, polls heartbeat, and can run under
+  `systemd --user`.
+- The Python host library for broader automation. Use `RelayClient` for direct
+  serial control, discovery helpers to find relay controllers, and
+  `RelayDaemonClient` when automation should talk through a running daemon.
+
+| User goal | Interface |
+| --- | --- |
+| Manual bench operation | `rp2350-relay session` |
+| Linux local service deployment | `rp2350-relayd` and `rp2350-relayctl` |
+| Custom Python automation or test rigs | Host library with `RelayClient` or `RelayDaemonClient` |
+| Multi-device Linux host | One daemon instance and socket per relay controller |
+| Pico 2 DIY relay target | Same host tooling after flashing a supported overlay build |
+
+## Usage Preview
+
+These previews use the same grouping as the architecture diagrams.
+
+### Linux Daemon-Based Host Control
+
+#### Daemon Deployment
+
+File: `~/.config/rp2350-relay/config.toml`
+
+```toml
+[instances.bench-a]
+serial = "E6614C311F4B8B2F"
+socket = "${XDG_RUNTIME_DIR}/rp2350-relay/bench-a.sock"
+wait_device = true
+```
+
+Commands:
+
+```sh
+rp2350-relayctl systemd install
+systemctl --user daemon-reload
+systemctl --user enable --now rp2350-relayd@bench-a
+rp2350-relayctl --instance bench-a daemon-status
+```
+
+#### Python RelayDaemonClient
+
+The daemon owns the serial port and polls heartbeat internally. Automation can
+use `get_daemon_status()` to observe daemon connection state.
+
+```python
+from rp2350_relay_6ch import RelayDaemonClient
+
+with RelayDaemonClient.connect(
+    "/run/user/1000/rp2350-relay/bench-a.sock",
+    timeout_s=2.0,
+) as relay:
+    relay.get_daemon_status()
+    relay.pulse_relay(0, 100)
+```
+
+### Direct Host Control
+
+#### Interactive Session
+
+<pre style="background: #1b1b1b; color: #f2f2f2; padding: 12px; overflow-x: auto;"><code>$ <span style="color: #00d084;">rp2350-relay</span> session
+Relay USB candidates:
+  1. port=/dev/ttyACM0 serial=E6614C311F4B8B2F product=RP2350-Relay-6CH SMP CDC
+Select device number, or q to cancel: 1
+╭──────────────────────────────────────────────────────────────╮
+│   RP2350 Relay Session                                       │
+│                                                              │
+│   Connection:   <span style="color: #00ff99;">connected</span>                                    │
+│   Port:         /dev/ttyACM0                                 │
+│   Serial:       E6614C311F4B8B2F                             │
+│   Hardware:     Waveshare RP2350-Relay-6CH                   │
+│   Protocol:     3                                            │
+│   Relay count:  6                                            │
+│   State:        0x00                                         │
+│   On:           <span style="color: #ff4dff;">none</span>                                         │
+│   Pulsing:      <span style="color: #ff4dff;">none</span>                                         │
+╰──────────────────────────────────────────────────────────────╯
+<span style="color: #00d084;">rp2350-relay</span>[<span style="color: #00bfff;">/dev/ttyACM0</span>]$ <span style="color: #d7eaff;">info</span>
+                             <span style="background: #8f8f8f; color: #000000;"> info       </span>
+                             <span style="background: #c0c0c0; color: #000000;"> build-info </span>
+                             <span style="background: #c0c0c0; color: #000000;"> get        </span>
+                             <span style="background: #c0c0c0; color: #000000;"> set        </span>
+                             <span style="background: #c0c0c0; color: #000000;"> set-all    </span>
+                             <span style="background: #c0c0c0; color: #000000;"> pulse      </span>
+                             <span style="background: #c0c0c0; color: #000000;"> off-all    </span>
+                             <span style="background: #c0c0c0; color: #000000;"> status     </span>
+                             <span style="background: #c0c0c0; color: #000000;"> reboot     </span>
+                             <span style="background: #c0c0c0; color: #000000;"> disconnect </span>
+                             <span style="background: #c0c0c0; color: #000000;"> connect    </span>
+                             <span style="background: #c0c0c0; color: #000000;"> help       </span>
+                             <span style="background: #c0c0c0; color: #000000;"> exit       </span>
+                             <span style="background: #c0c0c0; color: #000000;"> quit       </span></code></pre>
+
+#### Python RelayClient
+
+Direct Python automation owns the serial connection. For link-health polling,
+call `relay.heartbeat()` on a regular background interval; see
+[Host library](docs/host-library.md#heartbeat-polling) for the serialized
+heartbeat loop pattern.
+
+```python
+from rp2350_relay_6ch import RelayClient
+from rp2350_relay_6ch.discovery import select_device_by_serial
+
+device = select_device_by_serial("E6614C311F4B8B2F")
+
+with RelayClient.connect(device.port, timeout_s=2.0, retries=1) as relay:
+    relay.get_info()
+    relay.pulse_relay(0, 100)
+    relay.off_all()
+```
+
+See [CLI utility](docs/cli.md), [Host library](docs/host-library.md), and
+[Pico 2 DIY targets](docs/pico-diy-targets.md) for complete setup and usage.
+
 ## Architecture
 
-The host side has two common control paths: cross-platform direct host control
-without a daemon, and Linux daemon-based host control.
+The host side has two common control paths: Linux daemon-based host control,
+and cross-platform direct host control.
 
 In the diagrams, `Python relay API` names the role used by Python automation.
 The concrete class depends on the control path: direct host control uses
 `RelayClient`, while daemon-based host control uses `RelayDaemonClient`.
 Inside daemon mode, `RelayClient` is internal to `rp2350-relayd`.
-
-### Direct Host Control Without Daemon
-
-```mermaid
-flowchart LR
-  operator["Operator"]
-  automation["External Python script / automation"]
-
-  subgraph host["Host Side"]
-    oneshot_cli["rp2350-relay CLI\nOne-shot commands"]
-    session_cli["rp2350-relay CLI\nInteractive session"]
-    direct_api["Python relay API\nRelayClient"]
-  end
-
-  protocol["USB command channel\nSMP frames + CBOR payloads"]
-
-  subgraph device["Device Side"]
-    zephyr["Zephyr-based relay firmware\nrunning on RP2350B MCU"]
-    safety["Relay safety logic\ndefault off, validation, pulse limits"]
-    relays["Six relay outputs\nCH1-CH6"]
-  end
-
-  loads["External circuits / loads"]
-
-  operator --> oneshot_cli
-  operator --> session_cli
-  automation --> direct_api
-
-  oneshot_cli --> direct_api
-  session_cli --> direct_api
-  direct_api <--> protocol
-
-  protocol <--> zephyr
-  zephyr --> safety
-  safety --> relays
-  relays --> loads
-```
 
 ### Linux Daemon-Based Host Control
 
@@ -75,10 +168,14 @@ flowchart LR
   operator["Operator"]
   automation["External Python script / automation"]
 
-  subgraph host["Host Side"]
+  subgraph client["Host Client"]
     relayctl["rp2350-relayctl\nclient CLI"]
     daemon_api["Python relay API\nRelayDaemonClient"]
-    socket["Local Unix socket\nNDJSON daemon protocol"]
+  end
+
+  socket["Local Unix socket\nNDJSON daemon protocol"]
+
+  subgraph server["Host Server"]
     daemon["rp2350-relayd\nlocal daemon"]
     direct_api["RelayClient\ninternal to rp2350-relayd"]
   end
@@ -108,6 +205,40 @@ flowchart LR
   relays --> loads
 ```
 
+### Direct Host Control Without Daemon
+
+```mermaid
+flowchart LR
+  operator["Operator"]
+  automation["External Python script / automation"]
+
+  subgraph host["Host Side"]
+    session_cli["rp2350-relay CLI\nInteractive session"]
+    direct_api["Python relay API\nRelayClient"]
+  end
+
+  protocol["USB command channel\nSMP frames + CBOR payloads"]
+
+  subgraph device["Device Side"]
+    zephyr["Zephyr-based relay firmware\nrunning on RP2350B MCU"]
+    safety["Relay safety logic\ndefault off, validation, pulse limits"]
+    relays["Six relay outputs\nCH1-CH6"]
+  end
+
+  loads["External circuits / loads"]
+
+  operator --> session_cli
+  automation --> direct_api
+
+  session_cli --> direct_api
+  direct_api <--> protocol
+
+  protocol <--> zephyr
+  zephyr --> safety
+  safety --> relays
+  relays --> loads
+```
+
 ## Features
 
 Implemented:
@@ -120,12 +251,12 @@ Implemented:
 - USB CDC SMP transport for host control.
 - Python RPC library with typed transport, timeout, protocol, validation, and
   device errors.
-- CLI utility for manual control, JSON output, scripted checks, and hardware
-  smoke tests.
 - Interactive `rp2350-relay session` mode with discovery, reconnect handling,
   and safer long-lived manual operation.
 - Linux `rp2350-relayd` daemon mode with `rp2350-relayctl` client commands,
   daemon status reporting, and background heartbeat polling.
+- CLI utilities for session operation, daemon-client commands, JSON output, and
+  hardware smoke tests.
 - Local WS2812 RGB status indication, bounded buzzer feedback, and optional
   128x64 SSD1306 OLED status display.
 - Host-side tests with simulated transports and firmware tests for relay and
@@ -272,23 +403,12 @@ BUILD_DIR=build/firmware
 For first-time setup and full verification commands, see
 [Development setup](docs/development-setup.md).
 
-## CLI Examples
+## Host Usage
 
-CLI channel numbers are one-based and match board labels: `1` is `CH1` and `6`
-is `CH6`.
-
-```sh
-rp2350-relay --port <serial-port> info
-rp2350-relay --port <serial-port> get
-rp2350-relay --port <serial-port> set 1 on
-rp2350-relay --port <serial-port> pulse 1 100
-rp2350-relay --port <serial-port> off-all
-rp2350-relay --port <serial-port> status
-rp2350-relay --port <serial-port> --output json status
-```
-
-See [docs/cli.md](docs/cli.md) for the full command list, session mode, Linux
-daemon mode, JSON output, and exit codes.
+Use [CLI utility](docs/cli.md) for full session mode, Linux daemon mode,
+`systemd --user`, JSON output, and exit-code details. Use
+[Host library](docs/host-library.md) for Python discovery, direct clients,
+daemon clients, and multi-device automation examples.
 
 ## Repository Layout
 
