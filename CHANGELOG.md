@@ -7,6 +7,75 @@ release assets. The section shape is inspired by Adafruit CircuitPython release
 notes: highlights, install/assets, verification, known limitations, and safety
 notes.
 
+## 0.8.8 - 2026-05-28
+
+OLED indicator and Linux service-management release for the current relay
+firmware and host tooling line.
+
+- Tag: `v0.8.8`
+- Commit: the `v0.8.8` tag target.
+
+### Highlights
+
+- Added Linux user systemd instance support for `rp2350-relayd`, including
+  generated service files, named instance configuration, and doctor helpers
+  under `rp2350-relayctl`.
+- Added optional firmware-local SSD1306 OLED indicator support with POST,
+  display failure handling, relay state rendering, pulse state rendering, and
+  native framebuffer coverage.
+- Added a fixed 128x64 OLED floorplan with annunciators, relay cells, status
+  band, preview-aligned divider rules, and pulse countdown bars.
+- Enabled the optional OLED setup for Waveshare firmware builds on I2C1 at
+  address `0x3d`, using GP10 for SDA and GP11 for SCL.
+- Documented OLED behavior, Waveshare wiring, daemon systemd installation,
+  daemon troubleshooting, and updated CLI and README release guidance.
+
+### Install / Assets
+
+- Install the host CLI from the GitHub Release wheel:
+  `rp2350_relay_6ch-0.8.8-py3-none-any.whl`.
+- Flash one of the matching firmware artifacts from the same release:
+  `rp2350_relay_6ch-0.8.8-waveshare.uf2` or
+  `rp2350_relay_6ch-0.8.8-pico2.uf2`.
+- Optional platform executable artifacts may be attached when useful:
+  `rp2350_relay_6ch-0.8.8-linux-x64` or
+  `rp2350_relay_6ch-0.8.8-windows-x64.exe`.
+- The source distribution `rp2350_relay_6ch-0.8.8.tar.gz` may be available as
+  an additional artifact.
+
+### Verification
+
+- Host tests passed with `scripts/test-host.sh`: `144 passed`.
+- Release metadata and formatting passed `git diff --check`.
+- Earlier implementation checks in this line built default Waveshare firmware,
+  Pico 2 firmware, OLED-enabled Pico 2/Pico 2 W firmware, and native indicator
+  and relay test suites.
+
+### Known Limitations
+
+- MCUboot-compatible firmware upload, test-image, confirm-image, and rollback
+  workflows remain planned but not implemented.
+- Communication-loss firmware safety actions remain planned but not
+  implemented.
+- OLED status is firmware-local and is not exposed through host-visible status,
+  protocol, CLI, or daemon APIs.
+- Pico 2 and Pico 2 W DIY builds require explicit relay overlays and external
+  relay driver hardware.
+- RS485 and wireless host communication are not v1 control paths.
+- Application-layer authentication is not implemented; this release assumes
+  trusted local USB or local Unix socket access.
+
+### Safety Notes
+
+- Keep hazardous relay-side loads disconnected during bring-up.
+- Confirm all relays are off after flashing, reset, smoke tests, daemon
+  reconnect checks, service restart checks, and teardown.
+- The OLED indicator is informational only; safe relay state remains defined by
+  relay GPIO state, firmware behavior, and host control checks.
+- Daemon health checks are host-side checks through the firmware heartbeat
+  command; they do not measure contact closure, load voltage, load current, or
+  external equipment health.
+
 ## 0.8.5 - 2026-05-26
 
 Linux daemon and CLI reliability release for the current relay host tooling
