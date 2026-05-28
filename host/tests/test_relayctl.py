@@ -164,6 +164,55 @@ def test_relayctl_daemon_status_defaults_to_human_output(
     assert FakeDaemonClient.instances[0].calls == [("get_daemon_status", ())]
 
 
+def test_relayctl_smoke_pulses_each_relay_and_forces_teardown(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Any,
+) -> None:
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        """
+[instances.bench-a]
+serial = "abc"
+socket = "/tmp/bench-a.sock"
+""",
+        encoding="utf-8",
+    )
+    sleeps: list[float] = []
+
+    monkeypatch.setattr("rp2350_relay_6ch.smoke.time.sleep", sleeps.append)
+
+    rc = relayctl.main(
+        [
+            "--instance",
+            "bench-a",
+            "--config",
+            str(config_path),
+            "smoke",
+            "--pulse-ms",
+            "25",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    calls = FakeDaemonClient.instances[0].calls
+
+    assert rc == relayctl.EXIT_OK
+    assert "smoke test passed" in captured.out
+    assert FakeDaemonClient.instances[0].socket_path == "/tmp/bench-a.sock"
+    assert calls[:2] == [("get_info", ()), ("get_status", ())]
+    assert [call for call in calls if call[0] == "pulse_relay"] == [
+        ("pulse_relay", (0, 25)),
+        ("pulse_relay", (1, 25)),
+        ("pulse_relay", (2, 25)),
+        ("pulse_relay", (3, 25)),
+        ("pulse_relay", (4, 25)),
+        ("pulse_relay", (5, 25)),
+    ]
+    assert sleeps == [0.025] * 6
+    assert calls[-1:] == [("off_all", ())]
+
+
 def test_relayctl_rejects_direct_serial_options() -> None:
     with pytest.raises(SystemExit) as exc:
         relayctl.main(["--socket", "/tmp/relay.sock", "--port", "COM7", "info"])

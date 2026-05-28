@@ -83,11 +83,11 @@ use `get_daemon_status()` to observe daemon connection state.
 
 ```python
 from rp2350_relay_6ch import RelayDaemonClient
+from rp2350_relay_6ch.config import resolve_socket_for_instance
 
-with RelayDaemonClient.connect(
-    "/run/user/1000/rp2350-relay/bench-a.sock",
-    timeout_s=2.0,
-) as relay:
+socket_path = resolve_socket_for_instance(instance="bench-a")
+
+with RelayDaemonClient.connect(socket_path, timeout_s=2.0) as relay:
     relay.get_daemon_status()
     relay.pulse_relay(0, 100)
 ```

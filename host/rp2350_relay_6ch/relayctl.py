@@ -28,6 +28,7 @@ from .exceptions import (
     RelayTransportError,
     RelayValidationError,
 )
+from .smoke import run_smoke_sequence
 from .systemd import doctor as systemd_doctor
 from .systemd import install_user_unit
 
@@ -95,6 +96,11 @@ def cmd_daemon_status(args: argparse.Namespace) -> dict[str, Any]:
         return client.get_daemon_status()
 
 
+def cmd_smoke(args: argparse.Namespace) -> dict[str, Any]:
+    with _client(args) as client:
+        return run_smoke_sequence(client, pulse_ms=args.pulse_ms)
+
+
 def cmd_systemd_install(args: argparse.Namespace) -> dict[str, Any]:
     output = install_user_unit(
         force=args.force,
@@ -120,6 +126,7 @@ COMMANDS = {
     "status": cmd_status,
     "reboot": cmd_reboot,
     "daemon-status": cmd_daemon_status,
+    "smoke": cmd_smoke,
     "systemd-install": cmd_systemd_install,
     "systemd-doctor": cmd_systemd_doctor,
 }
@@ -162,6 +169,9 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("status", help="print relay controller status")
     subparsers.add_parser("reboot", help="request a firmware reboot")
     subparsers.add_parser("daemon-status", help="print daemon process status")
+
+    smoke_parser = subparsers.add_parser("smoke", help="pulse each relay and turn all off")
+    smoke_parser.add_argument("--pulse-ms", type=int, default=1000)
 
     systemd_parser = subparsers.add_parser(
         "systemd",

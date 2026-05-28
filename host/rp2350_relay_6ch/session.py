@@ -9,6 +9,7 @@ import threading
 import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any, TextIO
 
 from prompt_toolkit import prompt as prompt_toolkit_prompt
@@ -33,6 +34,7 @@ from rp2350_relay_6ch.discovery import (
 )
 
 from .constants import RELAY_COUNT
+from .smoke import run_smoke_sequence
 
 HEARTBEAT_INTERVAL_S = 5.0
 REBOOT_RECONNECT_SETTLE_S = 1.0
@@ -50,6 +52,7 @@ CONNECTED_COMMANDS = (
     "pulse",
     "off-all",
     "status",
+    "smoke",
     "reboot",
     "disconnect",
     "connect",
@@ -74,6 +77,15 @@ class _ConnectionProbe:
     client: RelayClient
     info: dict[str, Any]
     status: dict[str, Any]
+
+
+class _ConnectResult(Enum):
+    CONNECTED = "connected"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+_SELECTION_CANCELLED = object()
 
 
 class HeartbeatPoller:
@@ -198,7 +210,10 @@ class RelaySession:
         self.history = InMemoryHistory()
 
     def run(self) -> int:
-        if not self._connect_from_options(self.options, initial=True):
+        startup_result = self._connect_from_options(self.options, initial=True)
+        if startup_result is _ConnectResult.CANCELLED:
+            return 0
+        if startup_result is _ConnectResult.FAILED:
             print("disconnected: run 'connect' to select a relay controller", file=self.output)
 
         while not self.should_exit:
@@ -256,7 +271,7 @@ class RelaySession:
         *,
         initial: bool = False,
         skip_preferred: bool = False,
-    ) -> bool:
+    ) -> _ConnectResult:
         if options.port:
             self.preferred_port = options.port
             self.preferred_serial = None
@@ -266,10 +281,10 @@ class RelaySession:
                 usb_serial=device.serial_number if device else None,
                 product=device.product if device else None,
             ):
-                return True
+                return _ConnectResult.CONNECTED
             if initial:
                 self._print_available_devices()
-            return False
+            return _ConnectResult.FAILED
         if options.serial:
             self.preferred_serial = options.serial
             self.preferred_port = None
@@ -279,12 +294,14 @@ class RelaySession:
                 print(f"{_error_label(exc)}: {exc}", file=self.output)
                 if initial:
                     self._print_available_devices()
-                return False
-            return self._open(
+                return _ConnectResult.FAILED
+            if self._open(
                 device.port,
                 usb_serial=device.serial_number,
                 product=device.product,
-            )
+            ):
+                return _ConnectResult.CONNECTED
+            return _ConnectResult.FAILED
         if not initial and not skip_preferred and self.preferred_port:
             device = self._metadata_for_port(self.preferred_port)
             if self._open(
@@ -292,7 +309,7 @@ class RelaySession:
                 usb_serial=device.serial_number if device else None,
                 product=device.product if device else None,
             ):
-                return True
+                return _ConnectResult.CONNECTED
             return self._connect_from_options(
                 SessionOptions(
                     port=None,
@@ -318,19 +335,25 @@ class RelaySession:
                     ),
                     skip_preferred=True,
                 )
-            return self._open(
+            if self._open(
                 device.port,
                 usb_serial=device.serial_number,
                 product=device.product,
-            )
+            ):
+                return _ConnectResult.CONNECTED
+            return _ConnectResult.FAILED
         try:
             device = self._select_interactive_device()
         except RelayError as exc:
             print(f"{_error_label(exc)}: {exc}", file=self.output)
-            return False
+            return _ConnectResult.FAILED
+        if device is _SELECTION_CANCELLED:
+            return _ConnectResult.CANCELLED if initial else _ConnectResult.FAILED
         if device is None:
-            return False
-        return self._open(device.port, usb_serial=device.serial_number, product=device.product)
+            return _ConnectResult.FAILED
+        if self._open(device.port, usb_serial=device.serial_number, product=device.product):
+            return _ConnectResult.CONNECTED
+        return _ConnectResult.FAILED
 
     def _metadata_for_port(self, port: str) -> RelayUsbDevice | None:
         try:
@@ -414,7 +437,7 @@ class RelaySession:
             return True
         return post_uptime < pre_uptime
 
-    def _select_interactive_device(self) -> RelayUsbDevice | None:
+    def _select_interactive_device(self) -> RelayUsbDevice | None | object:
         devices = self.discover()
         if not devices:
             print("transport error: no relay USB serial devices found", file=self.output)
@@ -425,9 +448,9 @@ class RelaySession:
             try:
                 choice = self._read_input("Select device number, or q to cancel: ").strip()
             except EOFError:
-                return None
+                return _SELECTION_CANCELLED
             if choice.lower() in {"q", "quit", "cancel"}:
-                return None
+                return _SELECTION_CANCELLED
             try:
                 index = int(choice, 10)
             except ValueError:
@@ -596,6 +619,11 @@ class RelaySession:
             elif command == "status":
                 _expect_arg_count(command, args, 0)
                 payload = client.get_status()
+            elif command == "smoke":
+                parser = _PromptArgParser(prog=command, add_help=False)
+                parser.add_argument("--pulse-ms", type=int, default=1000)
+                parsed = _parse_prompt_args(parser, args)
+                payload = run_smoke_sequence(client, pulse_ms=parsed.pulse_ms, sleep=self.sleep)
             else:
                 raise RelayValidationError(f"unknown command {command}")
         self._print_result(command, payload)
@@ -673,6 +701,7 @@ class RelaySession:
             "  set-all <mask>               set all relays from a six-bit mask\n"
             "  pulse <channel> <duration>   pulse one relay for duration in ms\n"
             "  off-all                      turn every relay off and cancel pulses\n"
+            "  smoke [--pulse-ms <ms>]      pulse each relay and turn all off\n"
             "\n"
             "Connection:\n"
             "  connect                      connect using saved selector or discovery\n"

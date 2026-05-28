@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-import time
 from typing import Any
 
 from rp2350_relay_6ch import (
@@ -19,6 +18,7 @@ from rp2350_relay_6ch import (
 )
 from rp2350_relay_6ch.constants import RELAY_COUNT, RELAY_MASK
 from rp2350_relay_6ch.session import run_session
+from rp2350_relay_6ch.smoke import run_smoke_sequence
 
 EXIT_OK = 0
 EXIT_ARGUMENT = 2
@@ -233,27 +233,8 @@ def cmd_reboot(args: argparse.Namespace) -> dict[str, Any]:
 
 def cmd_smoke(args: argparse.Namespace) -> dict[str, Any]:
     _require_port(args)
-    results: list[dict[str, Any]] = []
-    final: dict[str, Any] | None = None
     with _client(args) as client:
-        try:
-            results.append({"command": "info", "response": client.get_info()})
-            results.append({"command": "status", "response": client.get_status()})
-            for channel in range(RELAY_COUNT):
-                label = f"CH{channel + 1}"
-                results.append(
-                    {
-                        "command": "pulse",
-                        "channel": label,
-                        "response": client.pulse_relay(channel, args.pulse_ms),
-                    }
-                )
-                time.sleep(args.pulse_ms / 1000.0)
-            final = client.off_all()
-            return {"ok": True, "results": results, "final": final}
-        finally:
-            if final is None:
-                client.off_all()
+        return run_smoke_sequence(client, pulse_ms=args.pulse_ms)
 
 
 COMMANDS = {

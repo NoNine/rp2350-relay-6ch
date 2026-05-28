@@ -88,6 +88,8 @@ Selection rules:
   `connect`.
 - If the operator enters an invalid selection, report it and prompt again until
   a valid selection is made or the operator cancels.
+- If the operator cancels startup selection, exit the session with status `0`
+  without entering disconnected mode.
 - `--serial <usb-serial>` filters by exact serial number after candidate
   matching. It connects only when exactly one matching candidate exists.
 - If a startup `--serial` selector does not match, print the failure, list any

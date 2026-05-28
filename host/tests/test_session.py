@@ -15,6 +15,7 @@ from rp2350_relay_6ch.session import (
     RelaySession,
     RelaySessionCompleter,
     SessionOptions,
+    _ConnectResult,
     _format_heartbeat_error,
     _format_prompt,
 )
@@ -220,7 +221,7 @@ def test_discovery_exact_serial_selects_unverified_candidate() -> None:
 def test_startup_opens_one_client_runs_info_status_and_starts_heartbeat() -> None:
     session, output = make_session(port="COM7")
 
-    assert session._connect_from_options(session.options) is True
+    assert session._connect_from_options(session.options) is _ConnectResult.CONNECTED
 
     assert len(SessionFakeClient.instances) == 1
     assert SessionFakeClient.instances[0].calls == [("get_info", ()), ("get_status", ())]
@@ -239,7 +240,7 @@ def test_startup_with_explicit_port_attaches_matching_usb_metadata() -> None:
     devices = [RelayUsbDevice("COM7", "abc", "RP2350-Relay-6CH")]
     session, output = make_session(port="COM7", discover=lambda: devices)
 
-    assert session._connect_from_options(session.options) is True
+    assert session._connect_from_options(session.options) is _ConnectResult.CONNECTED
 
     assert session.usb_serial == "abc"
     assert session.product == "RP2350-Relay-6CH"
@@ -251,7 +252,7 @@ def test_startup_with_explicit_port_attaches_unverified_usb_metadata() -> None:
     devices = [RelayUsbDevice("COM7", "B905D541EF8C32DB", None, False)]
     session, output = make_session(port="COM7", discover=lambda: devices)
 
-    assert session._connect_from_options(session.options) is True
+    assert session._connect_from_options(session.options) is _ConnectResult.CONNECTED
 
     assert session.usb_serial == "B905D541EF8C32DB"
     assert session.product is None
@@ -263,7 +264,7 @@ def test_explicit_port_metadata_lookup_does_not_substitute_other_port() -> None:
     devices = [RelayUsbDevice("COM8", "abc", "RP2350-Relay-6CH")]
     session, output = make_session(port="COM7", discover=lambda: devices)
 
-    assert session._connect_from_options(session.options) is True
+    assert session._connect_from_options(session.options) is _ConnectResult.CONNECTED
 
     assert session.usb_serial is None
     assert "Serial:       unknown" in output.getvalue()
@@ -276,7 +277,7 @@ def test_explicit_port_opens_when_metadata_lookup_fails() -> None:
 
     session, output = make_session(port="COM7", discover=discover)
 
-    assert session._connect_from_options(session.options) is True
+    assert session._connect_from_options(session.options) is _ConnectResult.CONNECTED
 
     assert session.usb_serial is None
     assert "Serial:       unknown" in output.getvalue()
@@ -294,7 +295,7 @@ def test_interactive_selection_is_shown_even_for_one_device() -> None:
         heartbeat_factory=lambda client, out: FakeHeartbeat(client, out),
     )
 
-    assert session._connect_from_options(session.options) is True
+    assert session._connect_from_options(session.options) is _ConnectResult.CONNECTED
 
     assert "Relay USB candidates:" in output.getvalue()
     assert "Serial:       unknown" in output.getvalue()
@@ -312,7 +313,7 @@ def test_interactive_selection_marks_productless_candidate_unverified() -> None:
         heartbeat_factory=lambda client, out: FakeHeartbeat(client, out),
     )
 
-    assert session._connect_from_options(session.options) is True
+    assert session._connect_from_options(session.options) is _ConnectResult.CONNECTED
 
     text = output.getvalue()
     assert "Relay USB candidates:" in text
@@ -328,6 +329,28 @@ def test_startup_without_matching_devices_enters_disconnected_prompt_and_exits_z
     assert session.connected is False
     assert "no relay USB serial devices found" in output.getvalue()
     assert "rp2350-relay[disconnected]$ " in output.getvalue()
+
+
+def test_startup_selection_cancel_exits_without_disconnected_prompt() -> None:
+    devices = [RelayUsbDevice("/dev/ttyACM0", "abc", "RP2350-Relay-6CH SMP CDC")]
+    output = io.StringIO()
+    session = RelaySession(
+        SessionOptions(port=None, serial=None, baud=115200, timeout=2.0, retries=1),
+        input_stream=io.StringIO("q\n"),
+        output=output,
+        client_factory=SessionFakeClient.connect,
+        discover=lambda: devices,
+        heartbeat_factory=lambda client, out: FakeHeartbeat(client, out),
+    )
+
+    assert session.run() == 0
+
+    text = output.getvalue()
+    assert "Relay USB candidates:" in text
+    assert "port=/dev/ttyACM0 serial=abc product=RP2350-Relay-6CH SMP CDC" in text
+    assert "disconnected: run 'connect'" not in text
+    assert "rp2350-relay[disconnected]$ " not in text
+    assert SessionFakeClient.instances == []
 
 
 def test_missing_startup_serial_lists_available_devices_and_plain_connect_falls_back() -> None:
@@ -349,7 +372,7 @@ def test_missing_startup_serial_lists_available_devices_and_plain_connect_falls_
         heartbeat_factory=lambda client, out: FakeHeartbeat(client, out),
     )
 
-    assert session._connect_from_options(session.options, initial=True) is False
+    assert session._connect_from_options(session.options, initial=True) is _ConnectResult.FAILED
     assert session.preferred_serial == "wanted"
     assert "Relay USB candidates:" in output.getvalue()
     assert "serial=available" in output.getvalue()
@@ -374,7 +397,7 @@ def test_failed_startup_port_lists_available_devices_and_plain_connect_falls_bac
         heartbeat_factory=lambda client, out: FakeHeartbeat(client, out),
     )
 
-    assert session._connect_from_options(session.options, initial=True) is False
+    assert session._connect_from_options(session.options, initial=True) is _ConnectResult.FAILED
     assert session.preferred_port == "COM7"
     assert "transport error: cannot open COM7" in output.getvalue()
     assert "serial=available" in output.getvalue()
@@ -451,8 +474,31 @@ def test_help_output_is_grouped_and_mentions_safe_exit() -> None:
     assert "Connection:" in text
     assert "Exit:" in text
     assert "Notes:" in text
+    assert "smoke [--pulse-ms <ms>]" in text
     assert "Run off-all before disconnecting or exiting." in text
     assert "Use --force only when you intentionally accept unknown or active relay state." in text
+
+
+def test_session_smoke_pulses_each_relay_and_tears_down() -> None:
+    session, output = make_session(port="COM7")
+    sleeps: list[float] = []
+    session.sleep = sleeps.append
+    session._connect_from_options(session.options)
+
+    session.handle_line("smoke --pulse-ms 25")
+
+    calls = SessionFakeClient.instances[0].calls
+    assert [call for call in calls if call[0] == "pulse_relay"] == [
+        ("pulse_relay", (0, 25)),
+        ("pulse_relay", (1, 25)),
+        ("pulse_relay", (2, 25)),
+        ("pulse_relay", (3, 25)),
+        ("pulse_relay", (4, 25)),
+        ("pulse_relay", (5, 25)),
+    ]
+    assert sleeps == [0.025] * 6
+    assert calls[-1:] == [("off_all", ())]
+    assert "smoke test passed" in output.getvalue()
 
 
 def test_connected_completion_suggests_all_session_commands() -> None:
@@ -467,6 +513,7 @@ def test_connected_completion_suggests_all_session_commands() -> None:
         "pulse",
         "off-all",
         "status",
+        "smoke",
         "reboot",
         "disconnect",
         "connect",

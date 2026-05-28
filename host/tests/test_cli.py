@@ -5,6 +5,7 @@ from typing import Any
 import pytest
 
 import rp2350_relay_6ch.cli as cli
+import rp2350_relay_6ch.smoke as smoke
 from rp2350_relay_6ch.exceptions import (
     RelayDeviceError,
     RelayProtocolError,
@@ -495,7 +496,7 @@ def test_smoke_pulses_each_relay_and_forces_teardown(
 ) -> None:
     sleeps: list[float] = []
 
-    monkeypatch.setattr(cli.time, "sleep", sleeps.append)
+    monkeypatch.setattr(smoke.time, "sleep", sleeps.append)
 
     rc = cli.main(["--port", "COM7", "smoke", "--pulse-ms", "25"])
 
@@ -521,7 +522,7 @@ def test_smoke_defaults_to_observable_pulse_duration(
 ) -> None:
     sleeps: list[float] = []
 
-    monkeypatch.setattr(cli.time, "sleep", sleeps.append)
+    monkeypatch.setattr(smoke.time, "sleep", sleeps.append)
 
     rc = cli.main(["--port", "COM7", "smoke"])
 
