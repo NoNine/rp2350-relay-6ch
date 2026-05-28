@@ -69,8 +69,9 @@ Add a top `CHANGELOG.md` section for the new version. Include highlights,
 install/assets, verification, known limitations, and safety notes. The release
 notes used on GitHub should come from this changelog section.
 
-When Codex creates the release commit, include `Prompt:` and
-`Conversation context:` sections in the commit body, following `AGENTS.md`.
+When Codex creates the release commit, use summary `Release <version>` and
+include `Prompt:` and `Conversation context:` sections in the commit body,
+following `AGENTS.md`.
 
 Create and push the release tag:
 

@@ -123,6 +123,8 @@ verification commands that actually ran, and never record speculative results.
 
 Existing commits use short imperative summaries, such as `Add RP2350 relay
 hardware info` and `Plan PRD implementation phases`. Continue that style.
+For release commits that only prepare a versioned release, use
+`Release <version>`, for example `Release 0.8.8`.
 Keep commit message lines within 80 columns. In commit bodies, every section
 title should be followed immediately by its content, with no blank line after
 the title. Add one blank line between two sections. Start each item in every

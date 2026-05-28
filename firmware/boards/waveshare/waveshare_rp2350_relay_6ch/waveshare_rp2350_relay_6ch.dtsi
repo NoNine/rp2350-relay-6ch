@@ -22,6 +22,7 @@
 		zephyr,flash-controller = &qmi;
 		zephyr,console = &uart0;
 		zephyr,shell-uart = &uart0;
+		zephyr,display = &ssd1306;
 	};
 
 	aliases {
@@ -143,6 +144,21 @@ gpio1: &gpio0_hi {
 	pinctrl-0 = <&i2c1_default>;
 	pinctrl-names = "default";
 	status = "okay";
+
+	ssd1306: ssd1306@3d {
+		compatible = "solomon,ssd1306";
+		reg = <0x3d>;
+		width = <128>;
+		height = <64>;
+		segment-offset = <0>;
+		page-offset = <0>;
+		display-offset = <0>;
+		multiplex-ratio = <63>;
+		segment-remap;
+		com-invdir;
+		prechargep = <0x22>;
+		softreset-on;
+	};
 };
 
 &adc {

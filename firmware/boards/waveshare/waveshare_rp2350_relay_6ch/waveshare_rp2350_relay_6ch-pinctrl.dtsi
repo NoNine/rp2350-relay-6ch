@@ -37,7 +37,7 @@
 
 	i2c1_default: i2c1_default {
 		group1 {
-			pinmux = <I2C1_SDA_P6>, <I2C1_SCL_P7>;
+			pinmux = <I2C1_SDA_P10>, <I2C1_SCL_P11>;
 			input-enable;
 			input-schmitt-enable;
 		};

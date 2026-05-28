@@ -18,11 +18,20 @@ Host-visible command responses and status queries remain authoritative. OLED
 hardware detection, POST state, and write failures remain firmware-internal
 until device-originated asynchronous events are implemented and promoted.
 
-The first supported hardware target is the Raspberry Pi Pico 2 or Pico 2 W
-relay development fixture with a 3.3 V, 128x64, SSD1306-compatible I2C OLED at
-address `0x3d`.
+The first supported hardware targets are the Waveshare RP2350-Relay-6CH board
+and the Raspberry Pi Pico 2 or Pico 2 W relay development fixture with a
+3.3 V, 128x64, SSD1306-compatible I2C OLED at address `0x3d`.
 
 ## Hardware Contract
+
+For Waveshare RP2350-Relay-6CH hardware:
+
+- Use `i2c1` on GP10 and GP11 for the OLED, matching the Pico 2 fixture.
+- Wire OLED VCC to 3V3 and GND to MCU-side GND.
+- Wire OLED SDA to GP10 / H2 pin 14.
+- Wire OLED SCL to GP11 / H2 pin 15.
+- Keep relay channels on GP26 through GP31.
+- Keep the passive buzzer on GP23 and the WS2812 RGB LED on GP36.
 
 For the Pico relay development fixture:
 

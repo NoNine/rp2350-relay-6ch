@@ -126,8 +126,8 @@ Implemented:
   and safer long-lived manual operation.
 - Linux `rp2350-relayd` daemon mode with `rp2350-relayctl` client commands,
   daemon status reporting, and background heartbeat polling.
-- Local WS2812 RGB status indication and bounded buzzer feedback, including
-  one long beep after the controller reaches ready state.
+- Local WS2812 RGB status indication, bounded buzzer feedback, and optional
+  128x64 SSD1306 OLED status display.
 - Host-side tests with simulated transports and firmware tests for relay and
   relay-management behavior.
 
@@ -148,6 +148,9 @@ Planned:
 - Relay outputs: `CH1` through `CH6` on GPIO26 through GPIO31.
 - Relay polarity: active high unless board testing proves otherwise.
 - Host control: Python RPC library and CLI over the configured SMP serial route.
+- Local OLED display support is optional; display-capable firmware treats a
+  missing OLED as normal, and OLED state is a local diagnostic rather than an
+  authoritative host status source.
 - Safety requirement: all relays default off on boot, reset, firmware restart,
   and test setup/teardown.
 
@@ -309,6 +312,7 @@ docs/       Requirements, hardware notes, phase plans, protocol, and tests
 - [Device-originated SMP events discussion](docs/discussions/device-originated-smp-events.md)
 - [CLI utility](docs/cli.md)
 - [Status indicators](docs/status-indicators.md)
+- [OLED indicator](docs/oled-indicator.md)
 - [Test procedures](docs/testing/test-procedures.md)
 - [Relay smoke test](docs/testing/relay-smoke-test.md)
 - [USB RPC smoke test](docs/testing/usb-rpc-smoke-test.md)

@@ -146,6 +146,12 @@ Additional GPIO pads/points:
 | P15 | GPIO39 | P19 | GPIO46 |
 | P16 | GPIO43 | P20 | GPIO47 |
 
+Optional 3.3 V, 128x64 SSD1306-compatible OLED indicator wiring uses the
+MCU-side header power and `i2c1`: VCC to H1 pin 4 or 5 `3V3`, GND to a
+MCU-side `GND`, SDA to GPIO10 / H2 pin 14, and SCL to GPIO11 / H2 pin 15.
+The OLED is a local diagnostic display only; a missing OLED is normal for
+display-capable firmware and does not affect relay control.
+
 ## RP2350B ADC-Capable GPIOs
 
 | GPIO | ADC Channel | Exposed |
