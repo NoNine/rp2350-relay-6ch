@@ -74,11 +74,22 @@ wait_device = true
    rp2350-relayctl systemd install
    systemctl --user daemon-reload
    rp2350-relayctl systemd doctor --instance bench-a
+   systemctl --user enable --now rp2350-relayd@bench-a
+   rp2350-relayctl --instance bench-a daemon-status
    ```
 
-7. Stop the foreground daemon with `Ctrl+C`, or stop the service with
-   `systemctl --user stop rp2350-relayd@bench-a` when running under systemd.
-   Confirm all relays are off after shutdown.
+7. For PC-boot startup before operator login, enable lingering once for the
+   operator account:
+
+   ```sh
+   sudo loginctl enable-linger "$USER"
+   systemctl --user enable --now rp2350-relayd@bench-a
+   ```
+
+8. Stop the foreground daemon with `Ctrl+C`, or stop the service with
+   `systemctl --user stop rp2350-relayd@bench-a` when keeping autostart enabled.
+   Use `systemctl --user disable --now rp2350-relayd@bench-a` only when removing
+   autostart. Confirm all relays are off after shutdown.
 
 ## Expected Results
 
@@ -88,6 +99,8 @@ wait_device = true
 - Short-lived `rp2350-relayctl` commands complete through the daemon socket.
 - `daemon-status` succeeds while the daemon is running.
 - The daemon owns the serial port while running.
+- The enabled systemd user service restarts on future user-session starts, and
+  starts on PC boot when linger is enabled for the operator user.
 - All relays are off after `off-all` and after clean daemon shutdown.
 
 ## Troubleshooting

@@ -135,9 +135,12 @@ def _install_summary(paths: SystemdPaths) -> str:
             "",
             "Next commands:",
             "  systemctl --user daemon-reload",
-            "  systemctl --user start rp2350-relayd@bench-a",
-            "  journalctl --user -u rp2350-relayd@bench-a",
             "  rp2350-relayctl systemd doctor --instance bench-a",
+            "  systemctl --user enable --now rp2350-relayd@bench-a",
+            "  journalctl --user -u rp2350-relayd@bench-a",
+            "",
+            "For PC-boot startup before login:",
+            '  sudo loginctl enable-linger "$USER"',
         ]
     )
 

@@ -40,6 +40,8 @@ def test_install_user_unit_writes_templates(
     )
     assert "[instances.bench-a]" in config_path.read_text(encoding="utf-8")
     assert "systemctl --user daemon-reload" in summary
+    assert "systemctl --user enable --now rp2350-relayd@bench-a" in summary
+    assert 'sudo loginctl enable-linger "$USER"' in summary
 
 
 def test_install_user_unit_refuses_overwrite_without_force(

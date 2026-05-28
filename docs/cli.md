@@ -279,7 +279,8 @@ should run the daemon:
 ```sh
 rp2350-relayctl systemd install
 systemctl --user daemon-reload
-systemctl --user start rp2350-relayd@bench-a
+rp2350-relayctl systemd doctor --instance bench-a
+systemctl --user enable --now rp2350-relayd@bench-a
 ```
 
 The generated unit uses an absolute Python interpreter, for example
@@ -288,9 +289,19 @@ rp2350_relay_6ch.daemon --instance %i`. If using conda or venv, run
 `rp2350-relayctl systemd install` after activating that environment, or pass
 `--python /path/to/env/bin/python`.
 
+`systemctl --user enable --now` starts the daemon immediately and enables it
+for future user-session starts. To start the daemon on PC boot before the
+operator logs in, enable lingering once for the operator account:
+
+```sh
+sudo loginctl enable-linger "$USER"
+systemctl --user enable --now rp2350-relayd@bench-a
+```
+
 Useful systemd commands:
 
 ```sh
+systemctl --user disable --now rp2350-relayd@bench-a
 systemctl --user stop rp2350-relayd@bench-a
 systemctl --user status rp2350-relayd@bench-a
 journalctl --user -u rp2350-relayd@bench-a
