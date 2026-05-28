@@ -36,7 +36,12 @@ entry points.
 
 Use the Zephyr workspace virtual environment for Python and Zephyr tooling.
 Default to `${ZEPHYR_WORKSPACE:-$HOME/zephyrproject}/.venv`; set
-`ZEPHYR_VENV` only when a different venv is required.
+`ZEPHYR_VENV` only when a different venv is required. For one-off Python
+commands, use
+`${ZEPHYR_VENV:-${ZEPHYR_WORKSPACE:-$HOME/zephyrproject}/.venv}/bin/python`
+first, which resolves to `/home/ubuntu/zephyrproject/.venv/bin/python` in the
+default workspace. Fall back to system `python3` only when the workspace
+interpreter is unavailable, and call out that fallback.
 
 ## Coding Style & Naming Conventions
 

@@ -27,6 +27,23 @@ LOG_MODULE_REGISTER(rp2350_relay_indicator, LOG_LEVEL_INF);
 #define DISPLAY_POST_WIDTH 16U
 #define DISPLAY_POST_HEIGHT 8U
 #define DISPLAY_FRAME_SIZE ((DISPLAY_WIDTH * DISPLAY_HEIGHT) / 8U)
+#define DISPLAY_GLYPH_WIDTH 5U
+#define DISPLAY_GLYPH_HEIGHT 7U
+#define DISPLAY_TEXT_SPACING 1U
+#define DISPLAY_UI_TOP_TEXT_Y 3U
+#define DISPLAY_UI_TOP_RULE_Y 13U
+#define DISPLAY_UI_CELL_X0 3U
+#define DISPLAY_UI_CELL_Y 18U
+#define DISPLAY_UI_CELL_W 17U
+#define DISPLAY_UI_CELL_H 27U
+#define DISPLAY_UI_CELL_PITCH 21U
+#define DISPLAY_UI_BOTTOM_RULE_Y 50U
+#define DISPLAY_UI_STATUS_Y 54U
+#define DISPLAY_UI_RULE_X0 3U
+#define DISPLAY_UI_RULE_X1 124U
+#define DISPLAY_UI_RULE_W (DISPLAY_UI_RULE_X1 - DISPLAY_UI_RULE_X0 + 1U)
+#define DISPLAY_UI_TEXT_X0 3U
+#define DISPLAY_UI_TEXT_X1 124U
 
 #define COMMAND_TRANSIENT_MS 150U
 #define ATTENTION_TRANSIENT_MS 600U
@@ -543,18 +560,17 @@ static void display_draw_rect(uint8_t *frame, uint8_t x, uint8_t y,
 
 static void display_draw_pulse_mark(uint8_t *frame, uint8_t x, uint8_t y, bool filled)
 {
-	static const uint8_t heights[] = { 3U, 7U, 4U };
+	static const uint8_t block_offsets[] = { 0U, 3U };
 
-	for (uint8_t idx = 0U; idx < ARRAY_SIZE(heights); idx++) {
-		uint8_t bar_x = x + (idx * 3U);
-		uint8_t bar_y = y + (7U - heights[idx]);
+	for (uint8_t idx = 0U; idx < ARRAY_SIZE(block_offsets); idx++) {
+		uint8_t block_x = x + block_offsets[idx];
 
 		if (filled) {
-			display_clear_vline(frame, bar_x, bar_y, heights[idx]);
-			display_clear_vline(frame, bar_x + 1U, bar_y, heights[idx]);
+			display_clear_vline(frame, block_x, y, 2U);
+			display_clear_vline(frame, block_x + 1U, y, 2U);
 		} else {
-			display_draw_vline(frame, bar_x, bar_y, heights[idx]);
-			display_draw_vline(frame, bar_x + 1U, bar_y, heights[idx]);
+			display_draw_vline(frame, block_x, y, 2U);
+			display_draw_vline(frame, block_x + 1U, y, 2U);
 		}
 	}
 }
@@ -563,143 +579,143 @@ static uint8_t glyph_bits(char c, uint8_t row)
 {
 	switch (c) {
 	case '0': {
-		static const uint8_t glyph[] = { 0x7, 0x5, 0x5, 0x5, 0x7 };
+		static const uint8_t glyph[] = { 0x0e, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0e };
 		return glyph[row];
 	}
 	case '1': {
-		static const uint8_t glyph[] = { 0x2, 0x6, 0x2, 0x2, 0x7 };
+		static const uint8_t glyph[] = { 0x04, 0x0c, 0x14, 0x04, 0x04, 0x04, 0x1f };
 		return glyph[row];
 	}
 	case '2': {
-		static const uint8_t glyph[] = { 0x7, 0x1, 0x7, 0x4, 0x7 };
+		static const uint8_t glyph[] = { 0x0e, 0x11, 0x01, 0x02, 0x04, 0x08, 0x1f };
 		return glyph[row];
 	}
 	case '3': {
-		static const uint8_t glyph[] = { 0x7, 0x1, 0x7, 0x1, 0x7 };
+		static const uint8_t glyph[] = { 0x1e, 0x01, 0x01, 0x0e, 0x01, 0x01, 0x1e };
 		return glyph[row];
 	}
 	case '4': {
-		static const uint8_t glyph[] = { 0x5, 0x5, 0x7, 0x1, 0x1 };
+		static const uint8_t glyph[] = { 0x02, 0x06, 0x0a, 0x12, 0x1f, 0x02, 0x02 };
 		return glyph[row];
 	}
 	case '5': {
-		static const uint8_t glyph[] = { 0x7, 0x4, 0x7, 0x1, 0x7 };
+		static const uint8_t glyph[] = { 0x1f, 0x10, 0x10, 0x1e, 0x01, 0x01, 0x1e };
 		return glyph[row];
 	}
 	case '6': {
-		static const uint8_t glyph[] = { 0x7, 0x4, 0x7, 0x5, 0x7 };
+		static const uint8_t glyph[] = { 0x0e, 0x10, 0x10, 0x1e, 0x11, 0x11, 0x0e };
 		return glyph[row];
 	}
 	case ':': {
-		static const uint8_t glyph[] = { 0x0, 0x2, 0x0, 0x2, 0x0 };
+		static const uint8_t glyph[] = { 0x00, 0x04, 0x04, 0x00, 0x04, 0x04, 0x00 };
 		return glyph[row];
 	}
 	case '*': {
-		static const uint8_t glyph[] = { 0x5, 0x2, 0x7, 0x2, 0x5 };
+		static const uint8_t glyph[] = { 0x00, 0x15, 0x0e, 0x1f, 0x0e, 0x15, 0x00 };
 		return glyph[row];
 	}
 	case 'A': {
-		static const uint8_t glyph[] = { 0x2, 0x5, 0x7, 0x5, 0x5 };
+		static const uint8_t glyph[] = { 0x0e, 0x11, 0x11, 0x1f, 0x11, 0x11, 0x11 };
 		return glyph[row];
 	}
 	case 'B': {
-		static const uint8_t glyph[] = { 0x6, 0x5, 0x6, 0x5, 0x6 };
+		static const uint8_t glyph[] = { 0x1e, 0x11, 0x11, 0x1e, 0x11, 0x11, 0x1e };
 		return glyph[row];
 	}
 	case 'C': {
-		static const uint8_t glyph[] = { 0x7, 0x4, 0x4, 0x4, 0x7 };
+		static const uint8_t glyph[] = { 0x0f, 0x10, 0x10, 0x10, 0x10, 0x10, 0x0f };
 		return glyph[row];
 	}
 	case 'D': {
-		static const uint8_t glyph[] = { 0x6, 0x5, 0x5, 0x5, 0x6 };
+		static const uint8_t glyph[] = { 0x1e, 0x11, 0x11, 0x11, 0x11, 0x11, 0x1e };
 		return glyph[row];
 	}
 	case 'E': {
-		static const uint8_t glyph[] = { 0x7, 0x4, 0x6, 0x4, 0x7 };
+		static const uint8_t glyph[] = { 0x1f, 0x10, 0x10, 0x1e, 0x10, 0x10, 0x1f };
 		return glyph[row];
 	}
 	case 'F': {
-		static const uint8_t glyph[] = { 0x7, 0x4, 0x6, 0x4, 0x4 };
+		static const uint8_t glyph[] = { 0x1f, 0x10, 0x10, 0x1e, 0x10, 0x10, 0x10 };
 		return glyph[row];
 	}
 	case 'G': {
-		static const uint8_t glyph[] = { 0x7, 0x4, 0x5, 0x5, 0x7 };
+		static const uint8_t glyph[] = { 0x0f, 0x10, 0x10, 0x13, 0x11, 0x11, 0x0f };
 		return glyph[row];
 	}
 	case 'H': {
-		static const uint8_t glyph[] = { 0x5, 0x5, 0x7, 0x5, 0x5 };
+		static const uint8_t glyph[] = { 0x11, 0x11, 0x11, 0x1f, 0x11, 0x11, 0x11 };
 		return glyph[row];
 	}
 	case 'I': {
-		static const uint8_t glyph[] = { 0x7, 0x2, 0x2, 0x2, 0x7 };
+		static const uint8_t glyph[] = { 0x1f, 0x04, 0x04, 0x04, 0x04, 0x04, 0x1f };
 		return glyph[row];
 	}
 	case 'J': {
-		static const uint8_t glyph[] = { 0x3, 0x1, 0x1, 0x5, 0x7 };
+		static const uint8_t glyph[] = { 0x07, 0x02, 0x02, 0x02, 0x12, 0x12, 0x0c };
 		return glyph[row];
 	}
 	case 'K': {
-		static const uint8_t glyph[] = { 0x5, 0x6, 0x4, 0x6, 0x5 };
+		static const uint8_t glyph[] = { 0x11, 0x12, 0x14, 0x18, 0x14, 0x12, 0x11 };
 		return glyph[row];
 	}
 	case 'L': {
-		static const uint8_t glyph[] = { 0x4, 0x4, 0x4, 0x4, 0x7 };
+		static const uint8_t glyph[] = { 0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x1f };
 		return glyph[row];
 	}
 	case 'M': {
-		static const uint8_t glyph[] = { 0x5, 0x7, 0x7, 0x5, 0x5 };
+		static const uint8_t glyph[] = { 0x11, 0x1b, 0x15, 0x15, 0x11, 0x11, 0x11 };
 		return glyph[row];
 	}
 	case 'N': {
-		static const uint8_t glyph[] = { 0x5, 0x7, 0x7, 0x7, 0x5 };
+		static const uint8_t glyph[] = { 0x11, 0x19, 0x19, 0x15, 0x13, 0x13, 0x11 };
 		return glyph[row];
 	}
 	case 'O': {
-		static const uint8_t glyph[] = { 0x7, 0x5, 0x5, 0x5, 0x7 };
+		static const uint8_t glyph[] = { 0x0e, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0e };
 		return glyph[row];
 	}
 	case 'P': {
-		static const uint8_t glyph[] = { 0x7, 0x5, 0x7, 0x4, 0x4 };
+		static const uint8_t glyph[] = { 0x1e, 0x11, 0x11, 0x1e, 0x10, 0x10, 0x10 };
 		return glyph[row];
 	}
 	case 'Q': {
-		static const uint8_t glyph[] = { 0x7, 0x5, 0x5, 0x7, 0x1 };
+		static const uint8_t glyph[] = { 0x0e, 0x11, 0x11, 0x11, 0x15, 0x12, 0x0d };
 		return glyph[row];
 	}
 	case 'R': {
-		static const uint8_t glyph[] = { 0x6, 0x5, 0x6, 0x5, 0x5 };
+		static const uint8_t glyph[] = { 0x1e, 0x11, 0x11, 0x1e, 0x14, 0x12, 0x11 };
 		return glyph[row];
 	}
 	case 'S': {
-		static const uint8_t glyph[] = { 0x7, 0x4, 0x7, 0x1, 0x7 };
+		static const uint8_t glyph[] = { 0x0f, 0x10, 0x10, 0x0e, 0x01, 0x01, 0x1e };
 		return glyph[row];
 	}
 	case 'T': {
-		static const uint8_t glyph[] = { 0x7, 0x2, 0x2, 0x2, 0x2 };
+		static const uint8_t glyph[] = { 0x1f, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04 };
 		return glyph[row];
 	}
 	case 'U': {
-		static const uint8_t glyph[] = { 0x5, 0x5, 0x5, 0x5, 0x7 };
+		static const uint8_t glyph[] = { 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0e };
 		return glyph[row];
 	}
 	case 'V': {
-		static const uint8_t glyph[] = { 0x5, 0x5, 0x5, 0x5, 0x2 };
+		static const uint8_t glyph[] = { 0x11, 0x11, 0x11, 0x11, 0x11, 0x0a, 0x04 };
 		return glyph[row];
 	}
 	case 'W': {
-		static const uint8_t glyph[] = { 0x5, 0x5, 0x7, 0x7, 0x5 };
+		static const uint8_t glyph[] = { 0x11, 0x11, 0x11, 0x15, 0x15, 0x15, 0x0a };
 		return glyph[row];
 	}
 	case 'X': {
-		static const uint8_t glyph[] = { 0x5, 0x5, 0x2, 0x5, 0x5 };
+		static const uint8_t glyph[] = { 0x11, 0x11, 0x0a, 0x04, 0x0a, 0x11, 0x11 };
 		return glyph[row];
 	}
 	case 'Y': {
-		static const uint8_t glyph[] = { 0x5, 0x5, 0x2, 0x2, 0x2 };
+		static const uint8_t glyph[] = { 0x11, 0x11, 0x0a, 0x04, 0x04, 0x04, 0x04 };
 		return glyph[row];
 	}
 	case 'Z': {
-		static const uint8_t glyph[] = { 0x7, 0x1, 0x2, 0x4, 0x7 };
+		static const uint8_t glyph[] = { 0x1f, 0x01, 0x02, 0x04, 0x08, 0x10, 0x1f };
 		return glyph[row];
 	}
 	default:
@@ -707,70 +723,98 @@ static uint8_t glyph_bits(char c, uint8_t row)
 	}
 }
 
-static void display_draw_char(uint8_t *frame, uint8_t x, uint8_t y, char c)
+static void display_set_pixel(uint8_t *frame, uint8_t x, uint8_t y)
 {
-	for (uint8_t row = 0U; row < 5U; row++) {
+	if (x < DISPLAY_WIDTH && y < DISPLAY_HEIGHT) {
+		frame[((y / 8U) * DISPLAY_WIDTH) + x] |= BIT(y % 8U);
+	}
+}
+
+static void display_clear_pixel(uint8_t *frame, uint8_t x, uint8_t y)
+{
+	if (x < DISPLAY_WIDTH && y < DISPLAY_HEIGHT) {
+		frame[((y / 8U) * DISPLAY_WIDTH) + x] &= (uint8_t)~BIT(y % 8U);
+	}
+}
+
+static void display_draw_char(uint8_t *frame, uint8_t x, uint8_t y, char c, bool clear)
+{
+	for (uint8_t row = 0U; row < DISPLAY_GLYPH_HEIGHT; row++) {
 		uint8_t bits = glyph_bits(c, row);
 
-		for (uint8_t col = 0U; col < 3U; col++) {
-			if ((bits & BIT(2U - col)) != 0U) {
-				frame[(((y + row) / 8U) * DISPLAY_WIDTH) + x + col] |=
-					BIT((y + row) % 8U);
+		for (uint8_t col = 0U; col < DISPLAY_GLYPH_WIDTH; col++) {
+			if ((bits & BIT((DISPLAY_GLYPH_WIDTH - 1U) - col)) != 0U) {
+				if (clear) {
+					display_clear_pixel(frame, x + col, y + row);
+				} else {
+					display_set_pixel(frame, x + col, y + row);
+				}
 			}
 		}
 	}
 }
 
-static void display_clear_char(uint8_t *frame, uint8_t x, uint8_t y, char c)
+static uint8_t display_text_width(const char *text)
 {
-	for (uint8_t row = 0U; row < 5U; row++) {
-		uint8_t bits = glyph_bits(c, row);
+	uint8_t width = 0U;
 
-		for (uint8_t col = 0U; col < 3U; col++) {
-			if ((bits & BIT(2U - col)) != 0U) {
-				frame[(((y + row) / 8U) * DISPLAY_WIDTH) + x + col] &=
-					(uint8_t)~BIT((y + row) % 8U);
-			}
+	for (uint8_t idx = 0U; text[idx] != '\0'; idx++) {
+		if (idx > 0U) {
+			width += DISPLAY_TEXT_SPACING;
 		}
+		width += DISPLAY_GLYPH_WIDTH;
 	}
+
+	return width;
 }
 
 static void display_draw_text(uint8_t *frame, uint8_t x, uint8_t y, const char *text)
 {
-	for (uint8_t idx = 0U; text[idx] != '\0' && x < DISPLAY_WIDTH - 3U; idx++) {
+	uint8_t step = DISPLAY_GLYPH_WIDTH + DISPLAY_TEXT_SPACING;
+
+	for (uint8_t idx = 0U; text[idx] != '\0' && x <= DISPLAY_WIDTH - DISPLAY_GLYPH_WIDTH; idx++) {
 		if (text[idx] != ' ') {
-			display_draw_char(frame, x, y, text[idx]);
+			display_draw_char(frame, x, y, text[idx], false);
 		}
-		x += 4U;
+		x += step;
 	}
 }
 
 static void display_draw_annunciators(uint8_t *frame, bool ready, bool active,
 				      bool pulsing, bool error)
 {
-	display_draw_text(frame, 0U, 1U, "USB");
+	display_draw_text(frame, DISPLAY_UI_TEXT_X0, DISPLAY_UI_TOP_TEXT_Y, "USB");
 
 	if (ready) {
-		display_draw_text(frame, 26U, 1U, "RDY");
+		display_draw_text(frame, DISPLAY_UI_TEXT_X0 + 26U,
+				  DISPLAY_UI_TOP_TEXT_Y, "RDY");
 	}
 
 	if (active) {
-		display_draw_text(frame, 52U, 1U, "ACT");
+		display_draw_text(frame, DISPLAY_UI_TEXT_X0 + 52U,
+				  DISPLAY_UI_TOP_TEXT_Y, "ACT");
 	}
 
 	if (pulsing) {
-		display_draw_text(frame, 78U, 1U, "PLS");
+		display_draw_text(frame, DISPLAY_UI_TEXT_X0 + 78U,
+				  DISPLAY_UI_TOP_TEXT_Y, "PLS");
 	}
 
 	if (error) {
-		display_draw_text(frame, 108U, 1U, "ERR");
+		display_draw_text(frame, DISPLAY_UI_TEXT_X0 + 108U,
+				  DISPLAY_UI_TOP_TEXT_Y, "ERR");
 	}
+}
+
+static bool display_pulse_mark_visible(int64_t now)
+{
+	return ((now / 500) % 2) == 0;
 }
 
 static int display_render_frame(enum indicator_display_mode mode,
 				enum indicator_display_detail detail,
 				uint8_t state_mask, uint8_t pulse_mask,
-				bool ready, bool error)
+				bool ready, bool error, int64_t now)
 {
 	static uint8_t frame[DISPLAY_FRAME_SIZE];
 	struct display_buffer_descriptor desc = {
@@ -780,31 +824,46 @@ static int display_render_frame(enum indicator_display_mode mode,
 		.pitch = DISPLAY_WIDTH,
 	};
 	const char *detail_text = display_detail_text(detail);
-	static const uint8_t cell_x[] = { 2U, 23U, 44U, 65U, 86U, 107U };
+	const bool pulse_mark_visible = display_pulse_mark_visible(now);
+	const uint8_t detail_width = display_text_width(detail_text);
+	const uint8_t detail_x = detail_width <= DISPLAY_UI_RULE_W ?
+				 DISPLAY_UI_TEXT_X1 - detail_width + 1U :
+				 DISPLAY_UI_TEXT_X0;
 
 	memset(frame, 0, sizeof(frame));
 	display_draw_annunciators(frame, ready, state_mask != 0U,
 				  pulse_mask != 0U, error);
+	display_draw_hline(frame, DISPLAY_UI_RULE_X0, DISPLAY_UI_TOP_RULE_Y,
+			   DISPLAY_UI_RULE_W);
+	display_draw_hline(frame, DISPLAY_UI_RULE_X0, DISPLAY_UI_BOTTOM_RULE_Y,
+			   DISPLAY_UI_RULE_W);
 
-	for (uint8_t channel = 0U; channel < ARRAY_SIZE(cell_x); channel++) {
+	for (uint8_t channel = 0U; channel < 6U; channel++) {
+		uint8_t cell_x = DISPLAY_UI_CELL_X0 + (channel * DISPLAY_UI_CELL_PITCH);
 		uint8_t bit = BIT(channel);
 		bool filled = (state_mask & bit) != 0U || (pulse_mask & bit) != 0U;
 		char label = (char)('1' + channel);
+		uint8_t digit_x = cell_x + ((DISPLAY_UI_CELL_W - DISPLAY_GLYPH_WIDTH) / 2U);
+		uint8_t digit_y = DISPLAY_UI_CELL_Y +
+				  ((DISPLAY_UI_CELL_H - DISPLAY_GLYPH_HEIGHT) / 2U);
 
-		display_draw_rect(frame, cell_x[channel], 16U, 18U, 24U, filled);
+		display_draw_rect(frame, cell_x, DISPLAY_UI_CELL_Y,
+				  DISPLAY_UI_CELL_W, DISPLAY_UI_CELL_H, filled);
 		if (filled) {
-			display_clear_char(frame, cell_x[channel] + 7U, 25U, label);
+			display_draw_char(frame, digit_x, digit_y, label, true);
 		} else {
-			display_draw_char(frame, cell_x[channel] + 7U, 25U, label);
+			display_draw_char(frame, digit_x, digit_y, label, false);
 		}
-		if ((pulse_mask & bit) != 0U) {
-			display_draw_pulse_mark(frame, cell_x[channel] + 5U, 31U, filled);
+		if (((pulse_mask & bit) != 0U) && pulse_mark_visible) {
+			display_draw_pulse_mark(frame, cell_x + 11U, DISPLAY_UI_CELL_Y + 4U,
+						filled);
 		}
 	}
 
-	display_draw_text(frame, 0U, 56U, display_mode_text(mode));
+	display_draw_text(frame, DISPLAY_UI_TEXT_X0, DISPLAY_UI_STATUS_Y,
+			  display_mode_text(mode));
 	if (detail_text[0] != '\0') {
-		display_draw_text(frame, 96U, 56U, detail_text);
+		display_draw_text(frame, detail_x, DISPLAY_UI_STATUS_Y, detail_text);
 	}
 
 	return display_write_local(0U, 0U, &desc, frame, false);
@@ -969,6 +1028,7 @@ static void render(void)
 	render_buzzer_locked(now);
 	write_display = display_can_render_locked();
 	reschedule = has_active_transient_locked(now) ||
+		     state.pulse_mask != 0U ||
 		     pattern == INDICATOR_RGB_ATTENTION ||
 		     pattern == INDICATOR_RGB_REBOOT_PENDING ||
 		     pattern == INDICATOR_RGB_FAULT;
@@ -981,7 +1041,7 @@ static void render(void)
 						   display_filled_mask,
 						   display_pulse_mask,
 						   display_ready_state,
-						   display_error);
+						   display_error, now);
 		k_mutex_lock(&state.lock, K_FOREVER);
 		if (display_ret < 0) {
 			LOG_WRN("OLED display render failed: %d", display_ret);

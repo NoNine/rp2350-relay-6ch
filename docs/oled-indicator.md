@@ -46,6 +46,80 @@ Use a fixed 128x64 layout with three stable bands:
 - Main relay field: six stable relay cells, one per channel.
 - Bottom status band: a short mode label and terse detail code.
 
+### Pixel Floorplan And Attributes
+
+Render the watch-style UI on a `128x64` 1-bit SSD1306 framebuffer. Coordinates
+below are logical OLED pixels, with `(0, 0)` at the top-left corner. Use
+1 px strokes and fixed bitmap glyphs around `5x7`, rendered without
+antialiasing.
+
+```text
+x=0                                                        x=127
+y=0  +--------------------------------------------------------+
+     |                                                        |
+y=3  |   USB RDY ACT PLS ERR                                 |
+y=13 |   --------------------------------------------------   |
+y=18 |  [1]  [2]  [3]  [4]  [5]  [6]                         |
+y=44 |                                                        |
+y=50 |   --------------------------------------------------   |
+y=54 |   BOOT/READY/ACTIVE/ATTN/FAULT/REBOOT    OK/P2/E:IO   |
+y=63 +--------------------------------------------------------+
+```
+
+| Element | Attributes |
+| --- | --- |
+| Canvas | `128x64` px, monochrome 1-bit framebuffer |
+| Coordinate origin | `(0, 0)` at top-left |
+| Top annunciators | `x=3..124`, `y=3..9`, short uppercase labels such as `USB RDY ACT PLS ERR` |
+| Top divider | `x=3..124`, `y=13`, 1 px high |
+| Relay field | `y=18..44`, six fixed cells |
+| Bottom divider | `x=3..124`, `y=50`, 1 px high |
+| Bottom status text | `x=3..124`, `y=54..60`, mode label left-aligned and detail code right-aligned |
+| Font | fixed bitmap glyphs around `5x7`, no antialiasing |
+| Strokes and borders | 1 px |
+| Relay cell size | `17x27` px |
+| Relay cell border | 1 px |
+| Relay cell origins | `(3,18)`, `(24,18)`, `(45,18)`, `(66,18)`, `(87,18)`, `(108,18)` |
+| Relay cell pitch | 21 px |
+| Relay digit | centered within the cell using the same fixed bitmap font |
+| Off relay | outline cell with normal on-pixel digit |
+| Active relay | filled cell with reversed digit |
+| Pulsing relay | active relay rendering plus two small `2x2` reversed blocks near the top-right inside the cell |
+
+Relay cell `x` placement is:
+
+```c
+x = 3 + channel_index * 21; /* channel_index is 0..5 */
+```
+
+Use these renderer constants unless implementation constraints require an
+equivalent layout:
+
+```c
+#define OLED_W 128
+#define OLED_H 64
+
+#define UI_TOP_TEXT_Y 3
+#define UI_TOP_RULE_Y 13
+#define UI_CELL_X0 3
+#define UI_CELL_Y 18
+#define UI_CELL_W 17
+#define UI_CELL_H 27
+#define UI_CELL_PITCH 21
+#define UI_BOTTOM_RULE_Y 50
+#define UI_STATUS_Y 54
+
+#define UI_RULE_X0 3
+#define UI_RULE_X1 124
+#define UI_TEXT_X0 3
+#define UI_TEXT_X1 124
+#define UI_LINE_W 1
+```
+
+The preview assets use dim and bright OLED tones for readability. On a 1-bit
+SSD1306 framebuffer, render both as normal on pixels unless a later renderer
+explicitly adopts dithering.
+
 Recommended mode labels:
 
 - `BOOT`: firmware is initializing.
@@ -69,7 +143,8 @@ Relay cells show commanded firmware state only:
 
 - Off: outlined cell with the channel number.
 - On: filled or inverted cell with the channel number reversed.
-- Pulsing: same as on, plus a small pulse mark in the cell.
+- Pulsing: same as on, plus two small `2x2` reversed blocks near the
+  top-right inside the cell.
 
 Do not scroll. Do not draw explanatory sentences. Do not use animations except
 bounded blink markers for pulse or attention. Rate-limit display refreshes so
