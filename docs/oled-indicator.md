@@ -85,6 +85,7 @@ y=63 +--------------------------------------------------------+
 | Off relay | outline cell with normal on-pixel digit |
 | Active relay | filled cell with reversed digit |
 | Pulsing relay | active relay rendering plus two small `2x2` reversed blocks near the top-right inside the cell |
+| Pulse countdown | when pulse timing is available, a `15x2` px center-drain bar in `x=cell_x+1..cell_x+15`, `y=46..47` under each pulsing cell |
 
 Relay cell `x` placement is:
 
@@ -106,6 +107,9 @@ equivalent layout:
 #define UI_CELL_W 17
 #define UI_CELL_H 27
 #define UI_CELL_PITCH 21
+#define UI_PULSE_BAR_Y 46
+#define UI_PULSE_BAR_H 2
+#define UI_PULSE_BAR_W 15
 #define UI_BOTTOM_RULE_Y 50
 #define UI_STATUS_Y 54
 
@@ -115,6 +119,9 @@ equivalent layout:
 #define UI_TEXT_X1 124
 #define UI_LINE_W 1
 ```
+
+Keep `y=45`, `y=48`, and `y=49` clear around the pulse countdown bar so the
+bar does not merge visually with relay cell borders or the bottom divider.
 
 The preview assets use dim and bright OLED tones for readability. On a 1-bit
 SSD1306 framebuffer, render both as normal on pixels unless a later renderer

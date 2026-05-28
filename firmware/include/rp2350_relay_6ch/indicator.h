@@ -70,6 +70,11 @@ enum indicator_display_detail {
 	INDICATOR_DISPLAY_DETAIL_HOLD,
 };
 
+struct indicator_pulse_timing {
+	uint32_t duration_ms;
+	uint32_t remaining_ms;
+};
+
 struct indicator_test_snapshot {
 	enum indicator_rgb_pattern rgb;
 	enum indicator_buzzer_pattern buzzer;
@@ -91,6 +96,9 @@ struct indicator_test_snapshot {
 void indicator_init(void);
 void indicator_set_ready(bool ready);
 void indicator_set_relay_state(uint8_t state_mask, uint8_t pulse_mask);
+void indicator_set_relay_timed_state(
+	uint8_t state_mask, uint8_t pulse_mask,
+	const struct indicator_pulse_timing pulse_timing[6]);
 void indicator_record_command(enum indicator_command_result result);
 void indicator_set_degraded(bool degraded);
 void indicator_set_fault(bool fault);

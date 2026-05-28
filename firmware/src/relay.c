@@ -38,6 +38,7 @@ static uint8_t relay_pulse_mask;
 struct relay_pulse_work {
 	struct k_work_delayable work;
 	uint8_t channel;
+	uint32_t duration_ms;
 };
 
 static void pulse_expired(struct k_work *work);
@@ -56,9 +57,34 @@ static bool channel_valid(uint8_t channel)
 	return channel < ARRAY_SIZE(relays);
 }
 
-static void publish_indicator_state(uint8_t state_mask, uint8_t pulse_mask)
+static void publish_indicator_state(
+	uint8_t state_mask, uint8_t pulse_mask,
+	const struct indicator_pulse_timing pulse_timing[RP2350_RELAY_6CH_CHANNEL_COUNT])
 {
-	indicator_set_relay_state(state_mask, pulse_mask);
+	if (pulse_timing == NULL) {
+		indicator_set_relay_state(state_mask, pulse_mask);
+		return;
+	}
+
+	indicator_set_relay_timed_state(state_mask, pulse_mask, pulse_timing);
+}
+
+static void snapshot_pulse_timing_locked(
+	uint8_t pulse_mask,
+	struct indicator_pulse_timing pulse_timing[RP2350_RELAY_6CH_CHANNEL_COUNT])
+{
+	for (size_t i = 0; i < ARRAY_SIZE(relay_pulses); i++) {
+		if ((pulse_mask & BIT(i)) == 0U) {
+			pulse_timing[i].duration_ms = 0U;
+			pulse_timing[i].remaining_ms = 0U;
+			continue;
+		}
+
+		pulse_timing[i].duration_ms = relay_pulses[i].duration_ms;
+		pulse_timing[i].remaining_ms =
+			k_ticks_to_ms_ceil32(
+				k_work_delayable_remaining_get(&relay_pulses[i].work));
+	}
 }
 
 static int apply_state_locked(uint8_t state_mask)
@@ -82,6 +108,7 @@ static void cancel_pulses_locked(uint8_t pulse_mask)
 	for (size_t i = 0; i < ARRAY_SIZE(relay_pulses); i++) {
 		if ((pulse_mask & BIT(i)) != 0U) {
 			(void)k_work_cancel_delayable(&relay_pulses[i].work);
+			relay_pulses[i].duration_ms = 0U;
 		}
 	}
 
@@ -116,6 +143,7 @@ static void pulse_expired(struct k_work *work)
 		CONTAINER_OF(dwork, struct relay_pulse_work, work);
 	uint8_t state_mask = 0U;
 	uint8_t pulse_mask = 0U;
+	struct indicator_pulse_timing pulse_timing[RP2350_RELAY_6CH_CHANNEL_COUNT];
 	bool publish = false;
 	int ret;
 
@@ -126,16 +154,18 @@ static void pulse_expired(struct k_work *work)
 	}
 
 	relay_pulse_mask &= (uint8_t)~BIT(pulse->channel);
+	pulse->duration_ms = 0U;
 	ret = set_channel_locked(pulse->channel, false);
 	if (ret == 0) {
 		state_mask = relay_state_mask;
 		pulse_mask = relay_pulse_mask;
+		snapshot_pulse_timing_locked(pulse_mask, pulse_timing);
 		publish = true;
 	}
 	k_mutex_unlock(&relay_lock);
 
 	if (publish) {
-		publish_indicator_state(state_mask, pulse_mask);
+		publish_indicator_state(state_mask, pulse_mask, pulse_timing);
 	}
 
 	if (ret < 0) {
@@ -170,7 +200,7 @@ int relay_init(void)
 
 	relay_state_mask = 0U;
 	relay_pulse_mask = 0U;
-	publish_indicator_state(relay_state_mask, relay_pulse_mask);
+	publish_indicator_state(relay_state_mask, relay_pulse_mask, NULL);
 	LOG_INF("Initialized %u relays off", (unsigned int)ARRAY_SIZE(relays));
 
 	return 0;
@@ -232,6 +262,7 @@ int relay_set(uint8_t channel, bool on)
 {
 	uint8_t state_mask = 0U;
 	uint8_t pulse_mask = 0U;
+	struct indicator_pulse_timing pulse_timing[RP2350_RELAY_6CH_CHANNEL_COUNT];
 	int ret;
 
 	if (!channel_valid(channel)) {
@@ -244,11 +275,12 @@ int relay_set(uint8_t channel, bool on)
 	if (ret == 0) {
 		state_mask = relay_state_mask;
 		pulse_mask = relay_pulse_mask;
+		snapshot_pulse_timing_locked(pulse_mask, pulse_timing);
 	}
 	k_mutex_unlock(&relay_lock);
 
 	if (ret == 0) {
-		publish_indicator_state(state_mask, pulse_mask);
+		publish_indicator_state(state_mask, pulse_mask, pulse_timing);
 	}
 
 	return ret;
@@ -258,6 +290,7 @@ int relay_set_all(uint8_t state_mask)
 {
 	uint8_t next_state_mask = 0U;
 	uint8_t pulse_mask = 0U;
+	struct indicator_pulse_timing pulse_timing[RP2350_RELAY_6CH_CHANNEL_COUNT];
 	int ret;
 
 	if ((state_mask & ~BIT_MASK(ARRAY_SIZE(relays))) != 0U) {
@@ -270,11 +303,12 @@ int relay_set_all(uint8_t state_mask)
 	if (ret == 0) {
 		next_state_mask = relay_state_mask;
 		pulse_mask = relay_pulse_mask;
+		snapshot_pulse_timing_locked(pulse_mask, pulse_timing);
 	}
 	k_mutex_unlock(&relay_lock);
 
 	if (ret == 0) {
-		publish_indicator_state(next_state_mask, pulse_mask);
+		publish_indicator_state(next_state_mask, pulse_mask, pulse_timing);
 	}
 
 	return ret;
@@ -289,6 +323,7 @@ int relay_pulse(uint8_t channel, uint32_t duration_ms)
 {
 	uint8_t state_mask = 0U;
 	uint8_t pulse_mask = 0U;
+	struct indicator_pulse_timing pulse_timing[RP2350_RELAY_6CH_CHANNEL_COUNT];
 	int ret;
 
 	if (!channel_valid(channel)) {
@@ -309,19 +344,22 @@ int relay_pulse(uint8_t channel, uint32_t duration_ms)
 	ret = set_channel_locked(channel, true);
 	if (ret == 0) {
 		relay_pulse_mask |= BIT(channel);
+		relay_pulses[channel].duration_ms = duration_ms;
 		ret = k_work_schedule(&relay_pulses[channel].work, K_MSEC(duration_ms));
 		if (ret < 0) {
 			relay_pulse_mask &= (uint8_t)~BIT(channel);
+			relay_pulses[channel].duration_ms = 0U;
 			(void)set_channel_locked(channel, false);
 		} else {
 			state_mask = relay_state_mask;
 			pulse_mask = relay_pulse_mask;
+			snapshot_pulse_timing_locked(pulse_mask, pulse_timing);
 		}
 	}
 	k_mutex_unlock(&relay_lock);
 
 	if (ret >= 0) {
-		publish_indicator_state(state_mask, pulse_mask);
+		publish_indicator_state(state_mask, pulse_mask, pulse_timing);
 	}
 
 	return ret < 0 ? ret : 0;

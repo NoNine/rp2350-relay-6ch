@@ -556,6 +556,89 @@ ZTEST(indicator, test_display_blinks_pulse_mark_without_clearing_cell)
 	zassert_true(indicator_test_display_pixel_is_set(17U, 22U));
 }
 
+ZTEST(indicator, test_display_draws_full_pulse_countdown_lane)
+{
+	struct indicator_pulse_timing timing[6] = {
+		[0] = { .duration_ms = 1000U, .remaining_ms = 1000U },
+	};
+
+	indicator_test_configure_display(true, true, 128U, 64U,
+					 PIXEL_FORMAT_MONO01, false, false, false);
+	indicator_test_reset();
+	indicator_set_relay_timed_state(0U, BIT(0), timing);
+	(void)snapshot();
+
+	zassert_false(indicator_test_display_pixel_is_set(3U, 45U));
+	zassert_true(indicator_test_display_pixel_is_set(4U, 46U));
+	zassert_true(indicator_test_display_pixel_is_set(11U, 46U));
+	zassert_true(indicator_test_display_pixel_is_set(18U, 47U));
+	zassert_false(indicator_test_display_pixel_is_set(19U, 46U));
+	zassert_false(indicator_test_display_pixel_is_set(11U, 48U));
+}
+
+ZTEST(indicator, test_display_center_drains_pulse_countdown_lane)
+{
+	struct indicator_pulse_timing timing[6] = {
+		[0] = { .duration_ms = 1000U, .remaining_ms = 1000U },
+	};
+
+	indicator_test_configure_display(true, true, 128U, 64U,
+					 PIXEL_FORMAT_MONO01, false, false, false);
+	indicator_test_reset();
+	indicator_set_relay_timed_state(0U, BIT(0), timing);
+	(void)snapshot();
+
+	indicator_test_advance(500U);
+
+	zassert_false(indicator_test_display_pixel_is_set(4U, 46U));
+	zassert_true(indicator_test_display_pixel_is_set(8U, 46U));
+	zassert_true(indicator_test_display_pixel_is_set(11U, 46U));
+	zassert_true(indicator_test_display_pixel_is_set(14U, 47U));
+	zassert_false(indicator_test_display_pixel_is_set(18U, 47U));
+}
+
+ZTEST(indicator, test_display_removes_elapsed_pulse_countdown_lane)
+{
+	struct indicator_pulse_timing timing[6] = {
+		[0] = { .duration_ms = 1000U, .remaining_ms = 1000U },
+	};
+
+	indicator_test_configure_display(true, true, 128U, 64U,
+					 PIXEL_FORMAT_MONO01, false, false, false);
+	indicator_test_reset();
+	indicator_set_relay_timed_state(0U, BIT(0), timing);
+	(void)snapshot();
+
+	indicator_test_advance(1000U);
+
+	zassert_false(indicator_test_display_pixel_is_set(4U, 46U));
+	zassert_false(indicator_test_display_pixel_is_set(11U, 46U));
+	zassert_false(indicator_test_display_pixel_is_set(18U, 47U));
+	zassert_true(indicator_test_display_pixel_is_set(3U, 18U));
+}
+
+ZTEST(indicator, test_display_draws_countdown_for_each_pulsing_cell)
+{
+	struct indicator_pulse_timing timing[6] = {
+		[0] = { .duration_ms = 1000U, .remaining_ms = 1000U },
+		[3] = { .duration_ms = 2000U, .remaining_ms = 1000U },
+	};
+
+	indicator_test_configure_display(true, true, 128U, 64U,
+					 PIXEL_FORMAT_MONO01, false, false, false);
+	indicator_test_reset();
+	indicator_set_relay_timed_state(0U, BIT(0) | BIT(3), timing);
+	(void)snapshot();
+
+	zassert_true(indicator_test_display_pixel_is_set(4U, 46U));
+	zassert_true(indicator_test_display_pixel_is_set(11U, 47U));
+	zassert_false(indicator_test_display_pixel_is_set(67U, 46U));
+	zassert_true(indicator_test_display_pixel_is_set(71U, 46U));
+	zassert_true(indicator_test_display_pixel_is_set(77U, 47U));
+	zassert_false(indicator_test_display_pixel_is_set(82U, 47U));
+	zassert_false(indicator_test_display_pixel_is_set(25U, 46U));
+}
+
 ZTEST(indicator, test_display_multiple_pulses_render_p_star)
 {
 	struct indicator_test_snapshot snap;

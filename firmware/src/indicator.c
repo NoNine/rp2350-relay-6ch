@@ -44,6 +44,11 @@ LOG_MODULE_REGISTER(rp2350_relay_indicator, LOG_LEVEL_INF);
 #define DISPLAY_UI_RULE_W (DISPLAY_UI_RULE_X1 - DISPLAY_UI_RULE_X0 + 1U)
 #define DISPLAY_UI_TEXT_X0 3U
 #define DISPLAY_UI_TEXT_X1 124U
+#define DISPLAY_UI_PULSE_BAR_Y 46U
+#define DISPLAY_UI_PULSE_BAR_H 2U
+#define DISPLAY_UI_PULSE_BAR_W (DISPLAY_UI_CELL_W - 2U)
+#define DISPLAY_UI_PULSE_BAR_MAX_RADIUS ((DISPLAY_UI_PULSE_BAR_W + 1U) / 2U)
+#define DISPLAY_PULSE_CHANNELS 6U
 
 #define COMMAND_TRANSIENT_MS 150U
 #define ATTENTION_TRANSIENT_MS 600U
@@ -66,6 +71,8 @@ struct indicator_state {
 	bool reboot_pending;
 	uint8_t relay_state_mask;
 	uint8_t pulse_mask;
+	uint32_t pulse_duration_ms[DISPLAY_PULSE_CHANNELS];
+	int64_t pulse_end_ms[DISPLAY_PULSE_CHANNELS];
 	int64_t accepted_until;
 	int64_t attention_until;
 	enum indicator_buzzer_pattern buzzer_pattern;
@@ -453,6 +460,24 @@ static enum indicator_display_state display_post(void)
 	return INDICATOR_DISPLAY_READY;
 }
 
+static void log_display_detection(enum indicator_display_state display_state)
+{
+	switch (display_state) {
+	case INDICATOR_DISPLAY_READY:
+		LOG_INF("Optional OLED indicator detected");
+		break;
+	case INDICATOR_DISPLAY_NOT_DETECTED:
+		LOG_INF("Optional OLED indicator not detected");
+		break;
+	case INDICATOR_DISPLAY_UNSUPPORTED:
+		LOG_INF("Optional OLED indicator not configured");
+		break;
+	case INDICATOR_DISPLAY_FAILED:
+	default:
+		break;
+	}
+}
+
 static void schedule_render(k_timeout_t timeout)
 {
 	if (IS_ENABLED(CONFIG_RP2350_RELAY_6CH_INDICATORS)) {
@@ -572,6 +597,40 @@ static void display_draw_pulse_mark(uint8_t *frame, uint8_t x, uint8_t y, bool f
 			display_draw_vline(frame, block_x, y, 2U);
 			display_draw_vline(frame, block_x + 1U, y, 2U);
 		}
+	}
+}
+
+static void display_draw_pulse_countdown(uint8_t *frame, uint8_t cell_x,
+					 uint32_t duration_ms, int64_t end_ms,
+					 int64_t now)
+{
+	uint32_t remaining_ms;
+	uint8_t radius;
+	uint8_t center_x;
+	uint8_t left;
+	uint8_t width;
+
+	if (duration_ms == 0U || end_ms <= now) {
+		return;
+	}
+
+	remaining_ms = (uint32_t)(end_ms - now);
+	if (remaining_ms > duration_ms) {
+		remaining_ms = duration_ms;
+	}
+
+	radius = (uint8_t)(((uint64_t)remaining_ms * DISPLAY_UI_PULSE_BAR_MAX_RADIUS +
+			    duration_ms - 1U) / duration_ms);
+	if (radius == 0U) {
+		radius = 1U;
+	}
+
+	center_x = cell_x + (DISPLAY_UI_CELL_W / 2U);
+	left = center_x - radius + 1U;
+	width = (uint8_t)((radius * 2U) - 1U);
+
+	for (uint8_t row = 0U; row < DISPLAY_UI_PULSE_BAR_H; row++) {
+		display_draw_hline(frame, left, DISPLAY_UI_PULSE_BAR_Y + row, width);
 	}
 }
 
@@ -814,6 +873,8 @@ static bool display_pulse_mark_visible(int64_t now)
 static int display_render_frame(enum indicator_display_mode mode,
 				enum indicator_display_detail detail,
 				uint8_t state_mask, uint8_t pulse_mask,
+				const uint32_t pulse_duration_ms[DISPLAY_PULSE_CHANNELS],
+				const int64_t pulse_end_ms[DISPLAY_PULSE_CHANNELS],
 				bool ready, bool error, int64_t now)
 {
 	static uint8_t frame[DISPLAY_FRAME_SIZE];
@@ -857,6 +918,10 @@ static int display_render_frame(enum indicator_display_mode mode,
 		if (((pulse_mask & bit) != 0U) && pulse_mark_visible) {
 			display_draw_pulse_mark(frame, cell_x + 11U, DISPLAY_UI_CELL_Y + 4U,
 						filled);
+		}
+		if ((pulse_mask & bit) != 0U) {
+			display_draw_pulse_countdown(frame, cell_x, pulse_duration_ms[channel],
+						     pulse_end_ms[channel], now);
 		}
 	}
 
@@ -1004,6 +1069,8 @@ static void render(void)
 	enum indicator_display_detail display_detail;
 	uint8_t display_filled_mask;
 	uint8_t display_pulse_mask;
+	uint32_t pulse_duration_ms[DISPLAY_PULSE_CHANNELS];
+	int64_t pulse_end_ms[DISPLAY_PULSE_CHANNELS];
 	int64_t now = indicator_now();
 	bool display_ready_state;
 	bool display_error;
@@ -1018,6 +1085,8 @@ static void render(void)
 	display_detail = display_detail_locked(pattern, display_mode);
 	display_filled_mask = state.relay_state_mask | state.pulse_mask;
 	display_pulse_mask = state.pulse_mask;
+	memcpy(pulse_duration_ms, state.pulse_duration_ms, sizeof(pulse_duration_ms));
+	memcpy(pulse_end_ms, state.pulse_end_ms, sizeof(pulse_end_ms));
 	display_ready_state = state.ready;
 	display_error = state.degraded || state.fault ||
 			pattern == INDICATOR_RGB_ATTENTION;
@@ -1040,6 +1109,8 @@ static void render(void)
 		display_ret = display_render_frame(display_mode, display_detail,
 						   display_filled_mask,
 						   display_pulse_mask,
+						   pulse_duration_ms,
+						   pulse_end_ms,
 						   display_ready_state,
 						   display_error, now);
 		k_mutex_lock(&state.lock, K_FOREVER);
@@ -1073,6 +1144,8 @@ static void ensure_initialized(void)
 
 void indicator_init(void)
 {
+	enum indicator_display_state display_state;
+
 	if (state.initialized) {
 		return;
 	}
@@ -1084,6 +1157,7 @@ void indicator_init(void)
 	state.initialized = true;
 	state.display_post_write_count = 0U;
 	state.display_state = display_post();
+	display_state = state.display_state;
 	state.hardware_enabled = rgb_available() || buzzer_available() ||
 				 state.display_state == INDICATOR_DISPLAY_READY;
 #ifdef CONFIG_ZTEST
@@ -1097,6 +1171,8 @@ void indicator_init(void)
 	state.reboot_pending = false;
 	state.relay_state_mask = 0U;
 	state.pulse_mask = 0U;
+	memset(state.pulse_duration_ms, 0, sizeof(state.pulse_duration_ms));
+	memset(state.pulse_end_ms, 0, sizeof(state.pulse_end_ms));
 	state.accepted_until = 0;
 	state.attention_until = 0;
 	state.buzzer_pattern = INDICATOR_BUZZER_SILENT;
@@ -1114,6 +1190,8 @@ void indicator_init(void)
 	state.last_rgb = state.hardware_enabled ? INDICATOR_RGB_BOOTING : INDICATOR_RGB_OFF;
 	state.last_buzzer = INDICATOR_BUZZER_SILENT;
 	k_mutex_unlock(&state.lock);
+
+	log_display_detection(display_state);
 
 	if (!IS_ENABLED(CONFIG_RP2350_RELAY_6CH_INDICATORS)) {
 		return;
@@ -1144,6 +1222,40 @@ void indicator_set_relay_state(uint8_t state_mask, uint8_t pulse_mask)
 	k_mutex_lock(&state.lock, K_FOREVER);
 	state.relay_state_mask = state_mask;
 	state.pulse_mask = pulse_mask;
+	memset(state.pulse_duration_ms, 0, sizeof(state.pulse_duration_ms));
+	memset(state.pulse_end_ms, 0, sizeof(state.pulse_end_ms));
+	k_mutex_unlock(&state.lock);
+	schedule_render_now();
+}
+
+void indicator_set_relay_timed_state(
+	uint8_t state_mask, uint8_t pulse_mask,
+	const struct indicator_pulse_timing pulse_timing[DISPLAY_PULSE_CHANNELS])
+{
+	const int64_t now = indicator_now();
+
+	ensure_initialized();
+	k_mutex_lock(&state.lock, K_FOREVER);
+	state.relay_state_mask = state_mask;
+	state.pulse_mask = pulse_mask;
+	memset(state.pulse_duration_ms, 0, sizeof(state.pulse_duration_ms));
+	memset(state.pulse_end_ms, 0, sizeof(state.pulse_end_ms));
+
+	if (pulse_timing != NULL) {
+		for (uint8_t channel = 0U; channel < DISPLAY_PULSE_CHANNELS; channel++) {
+			uint8_t bit = BIT(channel);
+
+			if ((pulse_mask & bit) == 0U ||
+			    pulse_timing[channel].duration_ms == 0U ||
+			    pulse_timing[channel].remaining_ms == 0U) {
+				continue;
+			}
+
+			state.pulse_duration_ms[channel] = pulse_timing[channel].duration_ms;
+			state.pulse_end_ms[channel] = now + pulse_timing[channel].remaining_ms;
+		}
+	}
+
 	k_mutex_unlock(&state.lock);
 	schedule_render_now();
 }
