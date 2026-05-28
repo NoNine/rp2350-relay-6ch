@@ -82,6 +82,16 @@ Do not update tests, docs, fixtures, or examples solely to mirror a version bump
 unless they assert released package metadata or represent current user-facing
 output. Prefer deriving expected versions from the authoritative declaration.
 
+Minimal change gate:
+
+- Before editing, state the requested behavior in one sentence.
+- After editing, inspect `git diff` and remove changes not required for that
+  behavior.
+- Do not add helpers, validation, abstractions, docs, or tests unless they are
+  directly required by the request.
+- If a useful cleanup is found, leave it out and mention it as follow-up work.
+- In handoff, report only changed files and verification commands that ran.
+
 ## Scope Discipline
 
 Treat discussion documents as idea exploration, not implementation approval.

@@ -99,7 +99,8 @@ rp2350-relay --port <serial-port> smoke
 ```
 
 Use `COM7`-style ports on Windows and `/dev/ttyACM0`-style ports on Linux.
-Confirm all relays are off after the command exits.
+The default smoke pulse timing is paced for visible relay and local indicator
+observation. Confirm all relays are off after the command exits.
 
 ### Optional CLI Executable
 
@@ -311,7 +312,7 @@ rp2350-relay --port <serial-port> pulse 1 100
 rp2350-relay --port <serial-port> off-all
 rp2350-relay --port <serial-port> status
 rp2350-relay --port <serial-port> reboot
-rp2350-relay --port <serial-port> smoke --pulse-ms 100
+rp2350-relay --port <serial-port> smoke --pulse-ms 1000
 ```
 
 Use JSON output for scripts:
@@ -323,9 +324,12 @@ rp2350-relayctl --socket "$SOCKET" --output json daemon-status
 
 ## Hardware Smoke Test
 
-The `smoke` command queries the controller, pulses `CH1` through `CH6`, and
-attempts final `off-all` teardown. Keep relay loads disconnected during
-bring-up and confirm all relays are off after the command exits.
+The `smoke` command queries the controller, pulses `CH1` through `CH6`
+sequentially, waits for each pulse to complete, and attempts final `off-all`
+teardown. The default `--pulse-ms 1000` is intended to make relay and optional
+OLED indicator updates observable; shorter values are useful for automation but
+may be too fast to see on the local display. Keep relay loads disconnected
+during bring-up and confirm all relays are off after the command exits.
 
 ## Local Status Indicators
 

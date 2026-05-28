@@ -490,7 +490,13 @@ def test_invalid_channel_exits_with_argument_code() -> None:
     assert exc.value.code == cli.EXIT_ARGUMENT
 
 
-def test_smoke_pulses_each_relay_and_forces_teardown() -> None:
+def test_smoke_pulses_each_relay_and_forces_teardown(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sleeps: list[float] = []
+
+    monkeypatch.setattr(cli.time, "sleep", sleeps.append)
+
     rc = cli.main(["--port", "COM7", "smoke", "--pulse-ms", "25"])
 
     calls = FakeClient.instances[0].calls
@@ -505,5 +511,29 @@ def test_smoke_pulses_each_relay_and_forces_teardown() -> None:
         ("pulse_relay", (4, 25)),
         ("pulse_relay", (5, 25)),
     ]
+    assert sleeps == [0.025] * 6
     assert calls[-1:] == [("off_all", ())]
     assert FakeClient.instances[0].closed is True
+
+
+def test_smoke_defaults_to_observable_pulse_duration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sleeps: list[float] = []
+
+    monkeypatch.setattr(cli.time, "sleep", sleeps.append)
+
+    rc = cli.main(["--port", "COM7", "smoke"])
+
+    calls = FakeClient.instances[0].calls
+
+    assert rc == cli.EXIT_OK
+    assert [call for call in calls if call[0] == "pulse_relay"] == [
+        ("pulse_relay", (0, 1000)),
+        ("pulse_relay", (1, 1000)),
+        ("pulse_relay", (2, 1000)),
+        ("pulse_relay", (3, 1000)),
+        ("pulse_relay", (4, 1000)),
+        ("pulse_relay", (5, 1000)),
+    ]
+    assert sleeps == [1.0] * 6

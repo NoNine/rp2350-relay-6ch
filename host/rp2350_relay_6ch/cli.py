@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from typing import Any
 
 from rp2350_relay_6ch import (
@@ -247,6 +248,7 @@ def cmd_smoke(args: argparse.Namespace) -> dict[str, Any]:
                         "response": client.pulse_relay(channel, args.pulse_ms),
                     }
                 )
+                time.sleep(args.pulse_ms / 1000.0)
             final = client.off_all()
             return {"ok": True, "results": results, "final": final}
         finally:
@@ -308,7 +310,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("reboot", help="request a firmware reboot")
 
     smoke_parser = subparsers.add_parser("smoke", help="pulse each relay and turn all off")
-    smoke_parser.add_argument("--pulse-ms", type=int, default=100)
+    smoke_parser.add_argument("--pulse-ms", type=int, default=1000)
 
     session_parser = subparsers.add_parser(
         "session",
