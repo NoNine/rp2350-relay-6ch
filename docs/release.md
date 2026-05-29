@@ -32,17 +32,18 @@ gh release view "v<version>"
 
 ## Automated Release
 
-Use the release script for the fixed build, verification, and publish workflow:
+Use the product build script for the fixed build, verification, and publish
+workflow:
 
 ```sh
-scripts/release-github.sh <version>
+scripts/build.sh release <version>
 ```
 
 The default mode builds and verifies the required artifacts without publishing.
 After reviewing the output, publish the GitHub Release with:
 
 ```sh
-scripts/release-github.sh <version> --publish
+scripts/build.sh release <version> --publish
 ```
 
 The script verifies the working tree is clean, `HEAD` is tagged with
@@ -51,6 +52,9 @@ Release does not already exist before publishing. It builds the host wheel,
 Waveshare UF2, and Pico 2 UF2, runs host tests, verifies wheel metadata,
 prints SHA256 checksums, extracts release notes from `CHANGELOG.md`, and
 verifies the uploaded GitHub Release assets.
+
+`scripts/release-github.sh <version> [--publish]` remains as a compatibility
+wrapper for this product release path.
 
 The remaining sections document the manual workflow that the script implements.
 
@@ -92,28 +96,10 @@ rm -f "dist/rp2350_relay_6ch-<version>-waveshare.uf2"
 rm -f "dist/rp2350_relay_6ch-<version>-pico2.uf2"
 ```
 
-Build the host wheel:
+The product build script performs the clean host and firmware build:
 
 ```sh
-python -m build --wheel
-```
-
-Build the Waveshare firmware and copy the UF2 to the release artifact name:
-
-```sh
-scripts/build-firmware.sh --pristine
-cp build/firmware/zephyr/zephyr.uf2 \
-  "dist/rp2350_relay_6ch-<version>-waveshare.uf2"
-```
-
-Build the Pico 2 firmware with the relay development overlay and copy the UF2:
-
-```sh
-TARGET=pico2 \
-  RELAY_OVERLAY=firmware/boards/raspberrypi/rpi_pico2/pico2w-relay-dev.overlay \
-  scripts/build-firmware.sh --pristine
-cp build/firmware-pico2/zephyr/zephyr.uf2 \
-  "dist/rp2350_relay_6ch-<version>-pico2.uf2"
+scripts/build.sh release <version>
 ```
 
 Optional platform executables are built separately on the matching operating

@@ -116,21 +116,20 @@ Run the host tests first because they do not require hardware:
 scripts/test-host.sh
 ```
 
-Build the firmware for the current development target:
+Build the product outputs for the current development target:
 
 ```sh
-scripts/build-firmware.sh
+scripts/build.sh
 ```
 
-The wrapper defaults to:
+The product build defaults to:
 
 ```text
-TARGET=waveshare
-BOARD=waveshare_rp2350_relay_6ch/rp2350b/m33
-BUILD_DIR=build/firmware
+LUNCH=rp2350_relay_6ch-standard-userdebug
 ```
 
-Override these when needed:
+This produces the host wheel and the Waveshare/Pico 2 firmware images. Use the
+lower-level firmware helper only for custom board or overlay experiments:
 
 ```sh
 BOARD=<zephyr-board> BUILD_DIR=build/<name> scripts/build-firmware.sh
@@ -163,7 +162,7 @@ build/firmware-tests/relay-mgmt/zephyr/zephyr.exe
 Flash the most recent firmware build:
 
 ```sh
-west flash -d build/firmware
+west flash -d build/product/rp2350_relay_6ch-standard-userdebug/waveshare
 ```
 
 Then run a CLI smoke test from the machine connected to the board:

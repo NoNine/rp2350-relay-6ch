@@ -387,17 +387,15 @@ Run these commands from the repository root after completing the Zephyr setup:
 source "${ZEPHYR_WORKSPACE:-$HOME/zephyrproject}/.venv/bin/activate"
 python -m pip install -e . pytest
 scripts/test-host.sh
-scripts/build-firmware.sh
-west flash -d build/firmware
+scripts/build.sh
+west flash -d build/product/rp2350_relay_6ch-standard-userdebug/waveshare
 rp2350-relay --port <serial-port> smoke
 ```
 
-The firmware wrapper defaults to:
+The product build defaults to:
 
 ```text
-TARGET=waveshare
-BOARD=waveshare_rp2350_relay_6ch/rp2350b/m33
-BUILD_DIR=build/firmware
+LUNCH=rp2350_relay_6ch-standard-userdebug
 ```
 
 For first-time setup and full verification commands, see

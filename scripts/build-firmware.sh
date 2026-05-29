@@ -54,6 +54,12 @@ case "${TARGET}" in
 		;;
 esac
 
+if [[ -n "${EXTRA_CONF_FILE:-}" ]]; then
+	EXTRA_CONF_ARGS+=(
+		"-DEXTRA_CONF_FILE=${EXTRA_CONF_FILE}"
+	)
+fi
+
 if [[ -f "${VENV_DIR}/bin/activate" ]]; then
 	# shellcheck disable=SC1091
 	source "${VENV_DIR}/bin/activate"
