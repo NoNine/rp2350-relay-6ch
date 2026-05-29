@@ -92,6 +92,23 @@ Minimal change gate:
 - If a useful cleanup is found, leave it out and mention it as follow-up work.
 - In handoff, report only changed files and verification commands that ran.
 
+After code changes, rebuild only artifacts whose inputs changed:
+
+- Rebuild the host wheel when changes affect `host/`, `tools/`, Python package
+  metadata, package assets, host entry points, or release/build scripts that
+  change wheel contents.
+- Rebuild Waveshare firmware when changes affect firmware sources, firmware
+  Kconfig/prj.conf, Waveshare board files, common firmware build scripts, or
+  embedded build/version metadata.
+- Rebuild Pico 2 W firmware when changes affect firmware sources, firmware
+  Kconfig/prj.conf, Pico/Pico 2 W overlays, common firmware build scripts, or
+  embedded build/version metadata.
+
+Do not rebuild artifacts for docs-only, tests-only, or unrelated changes unless
+the changed file is embedded into that artifact or the user explicitly requests
+a release-style artifact rebuild. In handoff, state which artifacts were rebuilt
+and why, or state that no artifact rebuild was relevant.
+
 ## Scope Discipline
 
 Treat discussion documents as idea exploration, not implementation approval.

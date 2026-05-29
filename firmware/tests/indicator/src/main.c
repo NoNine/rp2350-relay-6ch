@@ -305,6 +305,21 @@ ZTEST(indicator, test_display_post_success_and_ready_render)
 	zassert_false(indicator_test_display_pixel_is_set(125U, 54U));
 }
 
+ZTEST(indicator, test_display_post_sets_configured_orientation)
+{
+	indicator_test_configure_display(true, true, 128U, 64U,
+					 PIXEL_FORMAT_MONO01, false, false, false);
+	indicator_test_reset();
+
+	if (IS_ENABLED(CONFIG_RP2350_RELAY_6CH_DISPLAY_ROTATED_180)) {
+		zassert_equal(indicator_test_display_orientation(),
+			      DISPLAY_ORIENTATION_ROTATED_180);
+	} else {
+		zassert_equal(indicator_test_display_orientation(),
+			      DISPLAY_ORIENTATION_NORMAL);
+	}
+}
+
 ZTEST(indicator, test_display_glyphs_cover_fixed_label_vocabulary)
 {
 	const char required[] = "0123456:*ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -393,6 +408,21 @@ ZTEST(indicator, test_display_rejects_blanking_failure)
 
 	indicator_test_configure_display(true, true, 128U, 64U,
 					 PIXEL_FORMAT_MONO01, true, false, false);
+	indicator_test_reset();
+	snap = snapshot();
+
+	zassert_equal(snap.display_state, INDICATOR_DISPLAY_FAILED);
+	zassert_equal(snap.display_post_write_count, 0U);
+	zassert_equal(snap.display_write_count, 0U);
+}
+
+ZTEST(indicator, test_display_rejects_orientation_failure)
+{
+	struct indicator_test_snapshot snap;
+
+	indicator_test_configure_display(true, true, 128U, 64U,
+					 PIXEL_FORMAT_MONO01, false, false, false);
+	indicator_test_set_display_orientation_failure(true);
 	indicator_test_reset();
 	snap = snapshot();
 

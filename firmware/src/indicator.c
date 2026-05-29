@@ -122,8 +122,10 @@ struct indicator_display_test_config {
 	uint16_t height;
 	uint32_t pixel_formats;
 	bool blanking_fails;
+	bool orientation_fails;
 	bool post_write_fails;
 	bool render_write_fails;
+	enum display_orientation orientation;
 };
 
 static struct indicator_display_test_config display_test_config;
@@ -375,6 +377,20 @@ static int display_blanking_off_local(void)
 #endif
 }
 
+static int display_set_orientation_local(enum display_orientation orientation)
+{
+#ifdef CONFIG_ZTEST
+	display_test_config.orientation = orientation;
+	return display_test_config.orientation_fails ? -EIO : 0;
+#elif IS_ENABLED(CONFIG_RP2350_RELAY_6CH_DISPLAY)
+	return display_set_orientation(display_dev, orientation);
+#else
+	ARG_UNUSED(orientation);
+
+	return -ENODEV;
+#endif
+}
+
 static int display_write_local(uint16_t x, uint16_t y,
 			       const struct display_buffer_descriptor *desc,
 			       const uint8_t *buf, bool post)
@@ -441,6 +457,15 @@ static enum indicator_display_state display_post(void)
 	display_get_capabilities_local(&caps);
 	if (!display_capabilities_supported(&caps)) {
 		LOG_WRN("OLED display has unsupported geometry or pixel format");
+		return INDICATOR_DISPLAY_FAILED;
+	}
+
+	ret = display_set_orientation_local(
+		IS_ENABLED(CONFIG_RP2350_RELAY_6CH_DISPLAY_ROTATED_180) ?
+			DISPLAY_ORIENTATION_ROTATED_180 :
+			DISPLAY_ORIENTATION_NORMAL);
+	if (ret < 0) {
+		LOG_WRN("OLED display orientation failed: %d", ret);
 		return INDICATOR_DISPLAY_FAILED;
 	}
 
@@ -1332,6 +1357,7 @@ void indicator_test_reset(void)
 
 	indicator_test_now_ms = 0;
 	memset(display_test_frame, 0, sizeof(display_test_frame));
+	display_test_config.orientation = DISPLAY_ORIENTATION_NORMAL;
 	indicator_init();
 	render();
 }
@@ -1409,12 +1435,24 @@ void indicator_test_configure_display(bool supported, bool ready,
 	display_test_config.height = height;
 	display_test_config.pixel_formats = pixel_formats;
 	display_test_config.blanking_fails = blanking_fails;
+	display_test_config.orientation_fails = false;
 	display_test_config.post_write_fails = post_write_fails;
 	display_test_config.render_write_fails = render_write_fails;
+	display_test_config.orientation = DISPLAY_ORIENTATION_NORMAL;
 }
 
 void indicator_test_set_display_render_failure(bool render_write_fails)
 {
 	display_test_config.render_write_fails = render_write_fails;
+}
+
+void indicator_test_set_display_orientation_failure(bool orientation_fails)
+{
+	display_test_config.orientation_fails = orientation_fails;
+}
+
+enum display_orientation indicator_test_display_orientation(void)
+{
+	return display_test_config.orientation;
 }
 #endif

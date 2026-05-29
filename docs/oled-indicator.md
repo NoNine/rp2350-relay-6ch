@@ -197,6 +197,12 @@ Add display support behind a firmware Kconfig option such as
 minimum framebuffer/text drawing support only when the display feature is
 selected.
 
+Default firmware also enables
+`CONFIG_RP2350_RELAY_6CH_DISPLAY_ROTATED_180` so the OLED is readable with the
+project's default mounted orientation. Custom builds for panels mounted the
+opposite way can disable it with
+`-- -DCONFIG_RP2350_RELAY_6CH_DISPLAY_ROTATED_180=n`.
+
 ## Detection And POST Contract
 
 Use these internal display backend states:
@@ -215,6 +221,7 @@ POST success requires all of the following:
 - A `zephyr,display` device exists.
 - `device_is_ready()` returns true for that device.
 - Display capabilities match the expected 128x64 monochrome use.
+- The configured OLED orientation is accepted.
 - `display_blanking_off()` succeeds.
 - `display_write()` successfully writes a page-aligned 8-pixel-high diagnostic
   buffer, such as an 8x8 or 16x8 fixed bit pattern at `(0, 0)`.

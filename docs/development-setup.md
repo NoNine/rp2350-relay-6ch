@@ -136,6 +136,14 @@ Override these when needed:
 BOARD=<zephyr-board> BUILD_DIR=build/<name> scripts/build-firmware.sh
 ```
 
+Default firmware rotates the optional OLED 180 degrees. Disable that for custom
+hardware with:
+
+```sh
+scripts/build-firmware.sh --pristine -- \
+  -DCONFIG_RP2350_RELAY_6CH_DISPLAY_ROTATED_180=n
+```
+
 Use `BOARD=waveshare_rp2350_relay_6ch/rp2350b/m33/w` only when explicitly
 building for the optional RM2 Wi-Fi assembly. For Raspberry Pi Pico 2 DIY relay
 hardware, see [Pico 2 DIY targets](pico-diy-targets.md).

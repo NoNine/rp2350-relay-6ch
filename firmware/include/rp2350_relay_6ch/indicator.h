@@ -8,6 +8,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#ifdef CONFIG_ZTEST
+#include <zephyr/drivers/display.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -118,6 +122,8 @@ void indicator_test_configure_display(bool supported, bool ready,
 				      bool post_write_fails,
 				      bool render_write_fails);
 void indicator_test_set_display_render_failure(bool render_write_fails);
+void indicator_test_set_display_orientation_failure(bool orientation_fails);
+enum display_orientation indicator_test_display_orientation(void);
 #endif
 
 #ifdef __cplusplus

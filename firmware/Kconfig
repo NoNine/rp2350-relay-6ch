@@ -29,4 +29,12 @@ config RP2350_RELAY_6CH_DISPLAY
 	  hardware is treated as an optional add-on absence, not a controller
 	  fault.
 
+config RP2350_RELAY_6CH_DISPLAY_ROTATED_180
+	bool "Rotate the optional OLED local status display 180 degrees"
+	depends on RP2350_RELAY_6CH_DISPLAY
+	default n
+	help
+	  Rotate the optional OLED local status display 180 degrees for
+	  installations where the OLED panel is mounted upside down.
+
 source "Kconfig.zephyr"
