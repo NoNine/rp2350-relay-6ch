@@ -100,8 +100,9 @@ the needed behavior:
   supported range.
 - Firmware shall make relay state queryable after every control operation.
 - Firmware shall return a structured error when a command cannot be executed.
-- A communication-loss safety mechanism, such as a command/session timeout that
-  turns all relays off, is not a current project requirement.
+- Firmware shall provide v1 communication-loss safety through a build-time
+  policy. The standard profile shall turn all energized relays off after 5 s
+  without host command or heartbeat renewal.
 
 ### 5.3 Local Status Indicators
 
@@ -354,8 +355,8 @@ Acceptance criteria:
   one-based CLI channel arguments.
 - Keep one-shot direct serial commands available for diagnostics and simple
   checks.
-- Do not require firmware communication-loss safety beyond the dummy heartbeat
-  command used for session polling.
+- Use the firmware `heartbeat` command to renew communication-loss
+  leases while the session owns the direct serial connection.
 
 Acceptance criteria:
 
@@ -374,7 +375,8 @@ Acceptance criteria:
 - Use newline-delimited JSON over a same-user Unix domain socket.
 - Ship a `systemd --user` unit for production operation.
 - Keep direct serial control available through the existing CLI for diagnostics.
-- Do not require firmware communication-loss safety or heartbeat support.
+- Use firmware `heartbeat` support to renew communication-loss
+  leases while the daemon owns the serial connection.
 
 Acceptance criteria:
 

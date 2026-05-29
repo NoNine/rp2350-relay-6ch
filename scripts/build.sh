@@ -12,6 +12,7 @@ usage() {
 	cat >&2 <<'EOF'
 Usage:
   scripts/build.sh [--lunch <product_name-release_config-build_variant>] \
+    [--extra-conf-file <repo-relative-fragment>] \
     [--dry-run]
   scripts/build.sh release <version> [--publish] [--allow-non-user-publish] \
     [--lunch <product_name-release_config-build_variant>] [--dry-run]
@@ -154,6 +155,24 @@ load_product_composition() {
 		if [[ ! -f "${ROOT_DIR}/${fragment}" ]]; then
 			die "firmware Kconfig fragment '${fragment}' does not exist"
 		fi
+	done
+}
+
+append_extra_firmware_conf_fragments() {
+	local fragment
+
+	for fragment in "${EXTRA_FIRMWARE_CONF_LIST[@]}"; do
+		if [[ -z "${fragment}" ]]; then
+			die "--extra-conf-file requires a non-empty repo-relative path"
+		fi
+		if [[ "${fragment}" == /* || "${fragment}" == ".." || "${fragment}" == ../* ||
+			"${fragment}" == */../* || "${fragment}" == */.. ]]; then
+			die "--extra-conf-file '${fragment}' must be a repo-relative path"
+		fi
+		if [[ ! -f "${ROOT_DIR}/${fragment}" ]]; then
+			die "firmware Kconfig fragment '${fragment}' does not exist"
+		fi
+		FIRMWARE_KCONFIG_FRAGMENT_LIST+=("${fragment}")
 	done
 }
 
@@ -499,6 +518,7 @@ PUBLISH=false
 ALLOW_NON_USER_PUBLISH=false
 DRY_RUN=false
 EXPLICIT_LUNCH=""
+EXTRA_FIRMWARE_CONF_LIST=()
 
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
 	usage
@@ -529,6 +549,16 @@ while [[ $# -gt 0 ]]; do
 				die "--lunch requires a value"
 			fi
 			EXPLICIT_LUNCH="$2"
+			shift
+			;;
+		--extra-conf-file)
+			if [[ "${COMMAND}" == "release" ]]; then
+				die "--extra-conf-file is only valid with the build command"
+			fi
+			if [[ -z "${2:-}" ]]; then
+				die "--extra-conf-file requires a value"
+			fi
+			EXTRA_FIRMWARE_CONF_LIST+=("$2")
 			shift
 			;;
 		--publish)
@@ -583,6 +613,7 @@ declare -A IMAGE_ARTIFACTS=()
 TARGET_BUILD_VARIANT=""
 LUNCH_RECEIPT_NAME=""
 load_product_composition "${LUNCH_TARGET}"
+append_extra_firmware_conf_fragments
 
 if [[ "${PUBLISH}" == true && "${TARGET_BUILD_VARIANT}" != "user" && "${ALLOW_NON_USER_PUBLISH}" != true ]]; then
 	die "publishing '${TARGET_BUILD_VARIANT}' requires --allow-non-user-publish"

@@ -338,8 +338,8 @@ Deliverables:
 ## Phase 8a: Cross-Platform Session Mode
 
 Purpose: add the cross-platform manual/direct host-control workflow before
-firmware upgrade work, independent of any future firmware communication-loss
-safety.
+firmware upgrade work, with session-owned heartbeat renewal for
+communication-loss safety.
 
 Implementation scope:
 
@@ -357,9 +357,8 @@ Implementation scope:
   where practical.
 - Keep one-shot `rp2350-relay --port COM7 <command>` behavior available for
   diagnostics and simple checks.
-- Allow only the dummy firmware `heartbeat` command for session polling. Do not
-  require communication-loss timeout commands or firmware safety behavior in
-  this phase.
+- Poll the firmware `heartbeat` command every 2.5 s while connected so the
+  session renews communication-loss leases.
 
 Tests/gates:
 
@@ -390,7 +389,8 @@ Status:
 ## Phase 8b: Host Daemon Mode
 
 Purpose: add the production Linux host-control architecture before firmware
-upgrade work, independent of any future firmware communication-loss safety.
+upgrade work, with daemon-owned heartbeat renewal for communication-loss
+safety.
 
 Implementation scope:
 
@@ -407,8 +407,8 @@ Implementation scope:
 - Add named instances from a global TOML config for production operation.
 - Ship a generated `systemd --user` template unit and systemd install/doctor
   helpers.
-- Do not require firmware heartbeat, communication-loss timeout commands, or
-  new firmware protocol fields in this phase.
+- Poll the firmware `heartbeat` command every 2.5 s while connected so the
+  daemon renews communication-loss leases.
 
 Tests/gates:
 

@@ -91,6 +91,51 @@ def test_ordered_kconfig_fragments_and_release_artifacts_are_preserved() -> None
     ]
 
 
+def test_boardfarm_release_config_resolves_always_on_owner() -> None:
+    result = run_build("--dry-run", "--lunch", "rp2350_relay_6ch-boardfarm-userdebug")
+
+    assert result.returncode == 0, result.stderr
+    assert "Resolved lunch: rp2350_relay_6ch-boardfarm-userdebug" in result.stdout
+    manifest = read_manifest("rp2350_relay_6ch-boardfarm-userdebug")
+    assert manifest["release"] == "boardfarm"
+    assert manifest["firmware_kconfig_fragments"] == [
+        "firmware/profiles/always_on_owner.conf"
+    ]
+
+
+def test_extra_conf_file_appends_temporary_fragment() -> None:
+    result = run_build(
+        "--dry-run",
+        "--extra-conf-file",
+        "firmware/profiles/no_comm_timeout.conf",
+    )
+
+    assert result.returncode == 0, result.stderr
+    manifest = read_manifest("rp2350_relay_6ch-standard-userdebug")
+    assert manifest["firmware_kconfig_fragments"] == [
+        "firmware/profiles/standard.conf",
+        "firmware/profiles/no_comm_timeout.conf",
+    ]
+
+
+def test_extra_conf_file_can_repeat_preserving_order() -> None:
+    result = run_build(
+        "--dry-run",
+        "--extra-conf-file",
+        "firmware/profiles/no_comm_timeout.conf",
+        "--extra-conf-file",
+        "firmware/profiles/always_on_owner.conf",
+    )
+
+    assert result.returncode == 0, result.stderr
+    manifest = read_manifest("rp2350_relay_6ch-standard-userdebug")
+    assert manifest["firmware_kconfig_fragments"] == [
+        "firmware/profiles/standard.conf",
+        "firmware/profiles/no_comm_timeout.conf",
+        "firmware/profiles/always_on_owner.conf",
+    ]
+
+
 def test_manifest_records_image_metadata() -> None:
     result = run_build("--dry-run")
 
@@ -137,6 +182,15 @@ def test_unknown_variant_missing_product_and_missing_release_fail_before_build()
     )
     assert "does not exist" in missing_release.stderr
 
+    missing_extra_conf = run_build(
+        "--dry-run", "--extra-conf-file", "firmware/profiles/missing.conf"
+    )
+    assert missing_extra_conf.returncode != 0
+    assert (
+        "firmware Kconfig fragment 'firmware/profiles/missing.conf' does not exist"
+        in missing_extra_conf.stderr
+    )
+
 
 def test_non_user_publish_requires_override() -> None:
     result = run_build(
@@ -161,3 +215,16 @@ def test_non_user_publish_requires_override() -> None:
         "rp2350_relay_6ch-standard-userdebug",
     )
     assert allowed.returncode == 0, allowed.stderr
+
+
+def test_extra_conf_file_is_rejected_for_release_build() -> None:
+    result = run_build(
+        "release",
+        VERSION,
+        "--dry-run",
+        "--extra-conf-file",
+        "firmware/profiles/no_comm_timeout.conf",
+    )
+
+    assert result.returncode != 0
+    assert "--extra-conf-file is only valid with the build command" in result.stderr

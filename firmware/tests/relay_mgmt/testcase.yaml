@@ -7,3 +7,35 @@ tests:
       - mcumgr
       - relay
     harness: ztest
+  rp2350_relay_6ch.relay_mgmt.comm_loss_energized_only:
+    platform_allow:
+      - native_sim
+    tags:
+      - gpio
+      - mcumgr
+      - relay
+    harness: ztest
+    extra_configs:
+      - CONFIG_RP2350_RELAY_6CH_COMM_LOSS_ENERGIZED_ONLY=y
+      - CONFIG_RP2350_RELAY_6CH_COMM_LOSS_TIMEOUT_MS=50
+  rp2350_relay_6ch.relay_mgmt.comm_loss_no_timeout:
+    platform_allow:
+      - native_sim
+    tags:
+      - gpio
+      - mcumgr
+      - relay
+    harness: ztest
+    extra_configs:
+      - CONFIG_RP2350_RELAY_6CH_COMM_LOSS_NO_TIMEOUT=y
+  rp2350_relay_6ch.relay_mgmt.comm_loss_always_on_owner:
+    platform_allow:
+      - native_sim
+    tags:
+      - gpio
+      - mcumgr
+      - relay
+    harness: ztest
+    extra_configs:
+      - CONFIG_RP2350_RELAY_6CH_COMM_LOSS_ALWAYS_ON_OWNER=y
+      - CONFIG_RP2350_RELAY_6CH_COMM_LOSS_TIMEOUT_MS=50

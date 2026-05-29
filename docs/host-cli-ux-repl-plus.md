@@ -104,7 +104,7 @@ with device identity and current relay state:
 │   Port:         COM7                                         │
 │   Serial:       e6614c311f4b8b2f                             │
 │   Hardware:     RP2350-Relay-6CH                             │
-│   Protocol:     3                                            │
+│   Protocol:     5                                            │
 │   Relay count:  6                                            │
 │   State:        0x3f                                         │
 │   On:           CH1, CH2, CH3, CH4, CH5, CH6                 │

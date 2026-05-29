@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
@@ -150,6 +151,20 @@ static bool encode_transport_status(zcbor_state_t *zse)
 	       zcbor_bool_put(zse, IS_ENABLED(CONFIG_MCUMGR_TRANSPORT_UART));
 }
 
+static bool encode_comm_loss_policy(zcbor_state_t *zse)
+{
+	const char *policy = relay_comm_loss_policy();
+	const struct zcbor_string policy_string = {
+		.value = policy,
+		.len = strlen(policy),
+	};
+
+	return zcbor_tstr_put_lit(zse, "comm_loss_policy") &&
+	       zcbor_tstr_encode(zse, &policy_string) &&
+	       zcbor_tstr_put_lit(zse, "comm_loss_timeout_ms") &&
+	       zcbor_uint32_put(zse, relay_comm_loss_timeout_ms());
+}
+
 static int encode_state_or_error(zcbor_state_t *zse)
 {
 	if (!encode_state(zse)) {
@@ -207,6 +222,7 @@ static int info_handler(struct smp_streamer *ctxt)
 	     zcbor_uint32_put(zse, RP2350_RELAY_6CH_PULSE_MIN_MS) &&
 	     zcbor_tstr_put_lit(zse, "pulse_max_ms") &&
 	     zcbor_uint32_put(zse, RP2350_RELAY_6CH_PULSE_MAX_MS) &&
+	     encode_comm_loss_policy(zse) &&
 	     zcbor_tstr_put_lit(zse, "capabilities") &&
 	     zcbor_uint32_put(zse, BIT(0) | BIT(1) | BIT(2) | BIT(3) | BIT(4));
 
@@ -401,6 +417,7 @@ static int status_handler(struct smp_streamer *ctxt)
 
 	ok = encode_state(zse) &&
 	     encode_transport_status(zse) &&
+	     encode_comm_loss_policy(zse) &&
 	     zcbor_tstr_put_lit(zse, "uptime_ms") &&
 	     zcbor_uint64_put(zse, k_uptime_get()) &&
 	     zcbor_tstr_put_lit(zse, "received") &&
@@ -519,7 +536,11 @@ static int heartbeat_handler(struct smp_streamer *ctxt)
 		return error_response(zse, RP2350_RELAY_6CH_MGMT_ERR_DECODE);
 	}
 
-	ok = zcbor_tstr_put_lit(zse, "ok") && zcbor_bool_put(zse, true);
+	relay_comm_loss_renew();
+
+	ok = zcbor_tstr_put_lit(zse, "ok") &&
+	     zcbor_bool_put(zse, true) &&
+	     encode_comm_loss_policy(zse);
 	if (!ok) {
 		return MGMT_ERR_EMSGSIZE;
 	}

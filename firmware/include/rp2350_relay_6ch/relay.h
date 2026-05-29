@@ -25,6 +25,9 @@ int relay_set(uint8_t channel, bool on);
 int relay_set_all(uint8_t state_mask);
 int relay_off_all(void);
 int relay_pulse(uint8_t channel, uint32_t duration_ms);
+void relay_comm_loss_renew(void);
+const char *relay_comm_loss_policy(void);
+uint32_t relay_comm_loss_timeout_ms(void);
 
 #ifdef __cplusplus
 }

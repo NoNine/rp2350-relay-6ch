@@ -16,7 +16,7 @@ from rp2350_relay_6ch import (
     RelayTransportError,
     RelayValidationError,
 )
-from rp2350_relay_6ch.constants import RELAY_COUNT, RELAY_MASK
+from rp2350_relay_6ch.constants import PROTOCOL_VERSION, RELAY_COUNT, RELAY_MASK
 from rp2350_relay_6ch.session import run_session
 from rp2350_relay_6ch.smoke import run_smoke_sequence
 
@@ -35,6 +35,24 @@ def _client(args: argparse.Namespace) -> RelayClient:
         timeout_s=args.timeout,
         retries=args.retries,
     )
+
+
+def _validate_protocol(client: RelayClient) -> None:
+    info = client.get_info()
+    if info.get("protocol_version") != PROTOCOL_VERSION:
+        raise RelayProtocolError(
+            f"unexpected relay protocol version {info.get('protocol_version')}"
+        )
+
+
+def _ready_client(args: argparse.Namespace) -> RelayClient:
+    client = _client(args)
+    try:
+        _validate_protocol(client)
+    except Exception:
+        client.close()
+        raise
+    return client
 
 
 def _format_json(payload: dict[str, Any]) -> str:
@@ -193,47 +211,55 @@ def cmd_info(args: argparse.Namespace) -> dict[str, Any]:
 
 def cmd_build_info(args: argparse.Namespace) -> dict[str, Any]:
     _require_port(args)
-    return _client(args).get_build_info()
+    with _ready_client(args) as client:
+        return client.get_build_info()
 
 
 def cmd_get(args: argparse.Namespace) -> dict[str, Any]:
     _require_port(args)
-    return _client(args).get_relays(args.channel)
+    with _ready_client(args) as client:
+        return client.get_relays(args.channel)
 
 
 def cmd_set(args: argparse.Namespace) -> dict[str, Any]:
     _require_port(args)
-    return _client(args).set_relay(args.channel, args.state)
+    with _ready_client(args) as client:
+        return client.set_relay(args.channel, args.state)
 
 
 def cmd_set_all(args: argparse.Namespace) -> dict[str, Any]:
     _require_port(args)
-    return _client(args).set_all_relays(args.state)
+    with _ready_client(args) as client:
+        return client.set_all_relays(args.state)
 
 
 def cmd_pulse(args: argparse.Namespace) -> dict[str, Any]:
     _require_port(args)
-    return _client(args).pulse_relay(args.channel, args.duration_ms)
+    with _ready_client(args) as client:
+        return client.pulse_relay(args.channel, args.duration_ms)
 
 
 def cmd_off_all(args: argparse.Namespace) -> dict[str, Any]:
     _require_port(args)
-    return _client(args).off_all()
+    with _ready_client(args) as client:
+        return client.off_all()
 
 
 def cmd_status(args: argparse.Namespace) -> dict[str, Any]:
     _require_port(args)
-    return _client(args).get_status()
+    with _ready_client(args) as client:
+        return client.get_status()
 
 
 def cmd_reboot(args: argparse.Namespace) -> dict[str, Any]:
     _require_port(args)
-    return _client(args).reboot()
+    with _ready_client(args) as client:
+        return client.reboot()
 
 
 def cmd_smoke(args: argparse.Namespace) -> dict[str, Any]:
     _require_port(args)
-    with _client(args) as client:
+    with _ready_client(args) as client:
         return run_smoke_sequence(client, pulse_ms=args.pulse_ms)
 
 

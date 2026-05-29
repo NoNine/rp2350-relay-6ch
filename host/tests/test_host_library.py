@@ -159,11 +159,11 @@ def test_smp_package_encodes_serial_frames() -> None:
 
 def test_get_info_returns_decoded_success_response() -> None:
     transport = SimulatedPacketTransport(
-        [response(CMD_INFO, 0, {"protocol_version": 3, "relay_count": 6})]
+        [response(CMD_INFO, 0, {"protocol_version": 5, "relay_count": 6})]
     )
     client = RelayClient(transport)
 
-    assert client.get_info() == {"protocol_version": 3, "relay_count": 6}
+    assert client.get_info() == {"protocol_version": 5, "relay_count": 6}
 
 
 def test_heartbeat_sends_write_request_with_empty_payload() -> None:

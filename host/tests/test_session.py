@@ -11,6 +11,7 @@ from prompt_toolkit.history import InMemoryHistory
 from rp2350_relay_6ch.discovery import RelayUsbDevice, list_relay_devices, select_device_by_serial
 from rp2350_relay_6ch.exceptions import RelayTimeoutError, RelayTransportError
 from rp2350_relay_6ch.session import (
+    HEARTBEAT_INTERVAL_S,
     HeartbeatPoller,
     RelaySession,
     RelaySessionCompleter,
@@ -76,7 +77,7 @@ class SessionFakeClient:
         self.calls.append(("get_info", ()))
         return {
             "hardware": "Waveshare RP2350-Relay-6CH",
-            "protocol_version": 3,
+            "protocol_version": 5,
             "relay_count": 6,
         }
 
@@ -231,9 +232,13 @@ def test_startup_opens_one_client_runs_info_status_and_starts_heartbeat() -> Non
     assert "RP2350 Relay Session" in text
     assert "Connection:   connected" in text
     assert "Port:         COM7" in text
-    assert "Protocol:     3" in text
+    assert "Protocol:     5" in text
     assert "State:        0x00" in text
     assert "Pulsing:      none" in text
+
+
+def test_session_heartbeat_interval_is_fixed_2_5_seconds() -> None:
+    assert HEARTBEAT_INTERVAL_S == 2.5
 
 
 def test_startup_with_explicit_port_attaches_matching_usb_metadata() -> None:

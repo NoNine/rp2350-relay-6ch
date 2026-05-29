@@ -33,10 +33,10 @@ from rp2350_relay_6ch.discovery import (
     select_device_by_serial,
 )
 
-from .constants import RELAY_COUNT
+from .constants import PROTOCOL_VERSION, RELAY_COUNT
 from .smoke import run_smoke_sequence
 
-HEARTBEAT_INTERVAL_S = 5.0
+HEARTBEAT_INTERVAL_S = 2.5
 REBOOT_RECONNECT_SETTLE_S = 1.0
 REBOOT_RECONNECT_ATTEMPTS = 6
 ANSI_GREEN = "\033[32m"
@@ -392,6 +392,7 @@ class RelaySession:
             )
             with self._lock:
                 info = client.get_info()
+                _validate_readiness_info(info)
                 status = client.get_status()
         except RelayError as exc:
             if not quiet:
@@ -854,6 +855,13 @@ def _status_uptime_ms(status: dict[str, Any]) -> int | None:
     if isinstance(uptime, int):
         return uptime
     return None
+
+
+def _validate_readiness_info(info: dict[str, Any]) -> None:
+    if info.get("protocol_version") != PROTOCOL_VERSION:
+        raise RelayProtocolError(
+            f"unexpected relay protocol version {info.get('protocol_version')}"
+        )
 
 
 def _format_channels(mask: int) -> str:

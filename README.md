@@ -107,7 +107,7 @@ Select device number, or q to cancel: 1
 │   Port:         /dev/ttyACM0                                 │
 │   Serial:       E6614C311F4B8B2F                             │
 │   Hardware:     Waveshare RP2350-Relay-6CH                   │
-│   Protocol:     3                                            │
+│   Protocol:     5                                            │
 │   Relay count:  6                                            │
 │   State:        0x00                                         │
 │   On:           <span style="color: #ff4dff;">none</span>                                         │

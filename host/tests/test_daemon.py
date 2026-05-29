@@ -56,7 +56,7 @@ class FakeRelayClient:
         self.calls.append(("get_info", ()))
         if self.fail_info is not None:
             raise self.fail_info
-        return {"protocol_version": 3, "relay_count": 6}
+        return {"protocol_version": 5, "relay_count": 6}
 
     def get_build_info(self) -> dict[str, Any]:
         self.calls.append(("get_build_info", ()))
@@ -121,7 +121,7 @@ def make_daemon(
     selector_value: str = "COM7",
     wait_device: bool = False,
     serial_selector: Any | None = None,
-    heartbeat_interval: float = 5.0,
+    heartbeat_interval: float = 2.5,
 ) -> RelayDaemon:
     config = DaemonConfig(
         selector_type=selector_type,
@@ -197,6 +197,12 @@ def test_initial_connect_runs_info_then_status_without_off_all(tmp_path: Any) ->
 
     assert daemon.connected is True
     assert FakeRelayClient.instances[0].calls == [("get_info", ()), ("get_status", ())]
+
+
+def test_default_heartbeat_interval_is_fixed_2_5_seconds(tmp_path: Any) -> None:
+    daemon = make_daemon(tmp_path)
+
+    assert daemon.config.heartbeat_interval == 2.5
 
 
 def test_heartbeat_succeeds_silently_while_connected(tmp_path: Any) -> None:

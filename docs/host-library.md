@@ -114,10 +114,11 @@ the daemon process.
 
 ## Heartbeat Polling
 
-`RelayClient.heartbeat()` sends a no-op liveness request. Direct Python
-automation that needs link-health polling should call it on a regular
-background interval and serialize heartbeat calls with foreground commands that
-share the same serial client.
+`RelayClient.heartbeat()` sends the relay-management heartbeat request. Direct
+Python automation that owns the serial connection should call it every 2.5 s
+on a background interval and serialize heartbeat calls with foreground commands
+that share the same serial client. The 2.5 s cadence is fixed host behavior,
+not derived from `comm_loss_timeout_ms`.
 
 ```python
 import threading
@@ -130,7 +131,7 @@ lock = threading.Lock()
 
 
 def heartbeat_loop(relay: RelayClient) -> None:
-    while not stop.wait(5.0):
+    while not stop.wait(2.5):
         try:
             with lock:
                 relay.heartbeat()

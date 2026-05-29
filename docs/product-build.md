@@ -34,17 +34,19 @@ initial values:
 
 - `TARGET_PRODUCT=rp2350_relay_6ch`
 - `TARGET_RELEASE=standard`
+- additional release config: `boardfarm`
 - variants: `user`, `userdebug`, `eng`
 - default build lunch: `rp2350_relay_6ch-standard-userdebug`
 - default release lunch: `rp2350_relay_6ch-standard-user`
 
-For the first implementation, `TARGET_BUILD_VARIANT` affects build
+`TARGET_BUILD_VARIANT` affects build
 directories, publish safety, and manifest metadata only. It must not change
 firmware behavior, host behavior, Kconfig fragments, protocol fields, or
 artifact names.
 
-This contract does not add communication-loss behavior, protocol changes, extra
-release artifacts, or Python local-version wheel support.
+Release configs are for supported product or release compositions, not every
+firmware feature option. Build variants do not change firmware behavior, host
+behavior, Kconfig fragments, protocol fields, or artifact names.
 
 ## Public Interface
 
@@ -58,7 +60,14 @@ Explicit lunch:
 
 ```sh
 scripts/build.sh --lunch rp2350_relay_6ch-standard-userdebug
+scripts/build.sh --lunch rp2350_relay_6ch-boardfarm-userdebug
 LUNCH=rp2350_relay_6ch-standard-userdebug scripts/build.sh
+```
+
+Temporary firmware fragment:
+
+```sh
+scripts/build.sh --extra-conf-file firmware/profiles/no_comm_timeout.conf
 ```
 
 Flash product firmware outputs after a build:
@@ -99,6 +108,10 @@ Existing lower-level scripts remain developer helpers:
 `RELAY_OVERLAY` overrides. Use lower-level scripts for custom firmware
 experiments.
 
+For temporary local firmware profile experiments, `--extra-conf-file` appends a
+repo-relative Kconfig fragment after the selected release config fragments. It
+is rejected by the `release` command.
+
 ## Composition Rules
 
 The build resolves `product_name-release_config-build_variant` directly. For
@@ -117,6 +130,7 @@ products/
     product.env
     release_configs/
       standard.env
+      boardfarm.env
 firmware/
   profiles/
     standard.conf
@@ -133,8 +147,9 @@ PRODUCT_FIRMWARE_IMAGES="waveshare pico2"
 `TARGET_RELEASE` is selected in the context of `TARGET_PRODUCT` from the lunch
 target. Directory nesting defines valid combinations.
 
-The release config maps `TARGET_RELEASE=standard` to an ordered list of
-firmware Kconfig fragments:
+Release configs map `TARGET_RELEASE` to an ordered list of firmware Kconfig
+fragments. The standard profile uses energized-only communication-loss safety
+with a 5 s timeout:
 
 ```sh
 FIRMWARE_KCONFIG_FRAGMENTS="firmware/profiles/standard.conf"
@@ -142,7 +157,11 @@ FIRMWARE_KCONFIG_FRAGMENTS="firmware/profiles/standard.conf"
 
 The fragment order is significant and must be preserved when passed to Zephyr
 `EXTRA_CONF_FILE`. `firmware/prj.conf` remains the shared base.
-`firmware/profiles/standard.conf` is behavior-neutral.
+`firmware/profiles/standard.conf` selects the standard energized-only
+communication-loss policy.
+
+The `boardfarm` release config selects `firmware/profiles/always_on_owner.conf`
+for board-farm and lab compositions that need a persistent owner lease.
 
 Initial firmware image targets:
 
@@ -192,6 +211,7 @@ Add focused dry-run tests for the product build layer:
 - default build resolves `rp2350_relay_6ch-standard-userdebug`
 - release build resolves `rp2350_relay_6ch-standard-user`
 - explicit `--lunch` and `LUNCH` behavior
+- temporary `--extra-conf-file` ordering and release-command rejection
 - unknown variants, missing product or release configs, missing fragments, and forbidden
   overrides fail before build commands run
 - non-`user` publish guard requires `--allow-non-user-publish`

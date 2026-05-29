@@ -14,8 +14,7 @@ Firmware tests continue to exercise the management group handlers on
 ## SMP Group
 
 - Group ID: `64`
-- Protocol version: `3`
-- Planned event-capable protocol version: `4`
+- Protocol version: `5`
 - Hardware name: `Waveshare RP2350-Relay-6CH`
 - Relay channel indexes: zero-based, `0` through `5`
 - Relay state masks: bit `0` is `CH1`, bit `5` is `CH6`
@@ -33,12 +32,11 @@ Firmware tests continue to exercise the management group handlers on
 | 6 | `status` | Read | Return relay state, uptime, and protocol counters. |
 | 7 | `reboot` | Write | Request controlled reboot when Zephyr reboot support is enabled. |
 | 8 | `build_info` | Read | Return firmware build identity and traceability metadata. |
-| 9 | `heartbeat` | Write | Return a no-op liveness acknowledgement for host session polling. |
-| 10 | `event` | Device-originated `Write Response` | Planned best-effort asynchronous event frame in protocol version `4`. |
+| 9 | `heartbeat` | Write | Renew the communication-loss lease and return a liveness acknowledgement. |
+| 10 | `event` | Device-originated `Write Response` | Reserved best-effort asynchronous event frame. |
 
-Protocol version `3` is request/response only. Protocol version `4` is planned
-to add device-originated event frames over the same USB CDC SMP serial route.
-Until version `4` is implemented, hosts must treat `event` as unavailable and
+Protocol version `5` is request/response only and adds communication-loss
+policy fields and lease behavior. Hosts must treat `event` as unavailable and
 use normal command responses and reconnect/status checks.
 
 ## Error Codes
@@ -78,7 +76,12 @@ Response:
 | `relay_count` | uint | Number of relays, currently `6`. |
 | `pulse_min_ms` | uint | Minimum pulse duration. |
 | `pulse_max_ms` | uint | Maximum pulse duration. |
+| `comm_loss_policy` | text | Communication-loss policy string. |
+| `comm_loss_timeout_ms` | uint | Firmware communication-loss timeout. `0` means no firmware timeout. |
 | `capabilities` | uint | Capability bit mask for get, set, set-all, pulse, and off-all. |
+
+Policy strings are `energized-only`, `no-comm-timeout`, and
+`always-on-owner`.
 
 ### `build_info`
 
@@ -170,6 +173,8 @@ Response:
 | `transport` | text | Transport name, currently `usb_cdc_acm_smp`. |
 | `usb_cdc_acm` | bool | Whether USB CDC ACM serial support is compiled in. |
 | `smp_uart` | bool | Whether Zephyr's SMP UART transport is compiled in. |
+| `comm_loss_policy` | text | Communication-loss policy string. |
+| `comm_loss_timeout_ms` | uint | Firmware communication-loss timeout. `0` means no firmware timeout. |
 | `uptime_ms` | uint | Zephyr uptime in milliseconds. |
 | `received` | uint | Commands received, including this status command. |
 | `succeeded` | uint | Commands completed before this status response is encoded. |
@@ -199,16 +204,37 @@ Response:
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `ok` | bool | Present and true when the heartbeat request was accepted. |
+| `comm_loss_policy` | text | Communication-loss policy string. |
+| `comm_loss_timeout_ms` | uint | Firmware communication-loss timeout. `0` means no firmware timeout. |
 
-In Phase 8a, `heartbeat` is a no-op liveness command for host session polling.
-It does not change relay state, enforce communication-loss timeout, expose
-heartbeat health state, call `off_all`, or schedule a reboot.
+In protocol `5`, `heartbeat` renews the firmware communication-loss lease when
+the active policy uses a timeout. It does not change relay outputs directly,
+emit events, expose heartbeat health state, persist relay state, or schedule a
+reboot.
+
+## Communication-Loss Safety
+
+Protocol `5` defines build-time communication-loss policies:
+
+- `energized-only`: the timeout is armed or renewed by successful relay-control
+  commands that leave any relay on or pulsing, and by `heartbeat` while relays
+  are energized. When all relays are off, the timeout is disarmed. The standard
+  product profile uses this policy with `comm_loss_timeout_ms=5000`.
+- `no-comm-timeout`: firmware does not force relay state off because of
+  communication loss. `comm_loss_timeout_ms` is reported as `0`.
+- `always-on-owner`: the timeout starts at boot, renews on heartbeat and
+  successful relay-control commands, and does not disarm just because all
+  relays are off.
+
+When a timeout expires, firmware cancels active pulses, turns all relays off,
+and updates local indicators. It does not reboot, persist state, emit events,
+write audit logs, or imply mains-power SmartPDU behavior.
 
 ### Planned `event`
 
-`event` is reserved for best-effort device-originated notifications in planned
-protocol version `4`. It is not a host request command, and hosts must not send
-`Read` or `Write` requests to command ID `10`.
+`event` is reserved for future best-effort device-originated notifications. It
+is not a host request command, and hosts must not send `Read` or `Write`
+requests to command ID `10`.
 
 Event frame convention:
 

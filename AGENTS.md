@@ -92,6 +92,11 @@ Minimal change gate:
 - If a useful cleanup is found, leave it out and mention it as follow-up work.
 - In handoff, report only changed files and verification commands that ran.
 
+Do not create product release configs for every firmware feature option.
+Release configs are for supported product or release compositions. Keep
+feature-option coverage in firmware Kconfig fragments, profiles, or tests unless
+the user explicitly promotes the option to a product/release composition.
+
 After code changes, rebuild only artifacts whose inputs changed:
 
 - Rebuild the host wheel when changes affect `host/`, `tools/`, Python package

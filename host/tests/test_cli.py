@@ -19,6 +19,7 @@ class FakeClient:
     failure: Exception | None = None
     relay_state = 0x21
     relay_pulsing = 0
+    protocol_version = 5
 
     def __init__(
         self,
@@ -65,7 +66,7 @@ class FakeClient:
             "hardware": "Waveshare RP2350-Relay-6CH",
             "pulse_max_ms": 60000,
             "pulse_min_ms": 10,
-            "protocol_version": 3,
+            "protocol_version": self.protocol_version,
             "relay_count": 6,
         }
 
@@ -126,6 +127,7 @@ def fake_client(monkeypatch: pytest.MonkeyPatch) -> None:
     FakeClient.failure = None
     FakeClient.relay_state = 0x21
     FakeClient.relay_pulsing = 0
+    FakeClient.protocol_version = 5
     monkeypatch.setattr(cli, "RelayClient", FakeClient)
 
 
@@ -166,8 +168,32 @@ def test_info_human_output_lists_all_fields(capsys: pytest.CaptureFixture[str]) 
     assert "hardware:          Waveshare RP2350-Relay-6CH" in captured.out
     assert "pulse_max_ms:      60000" in captured.out
     assert "pulse_min_ms:      10" in captured.out
-    assert "protocol_version:  3" in captured.out
+    assert "protocol_version:  5" in captured.out
     assert "relay_count:       6" in captured.out
+
+
+def test_info_allows_old_protocol_for_diagnostics(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    FakeClient.protocol_version = 3
+
+    rc = cli.main(["--port", "COM7", "info"])
+
+    captured = capsys.readouterr()
+
+    assert rc == cli.EXIT_OK
+    assert "protocol_version:  3" in captured.out
+
+
+def test_non_info_rejects_old_protocol(capsys: pytest.CaptureFixture[str]) -> None:
+    FakeClient.protocol_version = 3
+
+    rc = cli.main(["--port", "COM7", "status"])
+
+    captured = capsys.readouterr()
+
+    assert rc == cli.EXIT_PROTOCOL
+    assert "unexpected relay protocol version 3" in captured.err
 
 
 def test_session_parser_accepts_port_and_delegates(
@@ -310,7 +336,7 @@ def test_build_info_outputs_json_and_uses_client(
 
     assert rc == cli.EXIT_OK
     assert '"git_commit": "abcdef123456"' in captured.out
-    assert FakeClient.instances[0].calls == [("get_build_info", ())]
+    assert FakeClient.instances[0].calls == [("get_info", ()), ("get_build_info", ())]
 
 
 def test_build_info_human_output_lists_fields(capsys: pytest.CaptureFixture[str]) -> None:
@@ -327,14 +353,17 @@ def test_set_converts_one_based_channel_to_zero_based() -> None:
     rc = cli.main(["--port", "COM7", "set", "6", "on"])
 
     assert rc == cli.EXIT_OK
-    assert FakeClient.instances[0].calls == [("set_relay", (5, True))]
+    assert FakeClient.instances[0].calls == [("get_info", ()), ("set_relay", (5, True))]
 
 
 def test_set_all_accepts_hex_mask() -> None:
     rc = cli.main(["--port", "COM7", "set-all", "0x21"])
 
     assert rc == cli.EXIT_OK
-    assert FakeClient.instances[0].calls == [("set_all_relays", (0x21,))]
+    assert FakeClient.instances[0].calls == [
+        ("get_info", ()),
+        ("set_all_relays", (0x21,)),
+    ]
 
 
 def test_get_all_human_output_names_enabled_relays(
@@ -348,7 +377,7 @@ def test_get_all_human_output_names_enabled_relays(
     assert "state:    0x21" in captured.out
     assert "on:       CH1, CH6" in captured.out
     assert "pulsing:  none" in captured.out
-    assert FakeClient.instances[0].calls == [("get_relays", (None,))]
+    assert FakeClient.instances[0].calls == [("get_info", ()), ("get_relays", (None,))]
 
 
 def test_get_channel_human_output_reports_on_channel(
@@ -362,7 +391,7 @@ def test_get_channel_human_output_reports_on_channel(
     assert "channel:  CH1" in captured.out
     assert "on:       true" in captured.out
     assert "pulsing:  false" in captured.out
-    assert FakeClient.instances[0].calls == [("get_relays", (0,))]
+    assert FakeClient.instances[0].calls == [("get_info", ()), ("get_relays", (0,))]
 
 
 def test_get_channel_human_output_reports_off_channel(
@@ -503,7 +532,7 @@ def test_smoke_pulses_each_relay_and_forces_teardown(
     calls = FakeClient.instances[0].calls
 
     assert rc == cli.EXIT_OK
-    assert calls[:2] == [("get_info", ()), ("get_status", ())]
+    assert calls[:3] == [("get_info", ()), ("get_info", ()), ("get_status", ())]
     assert [call for call in calls if call[0] == "pulse_relay"] == [
         ("pulse_relay", (0, 25)),
         ("pulse_relay", (1, 25)),

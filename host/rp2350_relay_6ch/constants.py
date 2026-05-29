@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 GROUP_RELAY = 64
-PROTOCOL_VERSION = 3
+PROTOCOL_VERSION = 5
 HARDWARE_NAME = "Waveshare RP2350-Relay-6CH"
 
 RELAY_COUNT = 6

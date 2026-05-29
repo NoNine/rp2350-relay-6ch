@@ -13,12 +13,11 @@ procedure once the implementation lands.
   through that connection.
 - Linux production automation remains covered by Phase 8b daemon mode. Linux
   session mode is for manual operation, diagnostics, and simple direct use.
-- The session is independent from firmware communication-loss safety.
-- Phase 8a may add only a dummy firmware `heartbeat` command for session
-  polling. Do not add communication-loss timeout commands,
-  reboot-on-silence behavior, firmware safety actions, heartbeat health state,
-  daemon IPC, keepalive sidecars, network APIs, audit logs, or other new relay
-  protocol fields.
+- The session is the direct-serial heartbeat owner for communication-loss
+  safety while connected.
+- Do not add reboot-on-silence behavior, heartbeat health state, daemon IPC,
+  keepalive sidecars, network APIs, audit logs, persistent relay-on state, or
+  firmware safety behavior beyond communication-loss lease renewal.
 - Keep existing one-shot direct serial commands available for diagnostics and
   simple checks.
 
@@ -252,24 +251,24 @@ Recovery behavior:
 
 ## Heartbeat Polling
 
-Phase 8a adds a dummy relay-management `heartbeat` command for host session
-polling:
+The relay-management `heartbeat` command is used for host session lease
+renewal:
 
 - Command ID: `9`.
 - SMP op: Write.
 - Request: empty CBOR map.
-- Response: `{"ok": true}`.
-- Relay protocol version: `3`.
+- Response includes `ok: true`, `comm_loss_policy`, and
+  `comm_loss_timeout_ms`.
+- Relay protocol version: `5`.
 
-Firmware heartbeat behavior in this phase is intentionally limited to decoding
-the request, returning success, and updating the normal management command
-counters. It must not change relay state, enforce communication-loss timeout,
-record heartbeat health state, expose new status fields, call `off-all`, or
-schedule a reboot.
+Firmware heartbeat behavior renews the active communication-loss lease. It
+must not directly change relay state, expose heartbeat health state, persist
+relay state, emit events, call `off-all`, or schedule a reboot.
 
 Session behavior:
 
-- Poll `heartbeat` every 5 seconds while connected.
+- Poll `heartbeat` every 2.5 seconds while connected. This cadence is fixed by
+  host design and is not computed from `comm_loss_timeout_ms`.
 - Do not print successful background heartbeat polls.
 - Print concise status warnings for heartbeat failures.
 - After one or more heartbeat failures, print `heartbeat: restored` once when a
@@ -277,8 +276,12 @@ Session behavior:
   remains healthy.
 - Keep the same client connected after a heartbeat failure; the next foreground
   command uses that client and succeeds or fails normally.
-- Do not expose `heartbeat` as a one-shot CLI command or session prompt command
-  in Phase 8a.
+- Do not expose `heartbeat` as a one-shot CLI command or session prompt
+  command.
+
+Direct one-shot relay-on commands remain available for diagnostics. Under the
+standard `energized-only` profile, energized outputs self-clear after the
+firmware lease expires unless a session or daemon heartbeat owner is active.
 
 ## Exit And Disconnect Safety
 

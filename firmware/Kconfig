@@ -37,4 +37,38 @@ config RP2350_RELAY_6CH_DISPLAY_ROTATED_180
 	  Rotate the optional OLED local status display 180 degrees for
 	  installations where the OLED panel is mounted upside down.
 
+choice RP2350_RELAY_6CH_COMM_LOSS_POLICY
+	prompt "Communication-loss relay safety policy"
+	default RP2350_RELAY_6CH_COMM_LOSS_ENERGIZED_ONLY
+	help
+	  Select how firmware applies the communication-loss off-all timeout.
+
+config RP2350_RELAY_6CH_COMM_LOSS_ENERGIZED_ONLY
+	bool "Energized-only timeout"
+	help
+	  Arm or renew the timeout only while a relay is on or pulsing, and disarm
+	  it when all relays are off.
+
+config RP2350_RELAY_6CH_COMM_LOSS_NO_TIMEOUT
+	bool "No communication-loss timeout"
+	help
+	  Leave relay state unchanged on host communication loss. Heartbeat remains
+	  a liveness command only.
+
+config RP2350_RELAY_6CH_COMM_LOSS_ALWAYS_ON_OWNER
+	bool "Always-on owner timeout"
+	help
+	  Start the timeout at boot, renew it on heartbeat and relay-control
+	  commands, and keep it armed even while all relays are off.
+
+endchoice
+
+config RP2350_RELAY_6CH_COMM_LOSS_TIMEOUT_MS
+	int "Communication-loss timeout in milliseconds"
+	default 5000
+	range 1 600000
+	help
+	  Timeout used by communication-loss policies that force all relays off.
+	  The standard product profile uses 5000 ms.
+
 source "Kconfig.zephyr"
