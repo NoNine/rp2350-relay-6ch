@@ -388,7 +388,7 @@ source "${ZEPHYR_WORKSPACE:-$HOME/zephyrproject}/.venv/bin/activate"
 python -m pip install -e . pytest
 scripts/test-host.sh
 scripts/build.sh
-west flash -d build/product/rp2350_relay_6ch-standard-userdebug/waveshare
+scripts/flash.sh
 rp2350-relay --port <serial-port> smoke
 ```
 
@@ -413,7 +413,7 @@ daemon clients, and multi-device automation examples.
 ```text
 firmware/   Zephyr application sources, config, board files, and tests
 host/       Python package and host-side tests
-scripts/    Build, test, flash, and smoke-test entry points
+scripts/    Build, test, flash, release, and smoke-test entry points
 tools/      CLI entry points and operational helpers
 docs/       Requirements, hardware notes, phase plans, protocol, and tests
 ```

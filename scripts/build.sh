@@ -11,9 +11,10 @@ PYTHON_BIN=""
 usage() {
 	cat >&2 <<'EOF'
 Usage:
-  scripts/build.sh [--lunch <product-release-variant>] [--dry-run]
+  scripts/build.sh [--lunch <product_name-release_config-build_variant>] \
+    [--dry-run]
   scripts/build.sh release <version> [--publish] [--allow-non-user-publish] \
-    [--lunch <product-release-variant>] [--dry-run]
+    [--lunch <product_name-release_config-build_variant>] [--dry-run]
 
 Build the complete relay-controller product: host wheel plus required firmware
 UF2 images. The default build lunch is rp2350_relay_6ch-standard-userdebug.
@@ -91,35 +92,43 @@ parse_lunch_variant() {
 
 load_product_composition() {
 	local lunch="$1"
-	local receipt_path
+	local product_path
 	local release_config_path
-	local expected_receipt_name
+	local lunch_product
+	local lunch_release
 	local fragment
 
 	parse_lunch_variant "${lunch}"
-	receipt_path="${ROOT_DIR}/products/lunch/${LUNCH_RECEIPT_NAME}.env"
-	if [[ ! -f "${receipt_path}" ]]; then
-		die "lunch receipt '${receipt_path#${ROOT_DIR}/}' does not exist"
+	if [[ ! "${LUNCH_RECEIPT_NAME}" =~ ^([A-Za-z0-9_]+)-([A-Za-z0-9_]+)$ ]]; then
+		die "lunch '${lunch}' must use product_name-release_config-build_variant"
+	fi
+	lunch_product="${BASH_REMATCH[1]}"
+	lunch_release="${BASH_REMATCH[2]}"
+
+	product_path="${ROOT_DIR}/products/${lunch_product}/product.env"
+	if [[ ! -f "${product_path}" ]]; then
+		die "product config '${product_path#${ROOT_DIR}/}' does not exist"
 	fi
 
 	unset TARGET_PRODUCT TARGET_RELEASE PRODUCT_HOST_WHEEL PRODUCT_FIRMWARE_IMAGES
-	# shellcheck disable=SC1090
-	source "${receipt_path}"
 
-	if [[ -z "${TARGET_PRODUCT:-}" || -z "${TARGET_RELEASE:-}" ]]; then
-		die "lunch receipt '${receipt_path#${ROOT_DIR}/}' must set TARGET_PRODUCT and TARGET_RELEASE"
+	# shellcheck disable=SC1090
+	source "${product_path}"
+
+	if [[ -z "${TARGET_PRODUCT:-}" ]]; then
+		die "product config '${product_path#${ROOT_DIR}/}' must set TARGET_PRODUCT"
 	fi
 
-	expected_receipt_name="${TARGET_PRODUCT}-${TARGET_RELEASE}"
-	if [[ "${expected_receipt_name}" != "${LUNCH_RECEIPT_NAME}" ]]; then
-		die "lunch '${lunch}' does not match receipt product/release '${expected_receipt_name}'"
+	if [[ "${TARGET_PRODUCT}" != "${lunch_product}" ]]; then
+		die "lunch '${lunch}' does not match product config TARGET_PRODUCT='${TARGET_PRODUCT}'"
 	fi
 
 	if [[ "${TARGET_PRODUCT}" != "rp2350_relay_6ch" ]]; then
 		die "unsupported TARGET_PRODUCT '${TARGET_PRODUCT}'"
 	fi
 
-	release_config_path="${ROOT_DIR}/products/release_configs/${TARGET_RELEASE}.env"
+	TARGET_RELEASE="${lunch_release}"
+	release_config_path="${ROOT_DIR}/products/${TARGET_PRODUCT}/release_configs/${TARGET_RELEASE}.env"
 	if [[ ! -f "${release_config_path}" ]]; then
 		die "release config '${release_config_path#${ROOT_DIR}/}' does not exist"
 	fi
@@ -132,10 +141,10 @@ load_product_composition() {
 	read -r -a FIRMWARE_KCONFIG_FRAGMENT_LIST <<<"${FIRMWARE_KCONFIG_FRAGMENTS:-}"
 
 	if [[ "${PRODUCT_HOST_WHEEL:-}" != "1" ]]; then
-		die "lunch receipt '${receipt_path#${ROOT_DIR}/}' must enable PRODUCT_HOST_WHEEL=1"
+		die "product config '${product_path#${ROOT_DIR}/}' must enable PRODUCT_HOST_WHEEL=1"
 	fi
 	if [[ ${#PRODUCT_FIRMWARE_IMAGE_LIST[@]} -eq 0 ]]; then
-		die "lunch receipt '${receipt_path#${ROOT_DIR}/}' must set PRODUCT_FIRMWARE_IMAGES"
+		die "product config '${product_path#${ROOT_DIR}/}' must set PRODUCT_FIRMWARE_IMAGES"
 	fi
 	if [[ ${#FIRMWARE_KCONFIG_FRAGMENT_LIST[@]} -eq 0 ]]; then
 		die "release config '${release_config_path#${ROOT_DIR}/}' must set FIRMWARE_KCONFIG_FRAGMENTS"

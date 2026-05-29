@@ -28,28 +28,30 @@ entire Android build environment.
 
 ## AOSP model reviewed
 
-AOSP exposes a shell function named `lunch`. Current usage accepts an explicit
-three-part form:
+AOSP exposes a shell function named `lunch`. Its build docs describe the target
+shape as:
 
 ```sh
-lunch TARGET_PRODUCT TARGET_RELEASE TARGET_BUILD_VARIANT
+lunch product_name-release_config-build_variant
 ```
 
-It also retains a legacy combined form:
+AOSP's environment also exposes concrete variables after selection:
 
-```sh
-lunch TARGET_PRODUCT-TARGET_RELEASE-TARGET_BUILD_VARIANT
+```text
+TARGET_PRODUCT
+TARGET_RELEASE
+TARGET_BUILD_VARIANT
+TARGET_BUILD_TYPE
 ```
 
-After selection, the build environment exposes concrete variables such as
-`TARGET_PRODUCT`, `TARGET_RELEASE`, `TARGET_BUILD_VARIANT`, and
-`TARGET_BUILD_TYPE`. AOSP also has list and completion helpers for products,
-releases, and variants.
+AOSP also has list and completion helpers for products, releases, and variants.
 
 Important lessons for this project:
 
 - The top-level selector is not just a firmware profile.
 - Product, release config, and build variant are separate axes.
+- Release config selection is product-aware; a release name may be shared, but
+  it is not useful as a standalone target without a product context.
 - The build variant is a suffix in the lunch target, not part of the product
   or release config filename.
 - A release config can map to multiple lower-level config fragments.
@@ -161,9 +163,9 @@ They should be treated as developer or implementation helpers in documentation.
 Normal build and release documentation should point users to `scripts/build.sh`
 once this design is implemented.
 
-## Receipt matching
+## Product-scoped config matching
 
-The selected parsing model is receipt matching.
+The selected parsing model is product-scoped config matching.
 
 For a combined lunch target:
 
@@ -176,24 +178,27 @@ the build script should:
 1. Validate the final suffix against known variants: `user`, `userdebug`, and
    `eng`.
 2. Strip the variant suffix.
-3. Resolve the remaining product-release receipt:
+3. Resolve the remaining product and release config names.
+4. Load the product config:
 
    ```text
-   products/lunch/rp2350_relay_6ch-standard.env
+   products/rp2350_relay_6ch/product.env
    ```
 
-4. Load that receipt.
-5. Verify it declares the expected product and release:
+5. Verify it declares the expected product:
 
    ```sh
    TARGET_PRODUCT=rp2350_relay_6ch
-   TARGET_RELEASE=standard
    ```
 
-This avoids clever hyphen parsing. The receipt file is the authority for the
-product and release values. The final variant suffix remains AOSP-like, but the
-project does not need to infer product and release from arbitrary string
-splitting.
+6. Load the product-scoped release config:
+
+   ```text
+   products/rp2350_relay_6ch/release_configs/standard.env
+   ```
+
+This keeps the final variant suffix AOSP-like while making release config
+selection product-aware.
 
 ## Config file layout
 
@@ -206,17 +211,17 @@ Proposed layout:
 
 ```text
 products/
-  lunch/
-    rp2350_relay_6ch-standard.env
-  release_configs/
-    standard.env
+  rp2350_relay_6ch/
+    product.env
+    release_configs/
+      standard.env
 firmware/
   profiles/
     standard.conf
 ```
 
-The lunch receipt should describe the product composition: host artifacts,
-firmware image targets, and the release config name.
+The product config should describe the product composition: host artifacts and
+firmware image targets.
 
 The release config should map `TARGET_RELEASE` to an ordered list of firmware
 Kconfig fragments. For the initial `standard` release:
@@ -357,13 +362,14 @@ This discussion does not approve or implement:
 
 When communication-loss safety is implemented, it can add new Kconfig fragments
 under `firmware/profiles/` and new `TARGET_RELEASE` mappings under
-`products/release_configs/`.
+`products/<product>/release_configs/`.
 
 ## Open implementation outline
 
 A future implementation can proceed in this order:
 
-1. Add product `.env` receipts and behavior-neutral firmware profile fragments.
+1. Add product-scoped `.env` configs and behavior-neutral firmware profile
+   fragments.
 2. Add `scripts/build.sh` as the single user-facing front door.
 3. Teach lower-level firmware build handling to accept ordered Zephyr
    `EXTRA_CONF_FILE` fragments.

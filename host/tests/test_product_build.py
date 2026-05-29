@@ -115,15 +115,27 @@ def test_forbidden_firmware_override_fails_before_build() -> None:
     assert "Building host wheel" not in result.stdout
 
 
-def test_unknown_variant_and_missing_receipt_fail_before_build() -> None:
+def test_unknown_variant_missing_product_and_missing_release_fail_before_build() -> None:
     bad_variant = run_build("--dry-run", "--lunch", "rp2350_relay_6ch-standard-prod")
     assert bad_variant.returncode != 0
     assert "must end with one of" in bad_variant.stderr
 
-    missing_receipt = run_build("--dry-run", "--lunch", "unknown-standard-userdebug")
-    assert missing_receipt.returncode != 0
-    assert "lunch receipt" in missing_receipt.stderr
-    assert "does not exist" in missing_receipt.stderr
+    missing_product = run_build("--dry-run", "--lunch", "unknown-standard-userdebug")
+    assert missing_product.returncode != 0
+    assert "product config" in missing_product.stderr
+    assert "products/unknown/product.env" in missing_product.stderr
+    assert "does not exist" in missing_product.stderr
+
+    missing_release = run_build(
+        "--dry-run", "--lunch", "rp2350_relay_6ch-missing-userdebug"
+    )
+    assert missing_release.returncode != 0
+    assert "release config" in missing_release.stderr
+    assert (
+        "products/rp2350_relay_6ch/release_configs/missing.env"
+        in missing_release.stderr
+    )
+    assert "does not exist" in missing_release.stderr
 
 
 def test_non_user_publish_requires_override() -> None:

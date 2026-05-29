@@ -23,13 +23,14 @@ The user-facing entrypoint is:
 scripts/build.sh
 ```
 
-Lunch targets use:
+Lunch targets use the AOSP-style human-facing shape:
 
 ```text
-<TARGET_PRODUCT>-<TARGET_RELEASE>-<TARGET_BUILD_VARIANT>
+product_name-release_config-build_variant
 ```
 
-Initial values:
+For this repo, those fields resolve to internal `TARGET_*` variables with
+initial values:
 
 - `TARGET_PRODUCT=rp2350_relay_6ch`
 - `TARGET_RELEASE=standard`
@@ -58,6 +59,14 @@ Explicit lunch:
 ```sh
 scripts/build.sh --lunch rp2350_relay_6ch-standard-userdebug
 LUNCH=rp2350_relay_6ch-standard-userdebug scripts/build.sh
+```
+
+Flash product firmware outputs after a build:
+
+```sh
+scripts/flash.sh
+scripts/flash.sh --target pico2
+scripts/flash.sh --lunch rp2350_relay_6ch-standard-userdebug
 ```
 
 Release path:
@@ -92,34 +101,37 @@ experiments.
 
 ## Composition Rules
 
-The build uses receipt matching. For
+The build resolves `product_name-release_config-build_variant` directly. For
 `rp2350_relay_6ch-standard-userdebug`, strip the known variant suffix and load:
 
 ```text
-products/lunch/rp2350_relay_6ch-standard.env
+products/rp2350_relay_6ch/product.env
+products/rp2350_relay_6ch/release_configs/standard.env
 ```
 
 Required initial layout:
 
 ```text
 products/
-  lunch/
-    rp2350_relay_6ch-standard.env
-  release_configs/
-    standard.env
+  rp2350_relay_6ch/
+    product.env
+    release_configs/
+      standard.env
 firmware/
   profiles/
     standard.conf
 ```
 
-The lunch receipt declares at least:
+The product config declares at least:
 
 ```sh
 TARGET_PRODUCT=rp2350_relay_6ch
-TARGET_RELEASE=standard
 PRODUCT_HOST_WHEEL=1
 PRODUCT_FIRMWARE_IMAGES="waveshare pico2"
 ```
+
+`TARGET_RELEASE` is selected in the context of `TARGET_PRODUCT` from the lunch
+target. Directory nesting defines valid combinations.
 
 The release config maps `TARGET_RELEASE=standard` to an ordered list of
 firmware Kconfig fragments:
@@ -162,8 +174,8 @@ GitHub Release artifact unless release docs are explicitly updated later.
 `scripts/build.sh` must fail before building anything when:
 
 - the lunch target is malformed or uses an unknown variant
-- the lunch receipt or release config is missing
-- the receipt's declared product or release does not match the lunch target
+- the product config or product-scoped release config is missing
+- the product config's declared product does not match the lunch target
 - any ordered Kconfig fragment is missing
 - required firmware image metadata is missing
 - forbidden firmware overrides are set
@@ -180,16 +192,18 @@ Add focused dry-run tests for the product build layer:
 - default build resolves `rp2350_relay_6ch-standard-userdebug`
 - release build resolves `rp2350_relay_6ch-standard-user`
 - explicit `--lunch` and `LUNCH` behavior
-- unknown variants, missing receipts, missing fragments, and forbidden
+- unknown variants, missing product or release configs, missing fragments, and forbidden
   overrides fail before build commands run
 - non-`user` publish guard requires `--allow-non-user-publish`
 - manifest content includes lunch, variant, artifacts, image metadata, and
   ordered fragments
+- flash dry-run resolves the default Waveshare product build directory and
+  explicit Pico 2 target directory
 
 Minimum verification after implementation:
 
 ```sh
-bash -n scripts/build.sh scripts/build-firmware.sh scripts/release-github.sh
+bash -n scripts/build.sh scripts/build-firmware.sh scripts/flash.sh scripts/release-github.sh
 ${ZEPHYR_VENV:-${ZEPHYR_WORKSPACE:-$HOME/zephyrproject}/.venv}/bin/python \
   -m pytest <focused-product-build-tests>
 scripts/build.sh

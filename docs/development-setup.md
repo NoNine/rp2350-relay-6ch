@@ -162,7 +162,7 @@ build/firmware-tests/relay-mgmt/zephyr/zephyr.exe
 Flash the most recent firmware build:
 
 ```sh
-west flash -d build/product/rp2350_relay_6ch-standard-userdebug/waveshare
+scripts/flash.sh
 ```
 
 Then run a CLI smoke test from the machine connected to the board:

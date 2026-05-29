@@ -10,7 +10,13 @@ if [[ -f "${VENV_DIR}/bin/activate" ]]; then
 	source "${VENV_DIR}/bin/activate"
 fi
 
-PYTHON_BIN="${PYTHON:-python3}"
+if [[ -x "${VENV_DIR}/bin/python" ]]; then
+	PYTHON_BIN="${VENV_DIR}/bin/python"
+elif [[ -n "${PYTHON:-}" ]]; then
+	PYTHON_BIN="${PYTHON}"
+else
+	PYTHON_BIN="python3"
+fi
 
 if ! command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
 	echo "Python not found. Activate the Zephyr workspace venv or set PYTHON to a Python executable." >&2
