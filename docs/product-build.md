@@ -161,7 +161,9 @@ The fragment order is significant and must be preserved when passed to Zephyr
 communication-loss policy.
 
 The `boardfarm` release config selects `firmware/profiles/always_on_owner.conf`
-for board-farm and lab compositions that need a persistent owner lease.
+for board-farm and lab compositions that need a persistent owner lease, plus
+`firmware/profiles/display_rotated_180.conf` for the boardfarm OLED mounting
+orientation.
 
 Initial firmware image targets:
 

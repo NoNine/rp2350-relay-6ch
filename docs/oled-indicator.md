@@ -197,11 +197,11 @@ Add display support behind a firmware Kconfig option such as
 minimum framebuffer/text drawing support only when the display feature is
 selected.
 
-Default firmware also enables
+The boardfarm product profile enables
 `CONFIG_RP2350_RELAY_6CH_DISPLAY_ROTATED_180` so the OLED is readable with the
-project's default mounted orientation. Custom builds for panels mounted the
-opposite way can disable it with
-`-- -DCONFIG_RP2350_RELAY_6CH_DISPLAY_ROTATED_180=n`.
+boardfarm mounted orientation. Standard builds leave the option at its Kconfig
+default unless a custom build enables it explicitly with
+`-- -DCONFIG_RP2350_RELAY_6CH_DISPLAY_ROTATED_180=y`.
 
 ## Detection And POST Contract
 

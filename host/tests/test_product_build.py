@@ -95,7 +95,7 @@ def test_ordered_kconfig_fragments_and_release_artifacts_are_preserved() -> None
     ]
 
 
-def test_boardfarm_release_config_resolves_always_on_owner() -> None:
+def test_boardfarm_release_config_resolves_boardfarm_fragments() -> None:
     result = run_build("--dry-run", "--lunch", "rp2350_relay_6ch-boardfarm-userdebug")
 
     assert result.returncode == 0, result.stderr
@@ -103,7 +103,8 @@ def test_boardfarm_release_config_resolves_always_on_owner() -> None:
     manifest = read_manifest("rp2350_relay_6ch-boardfarm-userdebug")
     assert manifest["release"] == "boardfarm"
     assert manifest["firmware_kconfig_fragments"] == [
-        "firmware/profiles/always_on_owner.conf"
+        "firmware/profiles/always_on_owner.conf",
+        "firmware/profiles/display_rotated_180.conf",
     ]
 
 
