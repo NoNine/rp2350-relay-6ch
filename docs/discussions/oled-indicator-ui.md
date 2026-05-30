@@ -28,8 +28,6 @@ The design started as a straightforward four-line OLED status screen, then
 evolved toward a more compact watch-style status display after reviewing how
 small LCDs preserve hierarchy under tight pixel limits.
 
-<img src="../assets/discussions/oled-indicator-ui-comparison.png" alt="OLED indicator UI prompt comparison" width="620">
-
 ## Hardware direction
 
 The first target should be a 3.3 V, 128x64, SSD1306-compatible I2C OLED at
@@ -98,6 +96,11 @@ specific brand identity, product graphics, or decorative styling.
 Use a fixed 128x64 layout with three visual bands.
 
 <img src="../assets/discussions/oled-indicator-ui-watch-preview.png" alt="Watch-style OLED indicator UI state previews" width="620">
+
+The generated preview below approximates the current firmware renderer output
+for the same state set, with inactive annunciators omitted.
+
+<img src="../assets/discussions/oled-indicator-ui-generated-output-preview.png" alt="Generated OLED indicator firmware output approximation" width="620">
 
 Top annunciator band, 8 px high:
 

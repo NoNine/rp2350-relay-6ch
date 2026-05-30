@@ -73,6 +73,45 @@ artifact names stay stable under `dist/`. YAML product configs keep release
 composition readable as firmware fragments grow. See
 [Product build contract](docs/product-build.md) for the full build interface.
 
+## Local Indicators
+
+Local indicators provide nearby diagnostic feedback without becoming a relay
+control surface or an authoritative automation interface. RGB LED, buzzer, and
+OLED state mirror firmware-owned controller facts; host command responses and
+status queries remain authoritative.
+
+The optional 128x64 SSD1306 OLED display shows compact relay status using fixed
+annunciators, six relay cells, and a short status band. Filled cells mean the
+firmware commanded that channel on or has an active pulse for that channel; the
+display does not prove relay contact closure, load voltage, or current flow.
+Display-capable firmware treats a missing OLED as normal.
+
+<table>
+  <tr>
+    <td>
+      <img src="docs/assets/discussions/23453-Qwiic-OLED-Front-NoDisplay.png"
+           alt="128x64 OLED module front view" width="160" height="160">
+    </td>
+    <td>
+      <img src="docs/assets/discussions/oled-indicator-ui-active-1.png"
+           alt="OLED indicator preview with channel 1 active" width="150">
+    </td>
+    <td>
+      <img src="docs/assets/discussions/oled-indicator-ui-pulse-2.png"
+           alt="OLED indicator preview with channel 2 pulsing" width="150">
+    </td>
+    <td>
+      <img src="docs/assets/discussions/oled-indicator-ui-active-1-pulse-2-3.png"
+           alt="OLED indicator preview with channel 1 active and channels 2 and 3 pulsing" width="150">
+    </td>
+  </tr>
+</table>
+
+See [OLED indicator](docs/oled-indicator.md) for the display contract,
+[Status indicators](docs/status-indicators.md) for RGB LED and buzzer behavior,
+and [OLED indicator UI discussion](docs/discussions/oled-indicator-ui.md) for
+design background.
+
 ## Usage Preview
 
 These previews use the same grouping as the architecture diagrams.

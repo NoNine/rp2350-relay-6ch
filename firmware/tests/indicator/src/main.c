@@ -345,6 +345,23 @@ ZTEST(indicator, test_display_draws_static_usb_annunciator)
 	zassert_false(indicator_test_display_pixel_is_set(3U, 1U));
 }
 
+ZTEST(indicator, test_display_draws_active_annunciator_for_pulse_only_state)
+{
+	struct indicator_test_snapshot snap;
+
+	indicator_test_configure_display(true, true, 128U, 64U,
+					 PIXEL_FORMAT_MONO01, false, false, false);
+	indicator_test_reset();
+	indicator_set_relay_state(0U, BIT(1));
+	snap = snapshot();
+
+	zassert_equal(snap.display_mode, INDICATOR_DISPLAY_MODE_ACTIVE);
+	zassert_equal(snap.display_detail, INDICATOR_DISPLAY_DETAIL_P2);
+	zassert_true(indicator_test_display_pixel_is_set(56U, 3U));
+	zassert_true(indicator_test_display_pixel_is_set(62U, 3U));
+	zassert_true(indicator_test_display_pixel_is_set(68U, 3U));
+}
+
 ZTEST(indicator, test_display_status_band_aligns_to_inset_column)
 {
 	indicator_test_configure_display(true, true, 128U, 64U,

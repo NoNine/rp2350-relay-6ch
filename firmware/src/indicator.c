@@ -917,7 +917,7 @@ static int display_render_frame(enum indicator_display_mode mode,
 				 DISPLAY_UI_TEXT_X0;
 
 	memset(frame, 0, sizeof(frame));
-	display_draw_annunciators(frame, ready, state_mask != 0U,
+	display_draw_annunciators(frame, ready, (state_mask | pulse_mask) != 0U,
 				  pulse_mask != 0U, error);
 	display_draw_hline(frame, DISPLAY_UI_RULE_X0, DISPLAY_UI_TOP_RULE_Y,
 			   DISPLAY_UI_RULE_W);
