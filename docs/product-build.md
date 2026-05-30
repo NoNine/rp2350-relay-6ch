@@ -118,19 +118,22 @@ The build resolves `product_name-release_config-build_variant` directly. For
 `rp2350_relay_6ch-standard-userdebug`, strip the known variant suffix and load:
 
 ```text
-products/rp2350_relay_6ch/product.env
-products/rp2350_relay_6ch/release_configs/standard.env
+products/rp2350_relay_6ch/product.yaml
+products/rp2350_relay_6ch/release_configs/standard.yaml
 ```
+
+`scripts/build.sh` parses these YAML files with PyYAML through the selected
+Zephyr workspace Python interpreter.
 
 Required initial layout:
 
 ```text
 products/
   rp2350_relay_6ch/
-    product.env
+    product.yaml
     release_configs/
-      standard.env
-      boardfarm.env
+      standard.yaml
+      boardfarm.yaml
 firmware/
   profiles/
     standard.conf
@@ -138,21 +141,24 @@ firmware/
 
 The product config declares at least:
 
-```sh
-TARGET_PRODUCT=rp2350_relay_6ch
-PRODUCT_HOST_WHEEL=1
-PRODUCT_FIRMWARE_IMAGES="waveshare pico2"
+```yaml
+target_product: rp2350_relay_6ch
+host_wheel: true
+firmware_images:
+  - waveshare
+  - pico2
 ```
 
-`TARGET_RELEASE` is selected in the context of `TARGET_PRODUCT` from the lunch
+`TARGET_RELEASE` is selected in the context of `target_product` from the lunch
 target. Directory nesting defines valid combinations.
 
 Release configs map `TARGET_RELEASE` to an ordered list of firmware Kconfig
 fragments. The standard profile uses energized-only communication-loss safety
 with a 5 s timeout:
 
-```sh
-FIRMWARE_KCONFIG_FRAGMENTS="firmware/profiles/standard.conf"
+```yaml
+firmware_kconfig_fragments:
+  - firmware/profiles/standard.conf
 ```
 
 The fragment order is significant and must be preserved when passed to Zephyr

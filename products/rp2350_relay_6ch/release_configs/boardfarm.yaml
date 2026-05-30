@@ -1,0 +1,3 @@
+firmware_kconfig_fragments:
+  - firmware/profiles/always_on_owner.conf
+  - firmware/profiles/display_rotated_180.conf

@@ -173,7 +173,7 @@ def test_unknown_variant_missing_product_and_missing_release_fail_before_build()
     missing_product = run_build("--dry-run", "--lunch", "unknown-standard-userdebug")
     assert missing_product.returncode != 0
     assert "product config" in missing_product.stderr
-    assert "products/unknown/product.env" in missing_product.stderr
+    assert "products/unknown/product.yaml" in missing_product.stderr
     assert "does not exist" in missing_product.stderr
 
     missing_release = run_build(
@@ -182,7 +182,7 @@ def test_unknown_variant_missing_product_and_missing_release_fail_before_build()
     assert missing_release.returncode != 0
     assert "release config" in missing_release.stderr
     assert (
-        "products/rp2350_relay_6ch/release_configs/missing.env"
+        "products/rp2350_relay_6ch/release_configs/missing.yaml"
         in missing_release.stderr
     )
     assert "does not exist" in missing_release.stderr
@@ -195,6 +195,28 @@ def test_unknown_variant_missing_product_and_missing_release_fail_before_build()
         "firmware Kconfig fragment 'firmware/profiles/missing.conf' does not exist"
         in missing_extra_conf.stderr
     )
+
+
+def test_empty_release_fragment_list_fails_before_build() -> None:
+    release_config = (
+        ROOT_DIR
+        / "products"
+        / "rp2350_relay_6ch"
+        / "release_configs"
+        / "empty.yaml"
+    )
+    release_config.write_text("firmware_kconfig_fragments: []\n")
+    try:
+        result = run_build(
+            "--dry-run", "--lunch", "rp2350_relay_6ch-empty-userdebug"
+        )
+    finally:
+        release_config.unlink()
+
+    assert result.returncode != 0
+    assert "release config" in result.stderr
+    assert "must set firmware_kconfig_fragments" in result.stderr
+    assert "Building host wheel" not in result.stdout
 
 
 def test_non_user_publish_requires_override() -> None:

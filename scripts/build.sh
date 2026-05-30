@@ -98,6 +98,9 @@ load_product_composition() {
 	local lunch_product
 	local lunch_release
 	local fragment
+	local config_records
+	local record_key
+	local record_value
 
 	parse_lunch_variant "${lunch}"
 	if [[ ! "${LUNCH_RECEIPT_NAME}" =~ ^([A-Za-z0-9_]+)-([A-Za-z0-9_]+)$ ]]; then
@@ -106,49 +109,137 @@ load_product_composition() {
 	lunch_product="${BASH_REMATCH[1]}"
 	lunch_release="${BASH_REMATCH[2]}"
 
-	product_path="${ROOT_DIR}/products/${lunch_product}/product.env"
+	product_path="${ROOT_DIR}/products/${lunch_product}/product.yaml"
 	if [[ ! -f "${product_path}" ]]; then
 		die "product config '${product_path#${ROOT_DIR}/}' does not exist"
 	fi
 
-	unset TARGET_PRODUCT TARGET_RELEASE PRODUCT_HOST_WHEEL PRODUCT_FIRMWARE_IMAGES
-
-	# shellcheck disable=SC1090
-	source "${product_path}"
-
-	if [[ -z "${TARGET_PRODUCT:-}" ]]; then
-		die "product config '${product_path#${ROOT_DIR}/}' must set TARGET_PRODUCT"
-	fi
-
-	if [[ "${TARGET_PRODUCT}" != "${lunch_product}" ]]; then
-		die "lunch '${lunch}' does not match product config TARGET_PRODUCT='${TARGET_PRODUCT}'"
-	fi
-
-	if [[ "${TARGET_PRODUCT}" != "rp2350_relay_6ch" ]]; then
-		die "unsupported TARGET_PRODUCT '${TARGET_PRODUCT}'"
-	fi
-
-	TARGET_RELEASE="${lunch_release}"
-	release_config_path="${ROOT_DIR}/products/${TARGET_PRODUCT}/release_configs/${TARGET_RELEASE}.env"
+	release_config_path="${ROOT_DIR}/products/${lunch_product}/release_configs/${lunch_release}.yaml"
 	if [[ ! -f "${release_config_path}" ]]; then
 		die "release config '${release_config_path#${ROOT_DIR}/}' does not exist"
 	fi
 
-	unset FIRMWARE_KCONFIG_FRAGMENTS
-	# shellcheck disable=SC1090
-	source "${release_config_path}"
+	TARGET_PRODUCT=""
+	PRODUCT_HOST_WHEEL=""
+	PRODUCT_FIRMWARE_IMAGE_LIST=()
+	FIRMWARE_KCONFIG_FRAGMENT_LIST=()
+	if ! config_records="$("${PYTHON_BIN}" - "${product_path}" "${release_config_path}" <<'PY'
+from pathlib import Path
+import sys
 
-	read -r -a PRODUCT_FIRMWARE_IMAGE_LIST <<<"${PRODUCT_FIRMWARE_IMAGES:-}"
-	read -r -a FIRMWARE_KCONFIG_FRAGMENT_LIST <<<"${FIRMWARE_KCONFIG_FRAGMENTS:-}"
+try:
+    import yaml
+except ModuleNotFoundError:
+    raise SystemExit(
+        "PyYAML is required to read product YAML configs; "
+        "install PyYAML in the Zephyr workspace virtual environment"
+    )
 
-	if [[ "${PRODUCT_HOST_WHEEL:-}" != "1" ]]; then
-		die "product config '${product_path#${ROOT_DIR}/}' must enable PRODUCT_HOST_WHEEL=1"
+
+def repo_relative(path: Path) -> str:
+    try:
+        return str(path.relative_to(Path.cwd()))
+    except ValueError:
+        return str(path)
+
+
+def load_mapping(path: Path, label: str) -> dict:
+    try:
+        data = yaml.safe_load(path.read_text())
+    except yaml.YAMLError as exc:
+        raise SystemExit(
+            f"{label} config '{repo_relative(path)}' is invalid YAML: {exc}"
+        ) from exc
+    if not isinstance(data, dict):
+        raise SystemExit(f"{label} config '{repo_relative(path)}' must be a mapping")
+    return data
+
+
+def require_string(data: dict, key: str, path: Path, label: str) -> str:
+    value = data.get(key)
+    if not isinstance(value, str) or not value:
+        raise SystemExit(f"{label} config '{repo_relative(path)}' must set {key}")
+    return value
+
+
+def require_bool(data: dict, key: str, path: Path, label: str) -> bool:
+    value = data.get(key)
+    if not isinstance(value, bool):
+        raise SystemExit(f"{label} config '{repo_relative(path)}' must set {key}")
+    return value
+
+
+def require_string_list(data: dict, key: str, path: Path, label: str) -> list[str]:
+    value = data.get(key)
+    if not isinstance(value, list) or not all(
+        isinstance(item, str) and item for item in value
+    ):
+        raise SystemExit(
+            f"{label} config '{repo_relative(path)}' must set {key} as a list"
+        )
+    return value
+
+
+def emit(key: str, value: str) -> None:
+    if "\n" in value or "\t" in value:
+        raise SystemExit(f"{key} value must not contain tabs or newlines")
+    print(f"{key}\t{value}")
+
+
+product_path = Path(sys.argv[1])
+release_config_path = Path(sys.argv[2])
+product = load_mapping(product_path, "product")
+release = load_mapping(release_config_path, "release")
+
+emit("target_product", require_string(product, "target_product", product_path, "product"))
+emit(
+    "host_wheel",
+    "1" if require_bool(product, "host_wheel", product_path, "product") else "0",
+)
+for image in require_string_list(product, "firmware_images", product_path, "product"):
+    emit("image", image)
+for fragment in require_string_list(
+    release, "firmware_kconfig_fragments", release_config_path, "release"
+):
+    emit("fragment", fragment)
+PY
+	)"; then
+		die "failed to load product composition"
+	fi
+
+	while IFS=$'\t' read -r record_key record_value; do
+		case "${record_key}" in
+			target_product) TARGET_PRODUCT="${record_value}" ;;
+			host_wheel) PRODUCT_HOST_WHEEL="${record_value}" ;;
+			image) PRODUCT_FIRMWARE_IMAGE_LIST+=("${record_value}") ;;
+			fragment) FIRMWARE_KCONFIG_FRAGMENT_LIST+=("${record_value}") ;;
+			"") ;;
+			*) die "unknown product config record '${record_key}'" ;;
+		esac
+	done <<<"${config_records}"
+
+	TARGET_RELEASE="${lunch_release}"
+
+	if [[ -z "${TARGET_PRODUCT:-}" ]]; then
+		die "product config '${product_path#${ROOT_DIR}/}' must set target_product"
+	fi
+
+	if [[ "${TARGET_PRODUCT}" != "${lunch_product}" ]]; then
+		die "lunch '${lunch}' does not match product config target_product='${TARGET_PRODUCT}'"
+	fi
+
+	if [[ "${TARGET_PRODUCT}" != "rp2350_relay_6ch" ]]; then
+		die "unsupported target_product '${TARGET_PRODUCT}'"
+	fi
+
+	if [[ "${PRODUCT_HOST_WHEEL}" != "1" ]]; then
+		die "product config '${product_path#${ROOT_DIR}/}' must enable host_wheel=true"
 	fi
 	if [[ ${#PRODUCT_FIRMWARE_IMAGE_LIST[@]} -eq 0 ]]; then
-		die "product config '${product_path#${ROOT_DIR}/}' must set PRODUCT_FIRMWARE_IMAGES"
+		die "product config '${product_path#${ROOT_DIR}/}' must set firmware_images"
 	fi
 	if [[ ${#FIRMWARE_KCONFIG_FRAGMENT_LIST[@]} -eq 0 ]]; then
-		die "release config '${release_config_path#${ROOT_DIR}/}' must set FIRMWARE_KCONFIG_FRAGMENTS"
+		die "release config '${release_config_path#${ROOT_DIR}/}' must set firmware_kconfig_fragments"
 	fi
 
 	for fragment in "${FIRMWARE_KCONFIG_FRAGMENT_LIST[@]}"; do

@@ -1,0 +1,2 @@
+firmware_kconfig_fragments:
+  - firmware/profiles/standard.conf

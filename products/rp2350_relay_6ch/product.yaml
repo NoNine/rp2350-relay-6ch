@@ -1,0 +1,5 @@
+target_product: rp2350_relay_6ch
+host_wheel: true
+firmware_images:
+  - waveshare
+  - pico2
