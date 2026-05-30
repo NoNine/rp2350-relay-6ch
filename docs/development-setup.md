@@ -122,14 +122,25 @@ Build the product outputs for the current development target:
 scripts/build.sh
 ```
 
-The product build defaults to:
+This builds the Python host wheel and the supported Waveshare/Pico 2 firmware
+images together. The product build defaults to:
 
 ```text
 LUNCH=rp2350_relay_6ch-standard-userdebug
 ```
 
-This produces the host wheel and the Waveshare/Pico 2 firmware images. Use the
-lower-level firmware helper only for custom board or overlay experiments:
+Use `--lunch` to choose another supported product composition:
+
+```sh
+scripts/build.sh --lunch rp2350_relay_6ch-boardfarm-userdebug
+scripts/build.sh --dry-run --lunch rp2350_relay_6ch-standard-userdebug
+```
+
+Intermediate outputs are isolated under `build/product/<lunch>/`, while release
+artifact names stay stable under `dist/`. See
+[Product build contract](product-build.md) for the complete build interface.
+Use the lower-level firmware helper only for custom board or overlay
+experiments:
 
 ```sh
 BOARD=<zephyr-board> BUILD_DIR=build/<name> scripts/build-firmware.sh

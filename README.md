@@ -50,6 +50,29 @@ The main control surfaces are:
 | Multi-device Linux host | One daemon instance and socket per relay controller |
 | Pico 2 DIY relay target | Same host tooling after flashing a supported overlay build |
 
+## Product Build Experience
+
+The source checkout builds the product, not just one firmware image. The main
+developer command builds the Python host wheel and the supported Waveshare and
+Pico 2 firmware UF2 images together:
+
+```sh
+scripts/build.sh
+```
+
+Choose a supported product composition with a lunch target:
+
+```sh
+scripts/build.sh --lunch rp2350_relay_6ch-standard-userdebug
+scripts/build.sh --lunch rp2350_relay_6ch-boardfarm-userdebug
+scripts/build.sh --dry-run --lunch rp2350_relay_6ch-standard-userdebug
+```
+
+Intermediate outputs are isolated under `build/product/<lunch>/`, while release
+artifact names stay stable under `dist/`. YAML product configs keep release
+composition readable as firmware fragments grow. See
+[Product build contract](docs/product-build.md) for the full build interface.
+
 ## Usage Preview
 
 These previews use the same grouping as the architecture diagrams.
@@ -392,7 +415,8 @@ scripts/flash.sh
 rp2350-relay --port <serial-port> smoke
 ```
 
-The product build defaults to:
+`scripts/build.sh` builds the host wheel and supported firmware images. It
+defaults to:
 
 ```text
 LUNCH=rp2350_relay_6ch-standard-userdebug
