@@ -172,7 +172,9 @@ Initial firmware image targets:
 Build directories include the lunch target, for example:
 
 ```text
+build/product/rp2350_relay_6ch-standard-userdebug/host-wheel
 build/product/rp2350_relay_6ch-standard-userdebug/waveshare
+build/product/rp2350_relay_6ch-standard-userdebug/pico2
 ```
 
 Artifact filenames stay unchanged:
@@ -184,9 +186,10 @@ dist/rp2350_relay_6ch-<version>-pico2.uf2
 ```
 
 `scripts/build.sh` writes a local JSON manifest under `dist/` recording lunch,
-product, release, variant, version, host wheel, firmware images, boards, build
-dirs, overlays, artifacts, and ordered Kconfig fragments. The manifest is not a
-GitHub Release artifact unless release docs are explicitly updated later.
+product, release, variant, version, host wheel, host wheel build dir, firmware
+images, boards, build dirs, overlays, artifacts, and ordered Kconfig fragments.
+The manifest is not a GitHub Release artifact unless release docs are
+explicitly updated later.
 
 ## Failure Rules
 

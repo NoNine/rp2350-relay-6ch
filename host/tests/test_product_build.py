@@ -85,6 +85,10 @@ def test_ordered_kconfig_fragments_and_release_artifacts_are_preserved() -> None
         manifest["host_wheel"]
         == f"dist/rp2350_relay_6ch-{VERSION}-py3-none-any.whl"
     )
+    assert (
+        manifest["host_wheel_build_dir"]
+        == "build/product/rp2350_relay_6ch-standard-user/host-wheel"
+    )
     assert [image["artifact"] for image in manifest["firmware_images"]] == [
         f"dist/rp2350_relay_6ch-{VERSION}-waveshare.uf2",
         f"dist/rp2350_relay_6ch-{VERSION}-pico2.uf2",

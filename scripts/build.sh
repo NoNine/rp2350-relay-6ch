@@ -225,6 +225,7 @@ write_manifest() {
 	local lunch="$2"
 	local version="$3"
 	local host_wheel="$4"
+	local host_wheel_build_dir="$5"
 	local args=()
 	local fragment
 	local image
@@ -242,16 +243,24 @@ write_manifest() {
 	mkdir -p "$(dirname "${manifest_path}")"
 	"${PYTHON_BIN}" - "${manifest_path}" "${lunch}" "${TARGET_PRODUCT}" \
 		"${TARGET_RELEASE}" "${TARGET_BUILD_VARIANT}" "${version}" \
-		"${host_wheel}" "${args[@]}" <<'PY'
+		"${host_wheel}" "${host_wheel_build_dir}" "${args[@]}" <<'PY'
 import json
 from pathlib import Path
 import sys
 
 manifest_path = Path(sys.argv[1])
-lunch, product, release, variant, version, host_wheel = sys.argv[2:8]
+(
+    lunch,
+    product,
+    release,
+    variant,
+    version,
+    host_wheel,
+    host_wheel_build_dir,
+) = sys.argv[2:9]
 fragments = []
 images = []
-args = sys.argv[8:]
+args = sys.argv[9:]
 i = 0
 while i < len(args):
     if args[i] == "--fragment":
@@ -282,6 +291,7 @@ payload = {
     "target_build_variant": variant,
     "version": version,
     "host_wheel": host_wheel,
+    "host_wheel_build_dir": host_wheel_build_dir,
     "firmware_kconfig_fragments": fragments,
     "firmware_images": images,
 }
@@ -388,8 +398,17 @@ PY
 }
 
 build_host_wheel() {
+	local staging_dir="${ROOT_DIR}/${HOST_WHEEL_BUILD_DIR}"
+
 	echo "Building host wheel"
-	"${PYTHON_BIN}" -m build --wheel
+	mkdir -p "${staging_dir}/egg-info"
+	"${PYTHON_BIN}" -m build --wheel --no-isolation --skip-dependency-check \
+		--outdir "${ROOT_DIR}/dist" \
+		--config-setting=--build-option=--bdist-dir="${staging_dir}/bdist" \
+		--config-setting=--build-option=build \
+		--config-setting=--build-option=--build-base="${staging_dir}/build" \
+		--config-setting=--build-option=egg_info \
+		--config-setting=--build-option=--egg-base="${staging_dir}/egg-info"
 	if [[ ! -s "${ROOT_DIR}/${HOST_WHEEL}" ]]; then
 		die "missing or empty artifact: ${HOST_WHEEL}"
 	fi
@@ -621,6 +640,7 @@ fi
 
 set_image_metadata "${LUNCH_TARGET}" "${VERSION}"
 HOST_WHEEL="dist/rp2350_relay_6ch-${VERSION}-py3-none-any.whl"
+HOST_WHEEL_BUILD_DIR="build/product/${LUNCH_TARGET}/host-wheel"
 MANIFEST="dist/${LUNCH_TARGET}-product-manifest.json"
 RELEASE_ARTIFACTS=("${HOST_WHEEL}")
 RELEASE_ASSET_NAMES=("$(basename "${HOST_WHEEL}")")
@@ -629,7 +649,8 @@ for image in "${PRODUCT_FIRMWARE_IMAGE_LIST[@]}"; do
 	RELEASE_ASSET_NAMES+=("$(basename "${IMAGE_ARTIFACTS[${image}]}")")
 done
 
-write_manifest "${ROOT_DIR}/${MANIFEST}" "${LUNCH_TARGET}" "${VERSION}" "${HOST_WHEEL}"
+write_manifest "${ROOT_DIR}/${MANIFEST}" "${LUNCH_TARGET}" "${VERSION}" \
+	"${HOST_WHEEL}" "${HOST_WHEEL_BUILD_DIR}"
 
 echo "Resolved lunch: ${LUNCH_TARGET}"
 echo "Product: ${TARGET_PRODUCT}"
