@@ -17,6 +17,17 @@ tests:
       - led
       - pwm
     harness: ztest
+  rp2350_relay_6ch.indicator.accepted_buzzer_feedback:
+    platform_allow:
+      - native_sim
+    extra_configs:
+      - CONFIG_RP2350_RELAY_6CH_BUZZER_FEEDBACK=y
+      - CONFIG_RP2350_RELAY_6CH_BUZZER_ACCEPTED_FEEDBACK=y
+    tags:
+      - indicator
+      - led
+      - pwm
+    harness: ztest
   rp2350_relay_6ch.indicator.display_rotated_180:
     platform_allow:
       - native_sim

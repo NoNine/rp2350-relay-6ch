@@ -98,6 +98,8 @@ struct indicator_test_snapshot {
 	uint8_t display_pulse_mask;
 	uint16_t display_post_write_count;
 	uint16_t display_write_count;
+	bool buzzer_on;
+	uint8_t beeps_remaining;
 };
 
 void indicator_init(void);

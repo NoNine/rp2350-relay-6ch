@@ -4,10 +4,11 @@ This page is the operator manual for the RP2350-Relay-6CH local RGB LED and
 buzzer behavior.
 
 Current firmware enables local status indication when the target devicetree
-provides the WS2812 RGB LED or passive buzzer devices. Development firmware
-enables bounded buzzer feedback by default so the buzzer path can be
-verified during hardware smoke testing. Release or quiet-site builds can disable
-the buzzer feedback Kconfig option explicitly.
+provides the WS2812 RGB LED or passive buzzer devices. The default behavior is
+quiet enough for lab and server-room use: routine heartbeat, idle-ready, and
+relay-toggle activity is visual only. Firmware may enable bounded buzzer
+notifications for boot-ready, rejected commands, owner-lost faults, and
+reboot-pending transitions.
 
 The indicators are local diagnostics. They help an operator answer whether the
 controller is alive, ready, handling a command, degraded, updating, or faulted.
@@ -58,15 +59,16 @@ background heartbeat.
 | Pattern | Meaning | Operator action |
 | --- | --- | --- |
 | Silent | Buzzer disabled, unsupported, idle, or PWM output off/zero duty. | No action. |
-| One long beep | Controller boot completed and firmware reached ready state. | Begin normal operation, or run `rp2350-relay info` if host communication is not available. |
-| One short beep | Operation accepted when buzzer feedback is enabled. | No action unless the host reports an error. |
+| One long beep | General notification: controller boot completed and firmware reached ready state. | Begin normal operation, or run `rp2350-relay info` if host communication is not available. |
 | Two short beeps | Command rejected or validation error. | Check the CLI error, command arguments, channel number, pulse duration, and current relay pulse state. |
-| Two long beeps | `always-on-owner` communication-loss timeout latched owner-lost attention. | Restore the heartbeat owner and verify relays are in the intended state. |
+| Three fast fault pulses | `always-on-owner` communication-loss timeout latched owner-lost fault requiring operator action. Each pulse is 250 ms on / 250 ms off. | Restore the heartbeat owner and verify relays are in the intended state. |
 | Three short beeps | Controlled reboot scheduled, autonomous communication-loss reboot recovery pending, or reserved Phase 9/10 firmware upgrade support. | Restore the heartbeat owner if communication-loss recovery was unintended; otherwise wait for the board to return and verify `info` or `status`. |
 
 The firmware must not generate a continuous alarm without a timeout or silence
-policy. Routine relay toggles should produce only bounded feedback when buzzer
-feedback is enabled.
+policy. Normal heartbeat, idle ready state, and routine relay toggles must not
+produce audible feedback by default. A future host/API configuration can add
+quiet mode, buzzer enable, brightness, and lamp/buzzer test controls without
+changing these quiet defaults.
 
 ## Troubleshooting
 

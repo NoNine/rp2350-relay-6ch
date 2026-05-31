@@ -217,7 +217,7 @@ ZTEST(indicator, test_owner_lost_persists_until_cleared)
 	zassert_false(snap.owner_lost);
 }
 
-ZTEST(indicator, test_owner_lost_buzzer_is_two_long_beeps_when_enabled)
+ZTEST(indicator, test_owner_lost_buzzer_is_three_fault_pulses_when_enabled)
 {
 	struct indicator_test_snapshot snap;
 
@@ -228,22 +228,44 @@ ZTEST(indicator, test_owner_lost_buzzer_is_two_long_beeps_when_enabled)
 	indicator_set_owner_lost(true);
 	snap = snapshot();
 	zassert_equal(snap.buzzer, INDICATOR_BUZZER_OWNER_LOST);
+	zassert_true(snap.buzzer_on);
+	zassert_equal(snap.beeps_remaining, 2U);
 
-	indicator_test_advance(301U);
+	indicator_test_advance(251U);
 	indicator_test_get_snapshot(&snap);
 	zassert_equal(snap.buzzer, INDICATOR_BUZZER_OWNER_LOST);
+	zassert_false(snap.buzzer_on);
+	zassert_equal(snap.beeps_remaining, 2U);
 
-	indicator_test_advance(180U);
+	indicator_test_advance(250U);
 	indicator_test_get_snapshot(&snap);
 	zassert_equal(snap.buzzer, INDICATOR_BUZZER_OWNER_LOST);
+	zassert_true(snap.buzzer_on);
+	zassert_equal(snap.beeps_remaining, 1U);
 
-	indicator_test_advance(361U);
+	indicator_test_advance(251U);
 	indicator_test_get_snapshot(&snap);
 	zassert_equal(snap.buzzer, INDICATOR_BUZZER_OWNER_LOST);
+	zassert_false(snap.buzzer_on);
+	zassert_equal(snap.beeps_remaining, 1U);
 
-	indicator_test_advance(181U);
+	indicator_test_advance(250U);
+	indicator_test_get_snapshot(&snap);
+	zassert_equal(snap.buzzer, INDICATOR_BUZZER_OWNER_LOST);
+	zassert_true(snap.buzzer_on);
+	zassert_equal(snap.beeps_remaining, 0U);
+
+	indicator_test_advance(251U);
+	indicator_test_get_snapshot(&snap);
+	zassert_equal(snap.buzzer, INDICATOR_BUZZER_OWNER_LOST);
+	zassert_false(snap.buzzer_on);
+	zassert_equal(snap.beeps_remaining, 0U);
+
+	indicator_test_advance(250U);
 	indicator_test_get_snapshot(&snap);
 	zassert_equal(snap.buzzer, INDICATOR_BUZZER_SILENT);
+	zassert_false(snap.buzzer_on);
+	zassert_equal(snap.beeps_remaining, 0U);
 }
 
 ZTEST(indicator, test_owner_lost_buzzer_does_not_repeat_while_latched)
@@ -258,10 +280,12 @@ ZTEST(indicator, test_owner_lost_buzzer_does_not_repeat_while_latched)
 	snap = snapshot();
 	zassert_equal(snap.buzzer, INDICATOR_BUZZER_OWNER_LOST);
 
-	indicator_test_advance(301U);
-	indicator_test_advance(181U);
-	indicator_test_advance(301U);
-	indicator_test_advance(181U);
+	indicator_test_advance(251U);
+	indicator_test_advance(250U);
+	indicator_test_advance(251U);
+	indicator_test_advance(250U);
+	indicator_test_advance(251U);
+	indicator_test_advance(250U);
 	indicator_test_get_snapshot(&snap);
 	zassert_equal(snap.buzzer, INDICATOR_BUZZER_SILENT);
 
@@ -302,17 +326,19 @@ ZTEST(indicator, test_fault_highest_priority)
 	zassert_true(snap.fault);
 }
 
-ZTEST(indicator, test_buzzer_quiet_by_default)
+ZTEST(indicator, test_accepted_command_buzzer_is_silent_by_default)
 {
 	struct indicator_test_snapshot snap;
 
 	indicator_record_command(INDICATOR_COMMAND_ACCEPTED);
 	snap = snapshot();
 
-	if (IS_ENABLED(CONFIG_RP2350_RELAY_6CH_BUZZER_FEEDBACK)) {
+	if (IS_ENABLED(CONFIG_RP2350_RELAY_6CH_BUZZER_ACCEPTED_FEEDBACK)) {
 		zassert_equal(snap.buzzer, INDICATOR_BUZZER_ACCEPTED);
+		zassert_true(snap.buzzer_on);
 	} else {
 		zassert_equal(snap.buzzer, INDICATOR_BUZZER_SILENT);
+		zassert_false(snap.buzzer_on);
 	}
 }
 
@@ -326,7 +352,11 @@ ZTEST(indicator, test_buzzer_feedback_mapping_when_enabled)
 
 	indicator_record_command(INDICATOR_COMMAND_ACCEPTED);
 	snap = snapshot();
-	zassert_equal(snap.buzzer, INDICATOR_BUZZER_ACCEPTED);
+	if (IS_ENABLED(CONFIG_RP2350_RELAY_6CH_BUZZER_ACCEPTED_FEEDBACK)) {
+		zassert_equal(snap.buzzer, INDICATOR_BUZZER_ACCEPTED);
+	} else {
+		zassert_equal(snap.buzzer, INDICATOR_BUZZER_SILENT);
+	}
 
 	indicator_record_command(INDICATOR_COMMAND_BUSY);
 	snap = snapshot();

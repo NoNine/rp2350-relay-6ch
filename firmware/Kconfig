@@ -11,13 +11,23 @@ config RP2350_RELAY_6CH_INDICATORS
 	  WS2812 RGB LED and passive PWM buzzer when those devices are present.
 
 config RP2350_RELAY_6CH_BUZZER_FEEDBACK
-	bool "Enable local buzzer command feedback"
+	bool "Enable local bounded buzzer notifications"
 	depends on RP2350_RELAY_6CH_INDICATORS
 	default n
 	help
-	  Enable bounded audible command feedback. The development firmware
-	  enables this in prj.conf so hardware smoke tests can verify the
-	  buzzer path; release or quiet-site builds can disable it explicitly.
+	  Enable bounded audible notifications for boot-ready, rejected commands,
+	  owner-lost faults, and reboot-pending transitions. Accepted commands,
+	  normal heartbeat, idle-ready state, and routine relay toggles remain
+	  silent by default.
+
+config RP2350_RELAY_6CH_BUZZER_ACCEPTED_FEEDBACK
+	bool "Enable accepted-command buzzer feedback"
+	depends on RP2350_RELAY_6CH_BUZZER_FEEDBACK
+	default n
+	help
+	  Enable one short beep for accepted commands. This is intended for
+	  bench/debug configurations; normal lab and server-room builds should
+	  leave accepted commands visual-only.
 
 config RP2350_RELAY_6CH_DISPLAY
 	bool "Enable optional OLED local status display"

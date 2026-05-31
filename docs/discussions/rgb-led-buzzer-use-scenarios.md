@@ -41,6 +41,76 @@ complexity.
   and local horn output. Source:
   <https://fr.comap-control.com/products/accessories/i-o-modules/em2iglrabaa/>
 
+### Audible buzzer pattern research
+
+Standards give useful constraints for audible indications, but they do not
+define a universal "accepted command", "warning", or "fault" buzzer catalog for
+small relay controllers. The consistent lesson is that audible indications must
+be recognizable, bounded, appropriate to the site, and not confused with
+emergency evacuation signals.
+
+- ISO 7731 covers auditory danger signals for public and work areas. It focuses
+  on audibility, recognition, and test methods for danger signals rather than
+  prescribing a fixed equipment-feedback pattern table. Source:
+  <https://www.iso.org/standard/33590.html>
+- IEC/EN 60073 defines coding principles for indicators and actuators,
+  including visual, acoustic, and tactile signals. It supports using
+  characteristics such as intermittency, sound, and duration as meaningful
+  codes, but still expects the equipment designer to assign meanings
+  consistently. Source:
+  <https://standards.iteh.ai/catalog/standards/clc/74016ce4-0b01-49c8-b265-33812d04ea68/en-60073-2002>
+- IEC 60204-1 treats audible and visual warning before hazardous machine start
+  as a risk-assessment topic. That fits pre-start or motion-warning use better
+  than routine relay command feedback. Source:
+  <https://preview.sist.si/sist-preview/103808/4a7e421d8a614886a504a6e95bf138fb/IEC-60204-1-2016-AMD1-2021.pdf>
+- ISO 8201 defines an audible emergency evacuation signal. Its evacuation
+  pattern should remain reserved for evacuation or emergency systems, not reused
+  for normal controller warnings or command feedback. Source:
+  <https://www.iso.org/standard/67046.html>
+- OSHA 29 CFR 1910.165 requires employee alarm systems to provide recognizable
+  warning for emergency action or safe escape and reaction time. This reinforces
+  keeping emergency alarms distinct from local equipment chirps. Source:
+  <https://www.osha.gov/etools/evacuation-plans-procedures/emergency-standards/employee-alarms/>
+- ISA-18.1 and ISA-18.2 are useful alarm-system references for consistency,
+  acknowledgement, silencing, operator response, and avoiding nuisance alarms.
+  They are most relevant if this project later grows an annunciator or alarm
+  philosophy, not for turning every relay event into a buzzer event. Source:
+  <https://www.isa.org/standards-and-publications/isa-standards/isa-18-series-of-standards>
+
+Well-known industrial signaling products converge on a small vocabulary:
+continuous tone, simple pulse, faster pulse, chirp, double-pulse, siren, and
+acknowledged/silenced states. The relay controller should use only the quiet
+subset needed for local feedback.
+
+- PATLITE product documentation includes examples such as 250 ms on/off,
+  500 ms on/off, double-pulse timing, and continuous on. Source:
+  <https://www.manualsdir.com/manuals/373122/patlite-nhl.html?page=22>
+- Siemens SIRIUS 8WD4 audible elements support continuous or pulsating tones.
+  Source:
+  <https://support.industry.siemens.com/cs/attachments/109758131/manual_SIRIUS_signal_columns_en-US.pdf>
+- Rockwell Automation / Allen-Bradley 855T audible modules support continuous
+  and pulse-tone operation with selectable sound levels. Source:
+  <https://www.rockwellautomation.com/en-us/products/details.855T-B24TA2.html>
+- Banner TL70 audible modules document pulse, chirp, siren, and continuous
+  alarm modes, with intensity options. Source:
+  <https://info.bannerengineering.com/cs/groups/public/documents/literature/182214.pdf>
+- Eaton M22 audible indicators are offered as distinct continuous-tone and
+  pulsed-tone buzzer devices; one pulsed model documents 2300 Hz and 83 dB.
+  Source:
+  <https://www.eaton.com/us/en-us/skuPage.229028.html>
+
+Practical mapping for this project:
+
+| Condition | Buzzer pattern | Reason |
+| --- | --- | --- |
+| Command accepted | 50-100 ms chirp or one short bounded beep | Confirms deliberate operator action without creating alarm noise. |
+| Noncritical local attention | 500 ms on / 500 ms off, time-limited | Matches common signal-tower pulse behavior and remains recognizable. |
+| Fault requiring operator action | 250 ms on / 250 ms off or about 1.5 Hz pulse, time-limited | More urgent than attention, but still bounded and distinct from evacuation. |
+| Critical local hazard | Distinct double-pulse sequence, time-limited | Easier to distinguish from simple warning or validation rejection. |
+| Pre-start or motion warning | Risk-assessed pulsed warning before the hazardous action | Applies only when the controlled equipment creates a local hazard. |
+| Emergency evacuation | Use only an applicable evacuation or site alarm pattern | Do not reuse evacuation-style temporal patterns for normal relay states. |
+| Acknowledged or silenced alarm | Audible off; visual and host-visible state remain active | Supports operator silence without hiding the underlying condition. |
+
 ## Recommended behavior
 
 - RGB LED owns controller-level state only:

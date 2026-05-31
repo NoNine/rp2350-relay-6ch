@@ -55,9 +55,9 @@ LOG_MODULE_REGISTER(rp2350_relay_indicator, LOG_LEVEL_INF);
 #define RENDER_INTERVAL_MS 100U
 #define BEEP_ON_MS 60U
 #define BOOT_READY_BEEP_ON_MS 300U
-#define OWNER_LOST_BEEP_ON_MS 300U
+#define OWNER_LOST_BEEP_ON_MS 250U
 #define BEEP_OFF_MS 60U
-#define OWNER_LOST_BEEP_OFF_MS 180U
+#define OWNER_LOST_BEEP_OFF_MS 250U
 #define BUZZER_PERIOD_NS PWM_USEC(1000)
 #define RGB_BRIGHTNESS_NUMERATOR 1U
 #define RGB_BRIGHTNESS_DENOMINATOR 5U
@@ -993,7 +993,7 @@ static void set_buzzer_locked(enum indicator_buzzer_pattern pattern)
 		state.beep_off_ms = BEEP_OFF_MS;
 		break;
 	case INDICATOR_BUZZER_OWNER_LOST:
-		state.beeps_remaining = 2U;
+		state.beeps_remaining = 3U;
 		state.beep_on_ms = OWNER_LOST_BEEP_ON_MS;
 		state.beep_off_ms = OWNER_LOST_BEEP_OFF_MS;
 		break;
@@ -1319,7 +1319,9 @@ void indicator_record_command(enum indicator_command_result result)
 	case INDICATOR_COMMAND_ACCEPTED:
 		state.accepted_until = now + COMMAND_TRANSIENT_MS;
 		state.attention_detail = INDICATOR_DISPLAY_DETAIL_NONE;
-		set_buzzer_locked(INDICATOR_BUZZER_ACCEPTED);
+		if (IS_ENABLED(CONFIG_RP2350_RELAY_6CH_BUZZER_ACCEPTED_FEEDBACK)) {
+			set_buzzer_locked(INDICATOR_BUZZER_ACCEPTED);
+		}
 		break;
 	case INDICATOR_COMMAND_BUSY:
 		state.attention_until = now + ATTENTION_TRANSIENT_MS;
@@ -1439,6 +1441,8 @@ void indicator_test_get_snapshot(struct indicator_test_snapshot *snapshot)
 	snapshot->display_pulse_mask = state.display_pulse_mask;
 	snapshot->display_post_write_count = state.display_post_write_count;
 	snapshot->display_write_count = state.display_write_count;
+	snapshot->buzzer_on = state.beep_on;
+	snapshot->beeps_remaining = state.beeps_remaining;
 	k_mutex_unlock(&state.lock);
 }
 
