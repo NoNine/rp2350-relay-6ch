@@ -32,7 +32,7 @@
 LOG_MODULE_REGISTER(rp2350_relay_mgmt, LOG_LEVEL_INF);
 
 /* Cover three short reboot beeps plus a quiet gap before reset. */
-#define REBOOT_PENDING_INDICATION_MS 800
+#define REBOOT_PENDING_INDICATION_MS 1000
 
 enum relay_mgmt_counter {
 	RELAY_MGMT_COUNTER_RECEIVED,
@@ -703,5 +703,22 @@ int relay_mgmt_test_handle(uint8_t command_id, bool write, const uint8_t *reques
 
 	*response_len = (size_t)(ctxt.writer->zs[0].payload - response);
 	return 0;
+}
+
+uint32_t relay_mgmt_test_reboot_delay_ms(void)
+{
+#ifdef CONFIG_REBOOT
+	return REBOOT_PENDING_INDICATION_MS;
+#else
+	return 0U;
+#endif
+}
+
+void relay_mgmt_test_cancel_reboot(void)
+{
+#ifdef CONFIG_REBOOT
+	(void)k_work_cancel_delayable(&reboot_work);
+	indicator_set_host_reboot_pending(false);
+#endif
 }
 #endif

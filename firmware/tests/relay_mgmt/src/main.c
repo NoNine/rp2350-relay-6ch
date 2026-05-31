@@ -239,6 +239,7 @@ static void relay_mgmt_before(void *fixture)
 	ARG_UNUSED(fixture);
 
 	indicator_test_reset();
+	relay_mgmt_test_cancel_reboot();
 	zassert_equal(relay_off_all(), 0);
 	relay_mgmt_reset_counters();
 }
@@ -248,6 +249,7 @@ static void relay_mgmt_after(void *fixture)
 	ARG_UNUSED(fixture);
 
 	zassert_equal(relay_off_all(), 0);
+	relay_mgmt_test_cancel_reboot();
 }
 
 ZTEST_SUITE(relay_mgmt, NULL, relay_mgmt_suite_setup, relay_mgmt_before,
@@ -656,8 +658,8 @@ ZTEST(relay_mgmt, test_comm_loss_always_on_owner_expires_outputs)
 	indicator_test_get_snapshot(&snap);
 	zassert_true(snap.owner_lost);
 #if IS_ENABLED(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_ALWAYS_ON_OWNER_REBOOT_ON_TIMEOUT)
-	zassert_equal(snap.rgb, INDICATOR_RGB_REBOOT_PENDING);
-	zassert_true(snap.reboot_pending);
+	zassert_equal(snap.rgb, INDICATOR_RGB_ATTENTION);
+	zassert_false(snap.reboot_pending);
 #else
 	zassert_equal(snap.rgb, INDICATOR_RGB_ATTENTION);
 #endif
@@ -736,12 +738,37 @@ ZTEST(relay_mgmt, test_comm_loss_always_on_owner_reboot_on_timeout_reports_and_s
 	k_msleep(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_TIMEOUT_MS + 20U);
 
 	zassert_true(relay_comm_loss_test_reboot_scheduled());
+	zassert_true(relay_comm_loss_test_reboot_pending_indication_scheduled());
 	reboot_remaining_ms = relay_comm_loss_test_reboot_remaining_ms();
 	zassert_true(reboot_remaining_ms <= relay_comm_loss_reboot_delay_ms());
 	zassert_true(reboot_remaining_ms > relay_comm_loss_reboot_delay_ms() / 2U);
 	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET, false,
 				    encode_empty_request());
 	assert_state(response_len, 0U, 0U);
+}
+
+ZTEST(relay_mgmt, test_comm_loss_reboot_pending_starts_in_final_grace_phase)
+{
+	size_t response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_SET, true,
+					   encode_set_request(0U, true));
+	struct indicator_test_snapshot snap;
+
+	assert_state(response_len, BIT(0), 0U);
+	k_msleep(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_TIMEOUT_MS + 20U);
+	zassert_true(relay_comm_loss_test_reboot_scheduled());
+	zassert_true(relay_comm_loss_test_reboot_pending_indication_scheduled());
+	indicator_test_force_render();
+	indicator_test_get_snapshot(&snap);
+	zassert_true(snap.owner_lost);
+	zassert_false(snap.reboot_pending);
+	zassert_equal(snap.rgb, INDICATOR_RGB_ATTENTION);
+
+	k_msleep(relay_comm_loss_test_reboot_remaining_ms() / 2U);
+	indicator_test_force_render();
+	indicator_test_get_snapshot(&snap);
+	zassert_true(snap.owner_lost);
+	zassert_true(snap.reboot_pending);
+	zassert_equal(snap.rgb, INDICATOR_RGB_REBOOT_PENDING);
 }
 
 ZTEST(relay_mgmt, test_comm_loss_reboot_pending_heartbeat_cancels_reboot)
@@ -753,10 +780,12 @@ ZTEST(relay_mgmt, test_comm_loss_reboot_pending_heartbeat_cancels_reboot)
 	assert_state(response_len, BIT(0), 0U);
 	k_msleep(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_TIMEOUT_MS + 20U);
 	zassert_true(relay_comm_loss_test_reboot_scheduled());
+	zassert_true(relay_comm_loss_test_reboot_pending_indication_scheduled());
 
 	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_HEARTBEAT, true,
 				    encode_empty_request());
 	zassert_false(relay_comm_loss_test_reboot_scheduled());
+	zassert_false(relay_comm_loss_test_reboot_pending_indication_scheduled());
 	indicator_test_force_render();
 	indicator_test_get_snapshot(&snap);
 	zassert_false(snap.owner_lost);
@@ -775,12 +804,13 @@ ZTEST(relay_mgmt, test_host_reboot_keeps_indicator_after_comm_loss_reboot_cancel
 	zassert_true(relay_comm_loss_test_reboot_scheduled());
 	indicator_test_force_render();
 	indicator_test_get_snapshot(&snap);
-	zassert_true(snap.reboot_pending);
+	zassert_false(snap.reboot_pending);
 
 	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_REBOOT, true,
 				    encode_empty_request());
 	zassert_true(decode_bool(response_len, "ok", &ok));
 	zassert_true(ok);
+	zassert_equal(relay_mgmt_test_reboot_delay_ms(), 1000U);
 
 	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_HEARTBEAT, true,
 				    encode_empty_request());
@@ -802,11 +832,13 @@ ZTEST(relay_mgmt, test_comm_loss_reboot_pending_control_cancels_reboot)
 	assert_state(response_len, BIT(0), 0U);
 	k_msleep(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_TIMEOUT_MS + 20U);
 	zassert_true(relay_comm_loss_test_reboot_scheduled());
+	zassert_true(relay_comm_loss_test_reboot_pending_indication_scheduled());
 
 	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_SET, true,
 				    encode_set_request(0U, false));
 	assert_state(response_len, 0U, 0U);
 	zassert_false(relay_comm_loss_test_reboot_scheduled());
+	zassert_false(relay_comm_loss_test_reboot_pending_indication_scheduled());
 	indicator_test_force_render();
 	indicator_test_get_snapshot(&snap);
 	zassert_false(snap.owner_lost);

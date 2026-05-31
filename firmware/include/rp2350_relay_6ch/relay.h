@@ -34,6 +34,7 @@ uint32_t relay_comm_loss_reboot_delay_ms(void);
 #ifdef CONFIG_ZTEST
 bool relay_comm_loss_test_reboot_scheduled(void);
 uint32_t relay_comm_loss_test_reboot_remaining_ms(void);
+bool relay_comm_loss_test_reboot_pending_indication_scheduled(void);
 #endif
 
 #ifdef __cplusplus

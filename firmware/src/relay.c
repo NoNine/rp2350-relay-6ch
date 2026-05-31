@@ -18,6 +18,11 @@
 LOG_MODULE_REGISTER(rp2350_relay, LOG_LEVEL_INF);
 
 #define RELAYS_NODE DT_PATH(relays)
+#ifdef CONFIG_ZTEST
+#define COMM_LOSS_REBOOT_PENDING_INDICATION_MS 40U
+#else
+#define COMM_LOSS_REBOOT_PENDING_INDICATION_MS 10000U
+#endif
 
 BUILD_ASSERT(DT_NODE_EXISTS(RELAYS_NODE), "Missing /relays devicetree node");
 BUILD_ASSERT(DT_CHILD_NUM(RELAYS_NODE) == RP2350_RELAY_6CH_CHANNEL_COUNT,
@@ -37,6 +42,7 @@ static uint8_t relay_state_mask;
 static uint8_t relay_pulse_mask;
 static bool comm_loss_armed;
 static bool comm_loss_reboot_scheduled;
+static bool comm_loss_reboot_pending_indication_scheduled;
 
 struct relay_pulse_work {
 	struct k_work_delayable work;
@@ -46,6 +52,7 @@ struct relay_pulse_work {
 
 static void pulse_expired(struct k_work *work);
 static void comm_loss_expired(struct k_work *work);
+static void comm_loss_reboot_pending_indication_expired(struct k_work *work);
 static void comm_loss_reboot_expired(struct k_work *work);
 
 static struct relay_pulse_work relay_pulses[] = {
@@ -58,6 +65,8 @@ static struct relay_pulse_work relay_pulses[] = {
 };
 
 static K_WORK_DELAYABLE_DEFINE(comm_loss_work, comm_loss_expired);
+static K_WORK_DELAYABLE_DEFINE(comm_loss_reboot_pending_indication_work,
+			       comm_loss_reboot_pending_indication_expired);
 static K_WORK_DELAYABLE_DEFINE(comm_loss_reboot_work, comm_loss_reboot_expired);
 
 static bool channel_valid(uint8_t channel)
@@ -156,9 +165,25 @@ static bool comm_loss_cancel_reboot_locked(void)
 	bool was_scheduled = comm_loss_reboot_scheduled;
 
 	comm_loss_reboot_scheduled = false;
+	comm_loss_reboot_pending_indication_scheduled = false;
+	(void)k_work_cancel_delayable(&comm_loss_reboot_pending_indication_work);
 	(void)k_work_cancel_delayable(&comm_loss_reboot_work);
 
 	return was_scheduled;
+}
+
+static void comm_loss_schedule_reboot_pending_indication(void)
+{
+	uint32_t delay_ms = relay_comm_loss_reboot_delay_ms();
+
+	if (delay_ms <= COMM_LOSS_REBOOT_PENDING_INDICATION_MS) {
+		indicator_set_comm_loss_reboot_pending(true);
+		return;
+	}
+
+	(void)k_work_schedule(&comm_loss_reboot_pending_indication_work,
+			      K_MSEC(delay_ms -
+				     COMM_LOSS_REBOOT_PENDING_INDICATION_MS));
 }
 
 static void cancel_pulses_locked(uint8_t pulse_mask)
@@ -262,6 +287,7 @@ static void comm_loss_expired(struct k_work *work)
 			if (relay_comm_loss_reboot_on_timeout()) {
 				comm_loss_armed = false;
 				comm_loss_reboot_scheduled = true;
+				comm_loss_reboot_pending_indication_scheduled = true;
 				reboot_pending = true;
 			} else {
 				comm_loss_schedule_locked();
@@ -282,7 +308,7 @@ static void comm_loss_expired(struct k_work *work)
 	}
 
 	if (reboot_pending) {
-		indicator_set_comm_loss_reboot_pending(true);
+		comm_loss_schedule_reboot_pending_indication();
 		(void)k_work_schedule(&comm_loss_reboot_work,
 				      K_MSEC(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_REBOOT_DELAY_MS));
 	}
@@ -290,6 +316,22 @@ static void comm_loss_expired(struct k_work *work)
 	if (ret < 0) {
 		LOG_ERR("Communication-loss off-all failed: %d", ret);
 	}
+}
+
+static void comm_loss_reboot_pending_indication_expired(struct k_work *work)
+{
+	ARG_UNUSED(work);
+
+	k_mutex_lock(&relay_lock, K_FOREVER);
+	if (!comm_loss_reboot_pending_indication_scheduled ||
+	    !comm_loss_reboot_scheduled) {
+		k_mutex_unlock(&relay_lock);
+		return;
+	}
+
+	comm_loss_reboot_pending_indication_scheduled = false;
+	k_mutex_unlock(&relay_lock);
+	indicator_set_comm_loss_reboot_pending(true);
 }
 
 static void comm_loss_reboot_expired(struct k_work *work)
@@ -333,7 +375,9 @@ int relay_init(void)
 	relay_pulse_mask = 0U;
 	comm_loss_armed = false;
 	comm_loss_reboot_scheduled = false;
+	comm_loss_reboot_pending_indication_scheduled = false;
 	(void)k_work_cancel_delayable(&comm_loss_work);
+	(void)k_work_cancel_delayable(&comm_loss_reboot_pending_indication_work);
 	(void)k_work_cancel_delayable(&comm_loss_reboot_work);
 	indicator_set_owner_lost(false);
 	indicator_set_reboot_pending(false);
@@ -592,5 +636,10 @@ uint32_t relay_comm_loss_test_reboot_remaining_ms(void)
 	}
 
 	return k_ticks_to_ms_ceil32(k_work_delayable_remaining_get(&comm_loss_reboot_work));
+}
+
+bool relay_comm_loss_test_reboot_pending_indication_scheduled(void)
+{
+	return comm_loss_reboot_pending_indication_scheduled;
 }
 #endif

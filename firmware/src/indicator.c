@@ -55,7 +55,9 @@ LOG_MODULE_REGISTER(rp2350_relay_indicator, LOG_LEVEL_INF);
 #define RENDER_INTERVAL_MS 100U
 #define BEEP_ON_MS 60U
 #define BOOT_READY_BEEP_ON_MS 300U
+#define OWNER_LOST_BEEP_ON_MS 300U
 #define BEEP_OFF_MS 60U
+#define OWNER_LOST_BEEP_OFF_MS 180U
 #define BUZZER_PERIOD_NS PWM_USEC(1000)
 #define RGB_BRIGHTNESS_NUMERATOR 1U
 #define RGB_BRIGHTNESS_DENOMINATOR 5U
@@ -81,6 +83,7 @@ struct indicator_state {
 	uint8_t beeps_remaining;
 	bool beep_on;
 	uint32_t beep_on_ms;
+	uint32_t beep_off_ms;
 	int64_t beep_next_ms;
 	enum indicator_display_state display_state;
 	enum indicator_display_mode display_mode;
@@ -982,23 +985,33 @@ static void set_buzzer_locked(enum indicator_buzzer_pattern pattern)
 	case INDICATOR_BUZZER_ACCEPTED:
 		state.beeps_remaining = 1U;
 		state.beep_on_ms = BEEP_ON_MS;
+		state.beep_off_ms = BEEP_OFF_MS;
 		break;
 	case INDICATOR_BUZZER_REJECTED:
 		state.beeps_remaining = 2U;
 		state.beep_on_ms = BEEP_ON_MS;
+		state.beep_off_ms = BEEP_OFF_MS;
+		break;
+	case INDICATOR_BUZZER_OWNER_LOST:
+		state.beeps_remaining = 2U;
+		state.beep_on_ms = OWNER_LOST_BEEP_ON_MS;
+		state.beep_off_ms = OWNER_LOST_BEEP_OFF_MS;
 		break;
 	case INDICATOR_BUZZER_REBOOT_PENDING:
 		state.beeps_remaining = 3U;
 		state.beep_on_ms = BEEP_ON_MS;
+		state.beep_off_ms = BEEP_OFF_MS;
 		break;
 	case INDICATOR_BUZZER_BOOT_READY:
 		state.beeps_remaining = 1U;
 		state.beep_on_ms = BOOT_READY_BEEP_ON_MS;
+		state.beep_off_ms = BEEP_OFF_MS;
 		break;
 	case INDICATOR_BUZZER_SILENT:
 	default:
 		state.beeps_remaining = 0U;
 		state.beep_on_ms = BEEP_ON_MS;
+		state.beep_off_ms = BEEP_OFF_MS;
 		break;
 	}
 
@@ -1060,7 +1073,7 @@ static void render_buzzer_locked(int64_t now)
 	if (state.beep_on) {
 		buzzer_off();
 		state.beep_on = false;
-		state.beep_next_ms = now + BEEP_OFF_MS;
+		state.beep_next_ms = now + state.beep_off_ms;
 		state.last_buzzer = state.buzzer_pattern;
 		return;
 	}
@@ -1214,6 +1227,7 @@ void indicator_init(void)
 	state.beeps_remaining = 0U;
 	state.beep_on = false;
 	state.beep_on_ms = BEEP_ON_MS;
+	state.beep_off_ms = BEEP_OFF_MS;
 	state.beep_next_ms = 0;
 	state.display_mode = state.hardware_enabled ? INDICATOR_DISPLAY_MODE_BOOT :
 						      INDICATOR_DISPLAY_MODE_OFF;
@@ -1336,6 +1350,9 @@ void indicator_set_owner_lost(bool owner_lost)
 {
 	ensure_initialized();
 	k_mutex_lock(&state.lock, K_FOREVER);
+	if (owner_lost && !state.owner_lost) {
+		set_buzzer_locked(INDICATOR_BUZZER_OWNER_LOST);
+	}
 	state.owner_lost = owner_lost;
 	k_mutex_unlock(&state.lock);
 	schedule_render_now();

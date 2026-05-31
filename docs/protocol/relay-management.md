@@ -197,7 +197,9 @@ Response:
 | `ok` | bool | Present and true when reboot was scheduled. |
 
 If Zephyr reboot support is not enabled, the command returns
-`reboot_unavailable`.
+`reboot_unavailable`. When reboot support is enabled, firmware shows
+reboot-pending local indication immediately and performs the cold reboot after
+1000 ms.
 
 ### `heartbeat`
 
@@ -235,11 +237,13 @@ Protocol `5` defines build-time communication-loss policies:
 
 When `comm_loss_timeout_ms` expires, firmware cancels active pulses, turns all
 relays off, and updates local indicators. Builds with
-`comm_loss_reboot_on_timeout=true` also show reboot-pending indication and
-schedule a cold firmware reboot after `comm_loss_reboot_delay_ms`. A successful
-heartbeat or relay-control command during that delay restores ownership and
-cancels the pending autonomous reboot. Firmware does not persist state, emit
-events, write audit logs, or imply mains-power SmartPDU behavior.
+`comm_loss_reboot_on_timeout=true` schedule a cold firmware reboot after
+`comm_loss_reboot_delay_ms`. During that delay firmware first shows owner-lost
+attention indication, then switches to reboot-pending indication for the final
+10 seconds before autonomous reboot. A successful heartbeat or relay-control
+command during that delay restores ownership and cancels the pending autonomous
+reboot. Firmware does not persist state, emit events, write audit logs, or
+imply mains-power SmartPDU behavior.
 
 The `reboot` command is host-initiated maintenance, not a communication-loss
 recovery action. It uses its own short controlled-reboot pending indication and

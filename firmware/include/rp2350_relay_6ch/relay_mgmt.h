@@ -57,6 +57,8 @@ void relay_mgmt_reset_counters(void);
 int relay_mgmt_test_handle(uint8_t command_id, bool write, const uint8_t *request,
 			   size_t request_len, uint8_t *response, size_t response_size,
 			   size_t *response_len);
+uint32_t relay_mgmt_test_reboot_delay_ms(void);
+void relay_mgmt_test_cancel_reboot(void);
 #endif
 
 #ifdef __cplusplus
