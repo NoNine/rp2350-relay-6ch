@@ -8,6 +8,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parents[2]
 BUILD_SCRIPT = ROOT_DIR / "scripts" / "build.sh"
 VERSION = tomllib.loads((ROOT_DIR / "pyproject.toml").read_text())["project"]["version"]
+MANIFEST_PATH = ROOT_DIR / "dist" / f"rp2350_relay_6ch-{VERSION}-product-manifest.json"
 
 
 def run_build(
@@ -29,9 +30,8 @@ def run_build(
     )
 
 
-def read_manifest(lunch: str) -> dict:
-    path = ROOT_DIR / "dist" / f"{lunch}-product-manifest.json"
-    return json.loads(path.read_text())
+def read_manifest() -> dict:
+    return json.loads(MANIFEST_PATH.read_text())
 
 
 def test_default_build_resolves_userdebug_product() -> None:
@@ -39,7 +39,8 @@ def test_default_build_resolves_userdebug_product() -> None:
 
     assert result.returncode == 0, result.stderr
     assert "Resolved lunch: rp2350_relay_6ch-standard-userdebug" in result.stdout
-    manifest = read_manifest("rp2350_relay_6ch-standard-userdebug")
+    assert f"Manifest: dist/{MANIFEST_PATH.name}" in result.stdout
+    manifest = read_manifest()
     assert manifest["product"] == "rp2350_relay_6ch"
     assert manifest["release"] == "standard"
     assert manifest["variant"] == "userdebug"
@@ -50,7 +51,8 @@ def test_release_build_resolves_user_product() -> None:
 
     assert result.returncode == 0, result.stderr
     assert "Resolved lunch: rp2350_relay_6ch-standard-user" in result.stdout
-    manifest = read_manifest("rp2350_relay_6ch-standard-user")
+    assert f"Manifest: dist/{MANIFEST_PATH.name}" in result.stdout
+    manifest = read_manifest()
     assert manifest["variant"] == "user"
 
 
@@ -77,7 +79,7 @@ def test_ordered_kconfig_fragments_and_release_artifacts_are_preserved() -> None
     result = run_build("release", VERSION, "--dry-run")
 
     assert result.returncode == 0, result.stderr
-    manifest = read_manifest("rp2350_relay_6ch-standard-user")
+    manifest = read_manifest()
     assert manifest["firmware_kconfig_fragments"] == [
         "firmware/profiles/standard.conf"
     ]
@@ -100,7 +102,7 @@ def test_boardfarm_release_config_resolves_boardfarm_fragments() -> None:
 
     assert result.returncode == 0, result.stderr
     assert "Resolved lunch: rp2350_relay_6ch-boardfarm-userdebug" in result.stdout
-    manifest = read_manifest("rp2350_relay_6ch-boardfarm-userdebug")
+    manifest = read_manifest()
     assert manifest["release"] == "boardfarm"
     assert manifest["firmware_kconfig_fragments"] == [
         "firmware/profiles/always_on_owner.conf",
@@ -116,7 +118,7 @@ def test_extra_conf_file_appends_temporary_fragment() -> None:
     )
 
     assert result.returncode == 0, result.stderr
-    manifest = read_manifest("rp2350_relay_6ch-standard-userdebug")
+    manifest = read_manifest()
     assert manifest["firmware_kconfig_fragments"] == [
         "firmware/profiles/standard.conf",
         "firmware/profiles/no_comm_timeout.conf",
@@ -133,7 +135,7 @@ def test_extra_conf_file_can_repeat_preserving_order() -> None:
     )
 
     assert result.returncode == 0, result.stderr
-    manifest = read_manifest("rp2350_relay_6ch-standard-userdebug")
+    manifest = read_manifest()
     assert manifest["firmware_kconfig_fragments"] == [
         "firmware/profiles/standard.conf",
         "firmware/profiles/no_comm_timeout.conf",
@@ -145,7 +147,7 @@ def test_manifest_records_image_metadata() -> None:
     result = run_build("--dry-run")
 
     assert result.returncode == 0, result.stderr
-    manifest = read_manifest("rp2350_relay_6ch-standard-userdebug")
+    manifest = read_manifest()
     images = {image["name"]: image for image in manifest["firmware_images"]}
     assert images["waveshare"]["board"] == "waveshare_rp2350_relay_6ch/rp2350b/m33"
     assert images["waveshare"]["overlay"] is None
@@ -155,6 +157,25 @@ def test_manifest_records_image_metadata() -> None:
         == "firmware/boards/raspberrypi/rpi_pico2/pico2w-relay-dev.overlay"
     )
     assert images["pico2"]["build_dir"].endswith("/pico2")
+
+
+def test_manifest_uses_versioned_filename_and_removes_stale_lunch_manifests() -> None:
+    stale_manifest = (
+        ROOT_DIR / "dist" / "rp2350_relay_6ch-standard-userdebug-product-manifest.json"
+    )
+    stale_manifest.parent.mkdir(exist_ok=True)
+    stale_manifest.write_text("{}\n")
+
+    result = run_build(
+        "--dry-run", "--lunch", "rp2350_relay_6ch-boardfarm-userdebug"
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert f"Manifest: dist/{MANIFEST_PATH.name}" in result.stdout
+    assert MANIFEST_PATH.exists()
+    assert not stale_manifest.exists()
+    manifest = read_manifest()
+    assert manifest["lunch"] == "rp2350_relay_6ch-boardfarm-userdebug"
 
 
 def test_forbidden_firmware_override_fails_before_build() -> None:

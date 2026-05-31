@@ -332,6 +332,8 @@ write_manifest() {
 	done
 
 	mkdir -p "$(dirname "${manifest_path}")"
+	find "$(dirname "${manifest_path}")" -maxdepth 1 -type f \
+		-name 'rp2350_relay_6ch-*-*-product-manifest.json' -delete
 	"${PYTHON_BIN}" - "${manifest_path}" "${lunch}" "${TARGET_PRODUCT}" \
 		"${TARGET_RELEASE}" "${TARGET_BUILD_VARIANT}" "${version}" \
 		"${host_wheel}" "${host_wheel_build_dir}" "${args[@]}" <<'PY'
@@ -732,7 +734,7 @@ fi
 set_image_metadata "${LUNCH_TARGET}" "${VERSION}"
 HOST_WHEEL="dist/rp2350_relay_6ch-${VERSION}-py3-none-any.whl"
 HOST_WHEEL_BUILD_DIR="build/product/${LUNCH_TARGET}/host-wheel"
-MANIFEST="dist/${LUNCH_TARGET}-product-manifest.json"
+MANIFEST="dist/rp2350_relay_6ch-${VERSION}-product-manifest.json"
 RELEASE_ARTIFACTS=("${HOST_WHEEL}")
 RELEASE_ASSET_NAMES=("$(basename "${HOST_WHEEL}")")
 for image in "${PRODUCT_FIRMWARE_IMAGE_LIST[@]}"; do

@@ -168,9 +168,14 @@ relay control and pulse timing remain primary.
 
 ## Firmware Integration Contract
 
-The OLED renderer belongs with the existing indicator subsystem. Relay control,
-management RPC, and startup code continue publishing domain facts through the
-typed indicator APIs:
+The OLED renderer belongs with the existing indicator subsystem. For stable
+controller state, follow the compact health model contract in
+[health-model.md](health-model.md): relay control, management RPC, and startup
+code publish facts to health, and the indicator consumes a health-derived
+summary. Presentation-only command feedback remains local to the indicator.
+
+Before the health model is implemented, existing firmware publishes domain
+facts through the typed indicator APIs:
 
 - `indicator_set_ready(bool ready)`
 - `indicator_set_relay_state(uint8_t state_mask, uint8_t pulse_mask)`

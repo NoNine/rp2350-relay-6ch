@@ -69,8 +69,9 @@ scripts/build.sh --dry-run --lunch rp2350_relay_6ch-standard-userdebug
 ```
 
 Intermediate outputs are isolated under `build/product/<lunch>/`, while release
-artifact names stay stable under `dist/`. YAML product configs keep release
-composition readable as firmware fragments grow. See
+artifact names and the versioned product manifest stay stable under `dist/`.
+YAML product configs keep release composition readable as firmware fragments
+grow. See
 [Product build contract](docs/product-build.md) for the full build interface.
 
 ## Local Indicators
@@ -111,107 +112,6 @@ See [OLED indicator](docs/oled-indicator.md) for the display contract,
 [Status indicators](docs/status-indicators.md) for RGB LED and buzzer behavior,
 and [OLED indicator UI discussion](docs/discussions/oled-indicator-ui.md) for
 design background.
-
-## Usage Preview
-
-These previews use the same grouping as the architecture diagrams.
-
-### Linux Daemon-Based Host Control
-
-#### Daemon Deployment
-
-File: `~/.config/rp2350-relay/config.toml`
-
-```toml
-[instances.bench-a]
-serial = "E6614C311F4B8B2F"
-socket = "${XDG_RUNTIME_DIR}/rp2350-relay/bench-a.sock"
-wait_device = true
-```
-
-Commands:
-
-```sh
-rp2350-relayctl systemd install
-systemctl --user daemon-reload
-systemctl --user enable --now rp2350-relayd@bench-a
-rp2350-relayctl --instance bench-a daemon-status
-```
-
-#### Python RelayDaemonClient
-
-The daemon owns the serial port and polls heartbeat internally. Automation can
-use `get_daemon_status()` to observe daemon connection state.
-
-```python
-from rp2350_relay_6ch import RelayDaemonClient
-from rp2350_relay_6ch.config import resolve_socket_for_instance
-
-socket_path = resolve_socket_for_instance(instance="bench-a")
-
-with RelayDaemonClient.connect(socket_path, timeout_s=2.0) as relay:
-    relay.get_daemon_status()
-    relay.pulse_relay(0, 100)
-```
-
-### Direct Host Control
-
-#### Interactive Session
-
-<pre style="background: #1b1b1b; color: #f2f2f2; padding: 12px; overflow-x: auto;"><code>$ <span style="color: #00d084;">rp2350-relay</span> session
-Relay USB candidates:
-  1. port=/dev/ttyACM0 serial=E6614C311F4B8B2F product=RP2350-Relay-6CH SMP CDC
-Select device number, or q to cancel: 1
-╭──────────────────────────────────────────────────────────────╮
-│   RP2350 Relay Session                                       │
-│                                                              │
-│   Connection:   <span style="color: #00ff99;">connected</span>                                    │
-│   Port:         /dev/ttyACM0                                 │
-│   Serial:       E6614C311F4B8B2F                             │
-│   Hardware:     Waveshare RP2350-Relay-6CH                   │
-│   Protocol:     5                                            │
-│   Relay count:  6                                            │
-│   State:        0x00                                         │
-│   On:           <span style="color: #ff4dff;">none</span>                                         │
-│   Pulsing:      <span style="color: #ff4dff;">none</span>                                         │
-╰──────────────────────────────────────────────────────────────╯
-<span style="color: #00d084;">rp2350-relay</span>[<span style="color: #00bfff;">/dev/ttyACM0</span>]$ <span style="color: #d7eaff;">info</span>
-                             <span style="background: #8f8f8f; color: #000000;"> info       </span>
-                             <span style="background: #c0c0c0; color: #000000;"> build-info </span>
-                             <span style="background: #c0c0c0; color: #000000;"> get        </span>
-                             <span style="background: #c0c0c0; color: #000000;"> set        </span>
-                             <span style="background: #c0c0c0; color: #000000;"> set-all    </span>
-                             <span style="background: #c0c0c0; color: #000000;"> pulse      </span>
-                             <span style="background: #c0c0c0; color: #000000;"> off-all    </span>
-                             <span style="background: #c0c0c0; color: #000000;"> status     </span>
-                             <span style="background: #c0c0c0; color: #000000;"> reboot     </span>
-                             <span style="background: #c0c0c0; color: #000000;"> disconnect </span>
-                             <span style="background: #c0c0c0; color: #000000;"> connect    </span>
-                             <span style="background: #c0c0c0; color: #000000;"> help       </span>
-                             <span style="background: #c0c0c0; color: #000000;"> exit       </span>
-                             <span style="background: #c0c0c0; color: #000000;"> quit       </span></code></pre>
-
-#### Python RelayClient
-
-Direct Python automation owns the serial connection. For link-health polling,
-call `relay.heartbeat()` on a regular background interval; see
-[Host library](docs/host-library.md#heartbeat-polling) for the serialized
-heartbeat loop pattern.
-
-```python
-from rp2350_relay_6ch import RelayClient
-from rp2350_relay_6ch.discovery import select_device_by_serial
-
-device = select_device_by_serial("E6614C311F4B8B2F")
-
-with RelayClient.connect(device.port, timeout_s=2.0, retries=1) as relay:
-    relay.get_info()
-    relay.pulse_relay(0, 100)
-    relay.off_all()
-```
-
-See [CLI utility](docs/cli.md), [Host library](docs/host-library.md), and
-[Pico 2 DIY targets](docs/pico-diy-targets.md) for complete setup and usage.
 
 ## Architecture
 
@@ -471,6 +371,107 @@ Use [CLI utility](docs/cli.md) for full session mode, Linux daemon mode,
 [Host library](docs/host-library.md) for Python discovery, direct clients,
 daemon clients, and multi-device automation examples.
 
+## Usage Preview
+
+These previews use the same grouping as the architecture diagrams.
+
+### Linux Daemon-Based Host Control
+
+#### Daemon Deployment
+
+File: `~/.config/rp2350-relay/config.toml`
+
+```toml
+[instances.bench-a]
+serial = "E6614C311F4B8B2F"
+socket = "${XDG_RUNTIME_DIR}/rp2350-relay/bench-a.sock"
+wait_device = true
+```
+
+Commands:
+
+```sh
+rp2350-relayctl systemd install
+systemctl --user daemon-reload
+systemctl --user enable --now rp2350-relayd@bench-a
+rp2350-relayctl --instance bench-a daemon-status
+```
+
+#### Python RelayDaemonClient
+
+The daemon owns the serial port and polls heartbeat internally. Automation can
+use `get_daemon_status()` to observe daemon connection state.
+
+```python
+from rp2350_relay_6ch import RelayDaemonClient
+from rp2350_relay_6ch.config import resolve_socket_for_instance
+
+socket_path = resolve_socket_for_instance(instance="bench-a")
+
+with RelayDaemonClient.connect(socket_path, timeout_s=2.0) as relay:
+    relay.get_daemon_status()
+    relay.pulse_relay(0, 100)
+```
+
+### Direct Host Control
+
+#### Interactive Session
+
+<pre style="background: #1b1b1b; color: #f2f2f2; padding: 12px; overflow-x: auto;"><code>$ <span style="color: #00d084;">rp2350-relay</span> session
+Relay USB candidates:
+  1. port=/dev/ttyACM0 serial=E6614C311F4B8B2F product=RP2350-Relay-6CH SMP CDC
+Select device number, or q to cancel: 1
+╭──────────────────────────────────────────────────────────────╮
+│   RP2350 Relay Session                                       │
+│                                                              │
+│   Connection:   <span style="color: #00ff99;">connected</span>                                    │
+│   Port:         /dev/ttyACM0                                 │
+│   Serial:       E6614C311F4B8B2F                             │
+│   Hardware:     Waveshare RP2350-Relay-6CH                   │
+│   Protocol:     5                                            │
+│   Relay count:  6                                            │
+│   State:        0x00                                         │
+│   On:           <span style="color: #ff4dff;">none</span>                                         │
+│   Pulsing:      <span style="color: #ff4dff;">none</span>                                         │
+╰──────────────────────────────────────────────────────────────╯
+<span style="color: #00d084;">rp2350-relay</span>[<span style="color: #00bfff;">/dev/ttyACM0</span>]$ <span style="color: #d7eaff;">info</span>
+                             <span style="background: #8f8f8f; color: #000000;"> info       </span>
+                             <span style="background: #c0c0c0; color: #000000;"> build-info </span>
+                             <span style="background: #c0c0c0; color: #000000;"> get        </span>
+                             <span style="background: #c0c0c0; color: #000000;"> set        </span>
+                             <span style="background: #c0c0c0; color: #000000;"> set-all    </span>
+                             <span style="background: #c0c0c0; color: #000000;"> pulse      </span>
+                             <span style="background: #c0c0c0; color: #000000;"> off-all    </span>
+                             <span style="background: #c0c0c0; color: #000000;"> status     </span>
+                             <span style="background: #c0c0c0; color: #000000;"> reboot     </span>
+                             <span style="background: #c0c0c0; color: #000000;"> disconnect </span>
+                             <span style="background: #c0c0c0; color: #000000;"> connect    </span>
+                             <span style="background: #c0c0c0; color: #000000;"> help       </span>
+                             <span style="background: #c0c0c0; color: #000000;"> exit       </span>
+                             <span style="background: #c0c0c0; color: #000000;"> quit       </span></code></pre>
+
+#### Python RelayClient
+
+Direct Python automation owns the serial connection. For link-health polling,
+call `relay.heartbeat()` on a regular background interval; see
+[Host library](docs/host-library.md#heartbeat-polling) for the serialized
+heartbeat loop pattern.
+
+```python
+from rp2350_relay_6ch import RelayClient
+from rp2350_relay_6ch.discovery import select_device_by_serial
+
+device = select_device_by_serial("E6614C311F4B8B2F")
+
+with RelayClient.connect(device.port, timeout_s=2.0, retries=1) as relay:
+    relay.get_info()
+    relay.pulse_relay(0, 100)
+    relay.off_all()
+```
+
+See [CLI utility](docs/cli.md), [Host library](docs/host-library.md), and
+[Pico 2 DIY targets](docs/pico-diy-targets.md) for complete setup and usage.
+
 ## Repository Layout
 
 ```text
@@ -502,6 +503,22 @@ Phase plans and verification reports live under `docs/phase-*-plan.md` and
 `docs/testing/phase-*-verification.md`.
 
 ## Safety Notes
+
+### Communication-Loss Safety
+
+- Session mode and daemon mode keep firmware communication ownership alive with
+  heartbeat while they control the board.
+- If that communication is lost while relays are energized, supported timeout
+  builds cancel active pulses and turn all relays off.
+- Local indicators may report owner-lost or reboot-pending attention states.
+  Restore the session or daemon, then use the `status` command, and verify relay
+  state before resuming normal operation.
+- This behavior is a local relay safety fallback, not persistent relay state,
+  telemetry, audit logging, or SmartPDU-style mains-power control.
+
+See [communication-loss safety](docs/protocol/relay-management.md#communication-loss-safety)
+for policy details and [status indicators](docs/status-indicators.md) for LED,
+buzzer, and OLED meanings.
 
 - Do not repurpose GPIO26, GPIO27, GPIO28, GPIO29, GPIO30, or GPIO31; they are
   relay outputs on Waveshare hardware.

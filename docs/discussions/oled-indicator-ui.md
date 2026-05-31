@@ -91,6 +91,65 @@ Observed principles:
 The relay controller should borrow these information-design rules, not any
 specific brand identity, product graphics, or decorative styling.
 
+## Industrial annunciator blink research
+
+Industrial annunciator practice is a useful reference for the OLED because it
+separates "new condition", "operator has seen it", "condition still exists",
+and "condition cleared" into distinct visual states. The important lesson for
+this project is not to copy full plant-annunciator behavior, but to avoid
+using blink or toggle effects casually.
+
+Relevant standards and product references:
+
+- IEC 60073 defines coding principles for visual, acoustic, and tactile
+  indicators. It supports temporal visual coding, such as flashing, as one
+  possible way to distinguish meanings, but the equipment designer must keep
+  those meanings consistent and unambiguous. Source:
+  <https://webstore.iec.ch/en/publication/587>
+- ISA-18.1 defines annunciator sequences and ISA-18.2 covers alarm management
+  lifecycle concepts. Together they reinforce that alarm presentation,
+  acknowledgement, silencing, reset, and operator response should be designed
+  deliberately rather than treated as decorative display effects. Source:
+  <https://www.isa.org/standards-and-publications/isa-standards/isa-18-series-of-standards>
+- AMETEK Series 90B annunciator documentation describes ISA-style sequences
+  including first-out fast flash, subsequent alarm behavior, ringback or return
+  indications, slow flash after return-to-normal, manual reset variants, horn
+  silence, acknowledge, and lamp test. Source:
+  <https://www.ametekpower.com/-/media/ametekpower/files/products/alarm-management/series-90b-annunciator/manual/series-90b-instruction-manual.pdf>
+- SEL-2522 annunciator documentation describes Sequence M and ringback-style
+  behavior where a new alarm flashes and drives audible output, acknowledge
+  changes the visual indication to steady and silences audible output, and a
+  returned-to-normal condition may slow-flash until reset. Source:
+  <https://selinc.com/products/2522/docs/>
+- Honeywell Fire-Lite panel operation uses the same operator model in a fire
+  alarm context: acknowledge silences local audible output and changes flashing
+  indicators to steady while the condition remains present. Source:
+  <https://www.manualslib.com/manual/2689947/Honeywell-Fire-Lite-Alarms-Es-200x.html?page=106>
+
+The common annunciator sequence can be summarized as:
+
+| Condition state | Typical visual behavior | Operator meaning |
+| --- | --- | --- |
+| Normal | Off | No active condition. |
+| New or unacknowledged abnormal condition | Flashing | Attention required; operator has not acknowledged it. |
+| Acknowledged but still abnormal | Steady on | Condition remains active, but the operator has seen it. |
+| Returned to normal after acknowledgement | Slow flash or ringback indication | Condition cleared and is ready for reset or review. |
+| Reset | Off | Condition cleared and acknowledgement/reset cycle is complete. |
+
+For the relay-controller OLED, these findings should be applied narrowly:
+
+- Do not blink normal `USB`, `RDY`, or stable `ACTIVE` annunciators.
+- Blink only the smallest affected element, such as `ERR`, an attention detail,
+  or a pulse marker; do not blink the whole screen or whole relay field.
+- Use steady display for latched or known states when there is no explicit
+  operator acknowledge path.
+- Treat first-out, ringback, and reset semantics as out of scope until firmware
+  has real acknowledge/reset state.
+- Keep `FAULT` and `REBOOT` / `HOLD` steady by default; blinking those labels
+  could imply the operator can acknowledge or reset them locally.
+- Preserve the existing display rule: no animations except bounded blink
+  markers for pulse or attention.
+
 ## Proposed screen model
 
 Use a fixed 128x64 layout with three visual bands.

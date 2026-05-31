@@ -197,13 +197,15 @@ Artifact filenames stay unchanged:
 dist/rp2350_relay_6ch-<version>-py3-none-any.whl
 dist/rp2350_relay_6ch-<version>-waveshare.uf2
 dist/rp2350_relay_6ch-<version>-pico2.uf2
+dist/rp2350_relay_6ch-<version>-product-manifest.json
 ```
 
-`scripts/build.sh` writes a local JSON manifest under `dist/` recording lunch,
+`scripts/build.sh` writes the local JSON manifest under `dist/` with a
+versioned filename independent of lunch target. The manifest records lunch,
 product, release, variant, version, host wheel, host wheel build dir, firmware
 images, boards, build dirs, overlays, artifacts, and ordered Kconfig fragments.
-The manifest is not a GitHub Release artifact unless release docs are
-explicitly updated later.
+The manifest is not a GitHub Release artifact unless release docs are explicitly
+updated later.
 
 ## Failure Rules
 

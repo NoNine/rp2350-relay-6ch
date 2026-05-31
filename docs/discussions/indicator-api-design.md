@@ -110,6 +110,20 @@ References:
 - Do not change the host RPC wire format, host library API, or relay command
   semantics for local indicators.
 
+## Later health-model refinement
+
+The compact health model added after Phase 7 refines stable-state ownership.
+The typed indicator APIs above describe the pre-health implementation boundary:
+domain code publishes facts directly to the indicator, and the indicator maps
+those facts to local output.
+
+Once the health module is implemented, stable controller facts should flow first
+to health. In MVC terms, health is the model, relay/startup/management code are
+controllers, and the indicator is a view over `health_snapshot`. The indicator
+still owns presentation behavior, transient command feedback, timing, rendering,
+and hardware I/O isolation, but it should no longer own the authoritative
+ready/degraded/fault/reboot/relay-active model.
+
 ## Assumptions
 
 - `docs/phase-7-plan.md` remains the authoritative Phase 7 implementation
