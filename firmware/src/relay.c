@@ -9,6 +9,7 @@
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/sys/reboot.h>
 #include <zephyr/sys/util.h>
 
 #include <rp2350_relay_6ch/indicator.h>
@@ -35,6 +36,7 @@ static struct k_mutex relay_lock;
 static uint8_t relay_state_mask;
 static uint8_t relay_pulse_mask;
 static bool comm_loss_armed;
+static bool comm_loss_reboot_scheduled;
 
 struct relay_pulse_work {
 	struct k_work_delayable work;
@@ -44,6 +46,7 @@ struct relay_pulse_work {
 
 static void pulse_expired(struct k_work *work);
 static void comm_loss_expired(struct k_work *work);
+static void comm_loss_reboot_expired(struct k_work *work);
 
 static struct relay_pulse_work relay_pulses[] = {
 	{ .channel = 0U },
@@ -55,6 +58,7 @@ static struct relay_pulse_work relay_pulses[] = {
 };
 
 static K_WORK_DELAYABLE_DEFINE(comm_loss_work, comm_loss_expired);
+static K_WORK_DELAYABLE_DEFINE(comm_loss_reboot_work, comm_loss_reboot_expired);
 
 static bool channel_valid(uint8_t channel)
 {
@@ -147,6 +151,16 @@ static void comm_loss_disarm_if_idle_locked(void)
 	}
 }
 
+static bool comm_loss_cancel_reboot_locked(void)
+{
+	bool was_scheduled = comm_loss_reboot_scheduled;
+
+	comm_loss_reboot_scheduled = false;
+	(void)k_work_cancel_delayable(&comm_loss_reboot_work);
+
+	return was_scheduled;
+}
+
 static void cancel_pulses_locked(uint8_t pulse_mask)
 {
 	for (size_t i = 0; i < ARRAY_SIZE(relay_pulses); i++) {
@@ -225,6 +239,8 @@ static void comm_loss_expired(struct k_work *work)
 	uint8_t pulse_mask = 0U;
 	struct indicator_pulse_timing pulse_timing[RP2350_RELAY_6CH_CHANNEL_COUNT];
 	bool publish = false;
+	bool owner_lost = false;
+	bool reboot_pending = false;
 	int ret = 0;
 
 	ARG_UNUSED(work);
@@ -242,7 +258,14 @@ static void comm_loss_expired(struct k_work *work)
 		pulse_mask = relay_pulse_mask;
 		snapshot_pulse_timing_locked(pulse_mask, pulse_timing);
 		if (IS_ENABLED(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_ALWAYS_ON_OWNER)) {
-			comm_loss_schedule_locked();
+			owner_lost = true;
+			if (relay_comm_loss_reboot_on_timeout()) {
+				comm_loss_armed = false;
+				comm_loss_reboot_scheduled = true;
+				reboot_pending = true;
+			} else {
+				comm_loss_schedule_locked();
+			}
 		} else {
 			comm_loss_armed = false;
 		}
@@ -254,9 +277,32 @@ static void comm_loss_expired(struct k_work *work)
 		publish_indicator_state(state_mask, pulse_mask, pulse_timing);
 	}
 
+	if (owner_lost) {
+		indicator_set_owner_lost(true);
+	}
+
+	if (reboot_pending) {
+		indicator_set_comm_loss_reboot_pending(true);
+		(void)k_work_schedule(&comm_loss_reboot_work,
+				      K_MSEC(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_REBOOT_DELAY_MS));
+	}
+
 	if (ret < 0) {
 		LOG_ERR("Communication-loss off-all failed: %d", ret);
 	}
+}
+
+static void comm_loss_reboot_expired(struct k_work *work)
+{
+	ARG_UNUSED(work);
+
+#ifdef CONFIG_ZTEST
+	return;
+#elif defined(CONFIG_REBOOT)
+	sys_reboot(SYS_REBOOT_COLD);
+#else
+	return;
+#endif
 }
 
 int relay_init(void)
@@ -286,7 +332,12 @@ int relay_init(void)
 	relay_state_mask = 0U;
 	relay_pulse_mask = 0U;
 	comm_loss_armed = false;
+	comm_loss_reboot_scheduled = false;
 	(void)k_work_cancel_delayable(&comm_loss_work);
+	(void)k_work_cancel_delayable(&comm_loss_reboot_work);
+	indicator_set_owner_lost(false);
+	indicator_set_reboot_pending(false);
+	indicator_set_comm_loss_reboot_pending(false);
 	if (IS_ENABLED(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_ALWAYS_ON_OWNER)) {
 		k_mutex_lock(&relay_lock, K_FOREVER);
 		comm_loss_schedule_locked();
@@ -355,6 +406,7 @@ int relay_set(uint8_t channel, bool on)
 	uint8_t state_mask = 0U;
 	uint8_t pulse_mask = 0U;
 	struct indicator_pulse_timing pulse_timing[RP2350_RELAY_6CH_CHANNEL_COUNT];
+	bool reboot_canceled = false;
 	int ret;
 
 	if (!channel_valid(channel)) {
@@ -368,12 +420,17 @@ int relay_set(uint8_t channel, bool on)
 		state_mask = relay_state_mask;
 		pulse_mask = relay_pulse_mask;
 		snapshot_pulse_timing_locked(pulse_mask, pulse_timing);
+		reboot_canceled = comm_loss_cancel_reboot_locked();
 		comm_loss_schedule_locked();
 	}
 	k_mutex_unlock(&relay_lock);
 
 	if (ret == 0) {
 		publish_indicator_state(state_mask, pulse_mask, pulse_timing);
+		indicator_set_owner_lost(false);
+		if (reboot_canceled) {
+			indicator_set_comm_loss_reboot_pending(false);
+		}
 	}
 
 	return ret;
@@ -384,6 +441,7 @@ int relay_set_all(uint8_t state_mask)
 	uint8_t next_state_mask = 0U;
 	uint8_t pulse_mask = 0U;
 	struct indicator_pulse_timing pulse_timing[RP2350_RELAY_6CH_CHANNEL_COUNT];
+	bool reboot_canceled = false;
 	int ret;
 
 	if ((state_mask & ~BIT_MASK(ARRAY_SIZE(relays))) != 0U) {
@@ -397,12 +455,17 @@ int relay_set_all(uint8_t state_mask)
 		next_state_mask = relay_state_mask;
 		pulse_mask = relay_pulse_mask;
 		snapshot_pulse_timing_locked(pulse_mask, pulse_timing);
+		reboot_canceled = comm_loss_cancel_reboot_locked();
 		comm_loss_schedule_locked();
 	}
 	k_mutex_unlock(&relay_lock);
 
 	if (ret == 0) {
 		publish_indicator_state(next_state_mask, pulse_mask, pulse_timing);
+		indicator_set_owner_lost(false);
+		if (reboot_canceled) {
+			indicator_set_comm_loss_reboot_pending(false);
+		}
 	}
 
 	return ret;
@@ -418,6 +481,7 @@ int relay_pulse(uint8_t channel, uint32_t duration_ms)
 	uint8_t state_mask = 0U;
 	uint8_t pulse_mask = 0U;
 	struct indicator_pulse_timing pulse_timing[RP2350_RELAY_6CH_CHANNEL_COUNT];
+	bool reboot_canceled = false;
 	int ret;
 
 	if (!channel_valid(channel)) {
@@ -448,6 +512,7 @@ int relay_pulse(uint8_t channel, uint32_t duration_ms)
 			state_mask = relay_state_mask;
 			pulse_mask = relay_pulse_mask;
 			snapshot_pulse_timing_locked(pulse_mask, pulse_timing);
+			reboot_canceled = comm_loss_cancel_reboot_locked();
 			comm_loss_schedule_locked();
 		}
 	}
@@ -455,6 +520,10 @@ int relay_pulse(uint8_t channel, uint32_t duration_ms)
 
 	if (ret >= 0) {
 		publish_indicator_state(state_mask, pulse_mask, pulse_timing);
+		indicator_set_owner_lost(false);
+		if (reboot_canceled) {
+			indicator_set_comm_loss_reboot_pending(false);
+		}
 	}
 
 	return ret < 0 ? ret : 0;
@@ -462,9 +531,16 @@ int relay_pulse(uint8_t channel, uint32_t duration_ms)
 
 void relay_comm_loss_renew(void)
 {
+	bool reboot_canceled;
+
 	k_mutex_lock(&relay_lock, K_FOREVER);
+	reboot_canceled = comm_loss_cancel_reboot_locked();
 	comm_loss_schedule_locked();
 	k_mutex_unlock(&relay_lock);
+	indicator_set_owner_lost(false);
+	if (reboot_canceled) {
+		indicator_set_comm_loss_reboot_pending(false);
+	}
 }
 
 const char *relay_comm_loss_policy(void)
@@ -488,3 +564,33 @@ uint32_t relay_comm_loss_timeout_ms(void)
 
 	return CONFIG_RP2350_RELAY_6CH_COMM_LOSS_TIMEOUT_MS;
 }
+
+bool relay_comm_loss_reboot_on_timeout(void)
+{
+	return IS_ENABLED(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_ALWAYS_ON_OWNER_REBOOT_ON_TIMEOUT);
+}
+
+uint32_t relay_comm_loss_reboot_delay_ms(void)
+{
+	if (!relay_comm_loss_reboot_on_timeout()) {
+		return 0U;
+	}
+
+	return CONFIG_RP2350_RELAY_6CH_COMM_LOSS_REBOOT_DELAY_MS;
+}
+
+#ifdef CONFIG_ZTEST
+bool relay_comm_loss_test_reboot_scheduled(void)
+{
+	return comm_loss_reboot_scheduled;
+}
+
+uint32_t relay_comm_loss_test_reboot_remaining_ms(void)
+{
+	if (!comm_loss_reboot_scheduled) {
+		return 0U;
+	}
+
+	return k_ticks_to_ms_ceil32(k_work_delayable_remaining_get(&comm_loss_reboot_work));
+}
+#endif

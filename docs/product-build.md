@@ -167,7 +167,12 @@ The fragment order is significant and must be preserved when passed to Zephyr
 communication-loss policy.
 
 The `boardfarm` release config selects `firmware/profiles/always_on_owner.conf`
-for board-farm and lab compositions that need a persistent owner lease, plus
+for board-farm and lab compositions that need a persistent owner lease. That
+profile also enables reboot-on-timeout recovery: after a 5 s owner timeout,
+firmware turns all relays off and shows local owner-lost/reboot-pending
+indication. If no heartbeat or relay-control command restores ownership during
+the 60 s reboot delay, firmware cold reboots to recover the application and USB
+communication path. The release config also selects
 `firmware/profiles/display_rotated_180.conf` for the boardfarm OLED mounting
 orientation.
 

@@ -67,8 +67,10 @@ struct indicator_state {
 	bool hardware_enabled;
 	bool ready;
 	bool degraded;
+	bool owner_lost;
 	bool fault;
-	bool reboot_pending;
+	bool host_reboot_pending;
+	bool comm_loss_reboot_pending;
 	uint8_t relay_state_mask;
 	uint8_t pulse_mask;
 	uint32_t pulse_duration_ms[DISPLAY_PULSE_CHANNELS];
@@ -194,11 +196,11 @@ static enum indicator_rgb_pattern resolve_rgb_locked(int64_t now)
 		return INDICATOR_RGB_FAULT;
 	}
 
-	if (state.reboot_pending) {
+	if (state.host_reboot_pending || state.comm_loss_reboot_pending) {
 		return INDICATOR_RGB_REBOOT_PENDING;
 	}
 
-	if (state.degraded || now < state.attention_until) {
+	if (state.degraded || state.owner_lost || now < state.attention_until) {
 		return INDICATOR_RGB_ATTENTION;
 	}
 
@@ -289,6 +291,10 @@ static enum indicator_display_detail display_detail_locked(enum indicator_rgb_pa
 	if (pattern == INDICATOR_RGB_ATTENTION) {
 		if (state.degraded) {
 			return INDICATOR_DISPLAY_DETAIL_E_IO;
+		}
+
+		if (state.owner_lost) {
+			return INDICATOR_DISPLAY_DETAIL_OWNER;
 		}
 
 		if (state.attention_detail != INDICATOR_DISPLAY_DETAIL_NONE) {
@@ -563,6 +569,8 @@ static const char *display_detail_text(enum indicator_display_detail detail)
 		return "E:BUSY";
 	case INDICATOR_DISPLAY_DETAIL_E_IO:
 		return "E:IO";
+	case INDICATOR_DISPLAY_DETAIL_OWNER:
+		return "OWNER";
 	case INDICATOR_DISPLAY_DETAIL_HOLD:
 		return "HOLD";
 	case INDICATOR_DISPLAY_DETAIL_NONE:
@@ -1113,7 +1121,7 @@ static void render(void)
 	memcpy(pulse_duration_ms, state.pulse_duration_ms, sizeof(pulse_duration_ms));
 	memcpy(pulse_end_ms, state.pulse_end_ms, sizeof(pulse_end_ms));
 	display_ready_state = state.ready;
-	display_error = state.degraded || state.fault ||
+	display_error = state.degraded || state.owner_lost || state.fault ||
 			pattern == INDICATOR_RGB_ATTENTION;
 	state.display_mode = display_mode;
 	state.display_detail = display_detail;
@@ -1192,8 +1200,10 @@ void indicator_init(void)
 #endif
 	state.ready = false;
 	state.degraded = false;
+	state.owner_lost = false;
 	state.fault = false;
-	state.reboot_pending = false;
+	state.host_reboot_pending = false;
+	state.comm_loss_reboot_pending = false;
 	state.relay_state_mask = 0U;
 	state.pulse_mask = 0U;
 	memset(state.pulse_duration_ms, 0, sizeof(state.pulse_duration_ms));
@@ -1322,6 +1332,15 @@ void indicator_set_degraded(bool degraded)
 	schedule_render_now();
 }
 
+void indicator_set_owner_lost(bool owner_lost)
+{
+	ensure_initialized();
+	k_mutex_lock(&state.lock, K_FOREVER);
+	state.owner_lost = owner_lost;
+	k_mutex_unlock(&state.lock);
+	schedule_render_now();
+}
+
 void indicator_set_fault(bool fault)
 {
 	ensure_initialized();
@@ -1333,9 +1352,26 @@ void indicator_set_fault(bool fault)
 
 void indicator_set_reboot_pending(bool pending)
 {
+	indicator_set_host_reboot_pending(pending);
+}
+
+void indicator_set_host_reboot_pending(bool pending)
+{
 	ensure_initialized();
 	k_mutex_lock(&state.lock, K_FOREVER);
-	state.reboot_pending = pending;
+	state.host_reboot_pending = pending;
+	if (pending) {
+		set_buzzer_locked(INDICATOR_BUZZER_REBOOT_PENDING);
+	}
+	k_mutex_unlock(&state.lock);
+	schedule_render_now();
+}
+
+void indicator_set_comm_loss_reboot_pending(bool pending)
+{
+	ensure_initialized();
+	k_mutex_lock(&state.lock, K_FOREVER);
+	state.comm_loss_reboot_pending = pending;
 	if (pending) {
 		set_buzzer_locked(INDICATOR_BUZZER_REBOOT_PENDING);
 	}
@@ -1376,8 +1412,10 @@ void indicator_test_get_snapshot(struct indicator_test_snapshot *snapshot)
 	snapshot->display_detail = state.display_detail;
 	snapshot->ready = state.ready;
 	snapshot->degraded = state.degraded;
+	snapshot->owner_lost = state.owner_lost;
 	snapshot->fault = state.fault;
-	snapshot->reboot_pending = state.reboot_pending;
+	snapshot->reboot_pending =
+		state.host_reboot_pending || state.comm_loss_reboot_pending;
 	snapshot->relay_state_mask = state.relay_state_mask;
 	snapshot->pulse_mask = state.pulse_mask;
 	snapshot->display_filled_mask = state.display_filled_mask;

@@ -162,7 +162,11 @@ static bool encode_comm_loss_policy(zcbor_state_t *zse)
 	return zcbor_tstr_put_lit(zse, "comm_loss_policy") &&
 	       zcbor_tstr_encode(zse, &policy_string) &&
 	       zcbor_tstr_put_lit(zse, "comm_loss_timeout_ms") &&
-	       zcbor_uint32_put(zse, relay_comm_loss_timeout_ms());
+	       zcbor_uint32_put(zse, relay_comm_loss_timeout_ms()) &&
+	       zcbor_tstr_put_lit(zse, "comm_loss_reboot_on_timeout") &&
+	       zcbor_bool_put(zse, relay_comm_loss_reboot_on_timeout()) &&
+	       zcbor_tstr_put_lit(zse, "comm_loss_reboot_delay_ms") &&
+	       zcbor_uint32_put(zse, relay_comm_loss_reboot_delay_ms());
 }
 
 static int encode_state_or_error(zcbor_state_t *zse)
@@ -481,7 +485,7 @@ static int reboot_handler(struct smp_streamer *ctxt)
 
 #ifdef CONFIG_REBOOT
 	counter_inc(RELAY_MGMT_COUNTER_SUCCEEDED);
-	indicator_set_reboot_pending(true);
+	indicator_set_host_reboot_pending(true);
 #else
 	record_error_indicator(RP2350_RELAY_6CH_MGMT_ERR_REBOOT_UNAVAILABLE);
 #endif

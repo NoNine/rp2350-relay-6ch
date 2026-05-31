@@ -197,6 +197,26 @@ ZTEST(indicator, test_degraded_persists_until_cleared)
 	zassert_false(snap.degraded);
 }
 
+ZTEST(indicator, test_owner_lost_persists_until_cleared)
+{
+	struct indicator_test_snapshot snap;
+
+	indicator_set_ready(true);
+	indicator_set_owner_lost(true);
+	snap = snapshot();
+
+	zassert_equal(snap.rgb, INDICATOR_RGB_ATTENTION);
+	zassert_true(snap.owner_lost);
+	zassert_false(snap.degraded);
+
+	indicator_test_advance(1000U);
+	indicator_set_owner_lost(false);
+	snap = snapshot();
+
+	zassert_equal(snap.rgb, INDICATOR_RGB_READY);
+	zassert_false(snap.owner_lost);
+}
+
 ZTEST(indicator, test_reboot_pending_priority)
 {
 	struct indicator_test_snapshot snap;
@@ -718,6 +738,11 @@ ZTEST(indicator, test_display_attention_reboot_and_fault_priority)
 	snap = snapshot();
 	zassert_equal(snap.display_mode, INDICATOR_DISPLAY_MODE_ATTN);
 	zassert_equal(snap.display_detail, INDICATOR_DISPLAY_DETAIL_E_BUSY);
+
+	indicator_set_owner_lost(true);
+	snap = snapshot();
+	zassert_equal(snap.display_mode, INDICATOR_DISPLAY_MODE_ATTN);
+	zassert_equal(snap.display_detail, INDICATOR_DISPLAY_DETAIL_OWNER);
 
 	indicator_set_reboot_pending(true);
 	snap = snapshot();

@@ -77,7 +77,9 @@ Response:
 | `pulse_min_ms` | uint | Minimum pulse duration. |
 | `pulse_max_ms` | uint | Maximum pulse duration. |
 | `comm_loss_policy` | text | Communication-loss policy string. |
-| `comm_loss_timeout_ms` | uint | Firmware communication-loss timeout. `0` means no firmware timeout. |
+| `comm_loss_timeout_ms` | uint | Firmware communication-loss all-off timeout. `0` means no firmware timeout. |
+| `comm_loss_reboot_on_timeout` | bool | Whether the active communication-loss policy schedules firmware reboot after timeout. |
+| `comm_loss_reboot_delay_ms` | uint | Delay from communication-loss all-off to autonomous reboot. `0` means no autonomous reboot is scheduled. |
 | `capabilities` | uint | Capability bit mask for get, set, set-all, pulse, and off-all. |
 
 Policy strings are `energized-only`, `no-comm-timeout`, and
@@ -174,7 +176,9 @@ Response:
 | `usb_cdc_acm` | bool | Whether USB CDC ACM serial support is compiled in. |
 | `smp_uart` | bool | Whether Zephyr's SMP UART transport is compiled in. |
 | `comm_loss_policy` | text | Communication-loss policy string. |
-| `comm_loss_timeout_ms` | uint | Firmware communication-loss timeout. `0` means no firmware timeout. |
+| `comm_loss_timeout_ms` | uint | Firmware communication-loss all-off timeout. `0` means no firmware timeout. |
+| `comm_loss_reboot_on_timeout` | bool | Whether the active communication-loss policy schedules firmware reboot after timeout. |
+| `comm_loss_reboot_delay_ms` | uint | Delay from communication-loss all-off to autonomous reboot. `0` means no autonomous reboot is scheduled. |
 | `uptime_ms` | uint | Zephyr uptime in milliseconds. |
 | `received` | uint | Commands received, including this status command. |
 | `succeeded` | uint | Commands completed before this status response is encoded. |
@@ -205,12 +209,13 @@ Response:
 | --- | --- | --- |
 | `ok` | bool | Present and true when the heartbeat request was accepted. |
 | `comm_loss_policy` | text | Communication-loss policy string. |
-| `comm_loss_timeout_ms` | uint | Firmware communication-loss timeout. `0` means no firmware timeout. |
+| `comm_loss_timeout_ms` | uint | Firmware communication-loss all-off timeout. `0` means no firmware timeout. |
+| `comm_loss_reboot_on_timeout` | bool | Whether the active communication-loss policy schedules firmware reboot after timeout. |
+| `comm_loss_reboot_delay_ms` | uint | Delay from communication-loss all-off to autonomous reboot. `0` means no autonomous reboot is scheduled. |
 
 In protocol `5`, `heartbeat` renews the firmware communication-loss lease when
 the active policy uses a timeout. It does not change relay outputs directly,
-emit events, expose heartbeat health state, persist relay state, or schedule a
-reboot.
+emit events, expose heartbeat health state, or persist relay state.
 
 ## Communication-Loss Safety
 
@@ -224,11 +229,21 @@ Protocol `5` defines build-time communication-loss policies:
   communication loss. `comm_loss_timeout_ms` is reported as `0`.
 - `always-on-owner`: the timeout starts at boot, renews on heartbeat and
   successful relay-control commands, and does not disarm just because all
-  relays are off.
+  relays are off. Timeout latches a local owner-lost attention indication until
+  a later successful heartbeat or relay-control command proves the owner is
+  back.
 
-When a timeout expires, firmware cancels active pulses, turns all relays off,
-and updates local indicators. It does not reboot, persist state, emit events,
-write audit logs, or imply mains-power SmartPDU behavior.
+When `comm_loss_timeout_ms` expires, firmware cancels active pulses, turns all
+relays off, and updates local indicators. Builds with
+`comm_loss_reboot_on_timeout=true` also show reboot-pending indication and
+schedule a cold firmware reboot after `comm_loss_reboot_delay_ms`. A successful
+heartbeat or relay-control command during that delay restores ownership and
+cancels the pending autonomous reboot. Firmware does not persist state, emit
+events, write audit logs, or imply mains-power SmartPDU behavior.
+
+The `reboot` command is host-initiated maintenance, not a communication-loss
+recovery action. It uses its own short controlled-reboot pending indication and
+is not delayed by `comm_loss_reboot_delay_ms`.
 
 ### Planned `event`
 

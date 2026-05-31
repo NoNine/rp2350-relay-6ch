@@ -71,6 +71,7 @@ enum indicator_display_detail {
 	INDICATOR_DISPLAY_DETAIL_E_ARG,
 	INDICATOR_DISPLAY_DETAIL_E_BUSY,
 	INDICATOR_DISPLAY_DETAIL_E_IO,
+	INDICATOR_DISPLAY_DETAIL_OWNER,
 	INDICATOR_DISPLAY_DETAIL_HOLD,
 };
 
@@ -87,6 +88,7 @@ struct indicator_test_snapshot {
 	enum indicator_display_detail display_detail;
 	bool ready;
 	bool degraded;
+	bool owner_lost;
 	bool fault;
 	bool reboot_pending;
 	uint8_t relay_state_mask;
@@ -105,7 +107,10 @@ void indicator_set_relay_timed_state(
 	const struct indicator_pulse_timing pulse_timing[6]);
 void indicator_record_command(enum indicator_command_result result);
 void indicator_set_degraded(bool degraded);
+void indicator_set_owner_lost(bool owner_lost);
 void indicator_set_fault(bool fault);
+void indicator_set_host_reboot_pending(bool pending);
+void indicator_set_comm_loss_reboot_pending(bool pending);
 void indicator_set_reboot_pending(bool pending);
 
 #ifdef CONFIG_ZTEST

@@ -28,6 +28,13 @@ int relay_pulse(uint8_t channel, uint32_t duration_ms);
 void relay_comm_loss_renew(void);
 const char *relay_comm_loss_policy(void);
 uint32_t relay_comm_loss_timeout_ms(void);
+bool relay_comm_loss_reboot_on_timeout(void);
+uint32_t relay_comm_loss_reboot_delay_ms(void);
+
+#ifdef CONFIG_ZTEST
+bool relay_comm_loss_test_reboot_scheduled(void);
+uint32_t relay_comm_loss_test_reboot_remaining_ms(void);
+#endif
 
 #ifdef __cplusplus
 }

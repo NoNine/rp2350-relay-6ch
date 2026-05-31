@@ -71,4 +71,24 @@ config RP2350_RELAY_6CH_COMM_LOSS_TIMEOUT_MS
 	  Timeout used by communication-loss policies that force all relays off.
 	  The standard product profile uses 5000 ms.
 
+config RP2350_RELAY_6CH_COMM_LOSS_ALWAYS_ON_OWNER_REBOOT_ON_TIMEOUT
+	bool "Reboot on always-on owner communication-loss timeout"
+	depends on RP2350_RELAY_6CH_COMM_LOSS_ALWAYS_ON_OWNER && REBOOT
+	default n
+	help
+	  After an always-on owner communication-loss timeout, force all relays
+	  off, show reboot-pending local indication, and cold reboot the firmware
+	  to recover the application and USB communication path.
+
+config RP2350_RELAY_6CH_COMM_LOSS_REBOOT_DELAY_MS
+	int "Always-on owner timeout reboot delay in milliseconds"
+	default 60000
+	range 0 600000
+	help
+	  Delay between an always-on owner communication-loss timeout all-off
+	  safety action and the cold reboot used for unattended recovery.
+	  Heartbeat or relay-control commands that restore ownership before this
+	  delay expires cancel the pending reboot. This value is reported as 0
+	  when reboot-on-timeout is disabled.
+
 source "Kconfig.zephyr"

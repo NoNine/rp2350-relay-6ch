@@ -41,8 +41,8 @@ rollback workflows.
 | Solid green | Controller is ready, RPC is available, and no relay is commanded on. | Normal idle state. |
 | Brief green blink | A valid host command was accepted. | No action unless the host reports an error. |
 | Solid cyan or blue | One or more relays are commanded on, or a pulse is active. | Confirm this matches the intended operation. Use `rp2350-relay status` for the commanded state mask. |
-| Yellow pulse | Degraded or attention state, such as RPC not ready, repeated invalid requests, busy pulse rejection, or pending update attention. | Query `rp2350-relay status` and review the host command result. |
-| Purple or blue animation | Controlled reboot is pending, or reserved Phase 9/10 firmware upgrade support is active. | Do not remove power unless following a documented recovery procedure. |
+| Yellow pulse | Degraded or attention state, such as RPC not ready, repeated invalid requests, busy pulse rejection, or `always-on-owner` communication-loss timeout. | Query `rp2350-relay status`; if owner loss is suspected, restore the session or daemon heartbeat owner and verify relays are in the intended state. |
+| Purple or blue animation | Controlled reboot is pending, autonomous communication-loss reboot recovery is pending, or reserved Phase 9/10 firmware upgrade support is active. | For communication-loss recovery, restore the session or daemon heartbeat owner before the reboot delay expires. For explicit reboot or upgrade, do not remove power unless following a documented recovery procedure. |
 | Red blink | Firmware or hardware fault requiring attention. Relays should be off unless the fault occurred after an explicit command state. | Run `rp2350-relay status` if reachable, then force `off-all` before inspecting wiring or logs. |
 
 The cyan or blue relay-active indication means commanded relay state only. It
@@ -61,7 +61,7 @@ background heartbeat.
 | One long beep | Controller boot completed and firmware reached ready state. | Begin normal operation, or run `rp2350-relay info` if host communication is not available. |
 | One short beep | Operation accepted when buzzer feedback is enabled. | No action unless the host reports an error. |
 | Two short beeps | Command rejected or validation error. | Check the CLI error, command arguments, channel number, pulse duration, and current relay pulse state. |
-| Three short beeps | Controlled reboot scheduled, or reserved Phase 9/10 firmware upgrade support. | Wait for the board to return and verify `info` or `status`. |
+| Three short beeps | Controlled reboot scheduled, autonomous communication-loss reboot recovery pending, or reserved Phase 9/10 firmware upgrade support. | Restore the heartbeat owner if communication-loss recovery was unintended; otherwise wait for the board to return and verify `info` or `status`. |
 | Time-limited repeating chirp | Fault or local attention condition. | Silence or power down according to site procedure, then run status/recovery checks. |
 
 The firmware must not generate a continuous alarm without a timeout or silence
