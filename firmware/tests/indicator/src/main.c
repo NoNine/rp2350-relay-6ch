@@ -49,7 +49,7 @@ ZTEST(indicator, test_booting_to_ready)
 
 	zassert_equal(snap.rgb, INDICATOR_RGB_BOOTING);
 
-	indicator_set_ready(true);
+	publish_health(HEALTH_NORMAL, HEALTH_REASON_NONE, HEALTH_REASON_NONE, 0U, 0U);
 	snap = snapshot();
 
 	zassert_equal(snap.rgb, INDICATOR_RGB_READY);
@@ -141,7 +141,7 @@ ZTEST(indicator, test_boot_ready_buzzer_is_long_when_enabled)
 		ztest_test_skip();
 	}
 
-	indicator_set_ready(true);
+	publish_health(HEALTH_NORMAL, HEALTH_REASON_NONE, HEALTH_REASON_NONE, 0U, 0U);
 	snap = snapshot();
 	zassert_equal(snap.buzzer, INDICATOR_BUZZER_BOOT_READY);
 
@@ -162,7 +162,7 @@ ZTEST(indicator, test_boot_ready_buzzer_does_not_repeat_when_already_ready)
 {
 	struct indicator_test_snapshot snap;
 
-	indicator_set_ready(true);
+	publish_health(HEALTH_NORMAL, HEALTH_REASON_NONE, HEALTH_REASON_NONE, 0U, 0U);
 	snap = snapshot();
 	if (IS_ENABLED(CONFIG_RP2350_RELAY_6CH_BUZZER_FEEDBACK)) {
 		zassert_equal(snap.buzzer, INDICATOR_BUZZER_BOOT_READY);
@@ -175,7 +175,7 @@ ZTEST(indicator, test_boot_ready_buzzer_does_not_repeat_when_already_ready)
 	indicator_test_get_snapshot(&snap);
 	zassert_equal(snap.buzzer, INDICATOR_BUZZER_SILENT);
 
-	indicator_set_ready(true);
+	publish_health(HEALTH_NORMAL, HEALTH_REASON_NONE, HEALTH_REASON_NONE, 0U, 0U);
 	snap = snapshot();
 	zassert_equal(snap.buzzer, INDICATOR_BUZZER_SILENT);
 }
@@ -188,7 +188,8 @@ ZTEST(indicator, test_reboot_pending_buzzer_finishes_before_reset_delay)
 		ztest_test_skip();
 	}
 
-	indicator_set_reboot_pending(true);
+	publish_health(HEALTH_RECOVERY_PENDING, HEALTH_REASON_HOST_REBOOT_PENDING,
+		       HEALTH_REASON_HOST_REBOOT_PENDING, 0U, 0U);
 	snap = snapshot();
 	zassert_equal(snap.buzzer, INDICATOR_BUZZER_REBOOT_PENDING);
 
@@ -225,13 +226,15 @@ ZTEST(indicator, test_relay_active_overrides_ready)
 {
 	struct indicator_test_snapshot snap;
 
-	indicator_set_ready(true);
-	indicator_set_relay_state(BIT(0), 0U);
+	publish_health(HEALTH_NORMAL, HEALTH_REASON_NONE, HEALTH_REASON_NONE, 0U, 0U);
+	publish_health(HEALTH_RELAY_ACTIVE, HEALTH_REASON_NONE, HEALTH_REASON_NONE,
+		       BIT(0), 0U);
 	snap = snapshot();
 
 	zassert_equal(snap.rgb, INDICATOR_RGB_RELAY_ACTIVE);
 
-	indicator_set_relay_state(0U, BIT(1));
+	publish_health(HEALTH_RELAY_ACTIVE, HEALTH_REASON_NONE, HEALTH_REASON_NONE,
+		       0U, BIT(1));
 	snap = snapshot();
 
 	zassert_equal(snap.rgb, INDICATOR_RGB_RELAY_ACTIVE);
@@ -242,7 +245,7 @@ ZTEST(indicator, test_accepted_command_transient)
 {
 	struct indicator_test_snapshot snap;
 
-	indicator_set_ready(true);
+	publish_health(HEALTH_NORMAL, HEALTH_REASON_NONE, HEALTH_REASON_NONE, 0U, 0U);
 	indicator_record_command(INDICATOR_COMMAND_ACCEPTED);
 	snap = snapshot();
 
@@ -258,7 +261,7 @@ ZTEST(indicator, test_attention_overrides_accepted)
 {
 	struct indicator_test_snapshot snap;
 
-	indicator_set_ready(true);
+	publish_health(HEALTH_NORMAL, HEALTH_REASON_NONE, HEALTH_REASON_NONE, 0U, 0U);
 	indicator_record_command(INDICATOR_COMMAND_ACCEPTED);
 	indicator_record_command(INDICATOR_COMMAND_REJECTED);
 	snap = snapshot();
@@ -270,15 +273,16 @@ ZTEST(indicator, test_degraded_persists_until_cleared)
 {
 	struct indicator_test_snapshot snap;
 
-	indicator_set_ready(true);
-	indicator_set_degraded(true);
+	publish_health(HEALTH_NORMAL, HEALTH_REASON_NONE, HEALTH_REASON_NONE, 0U, 0U);
+	publish_health(HEALTH_DEGRADED, HEALTH_REASON_INDICATOR_DEGRADED,
+		       HEALTH_REASON_INDICATOR_DEGRADED, 0U, 0U);
 	snap = snapshot();
 
 	zassert_equal(snap.rgb, INDICATOR_RGB_ATTENTION);
 	zassert_true(snap.degraded);
 
 	indicator_test_advance(1000U);
-	indicator_set_degraded(false);
+	publish_health(HEALTH_NORMAL, HEALTH_REASON_NONE, HEALTH_REASON_NONE, 0U, 0U);
 	snap = snapshot();
 
 	zassert_equal(snap.rgb, INDICATOR_RGB_READY);
@@ -289,16 +293,17 @@ ZTEST(indicator, test_owner_lost_persists_until_cleared)
 {
 	struct indicator_test_snapshot snap;
 
-	indicator_set_ready(true);
-	indicator_set_owner_lost(true);
+	publish_health(HEALTH_NORMAL, HEALTH_REASON_NONE, HEALTH_REASON_NONE, 0U, 0U);
+	publish_health(HEALTH_DEGRADED, HEALTH_REASON_COMM_OWNER_TIMEOUT,
+		       HEALTH_REASON_COMM_OWNER_TIMEOUT, 0U, 0U);
 	snap = snapshot();
 
 	zassert_equal(snap.rgb, INDICATOR_RGB_ATTENTION);
 	zassert_true(snap.owner_lost);
-	zassert_false(snap.degraded);
+	zassert_true(snap.degraded);
 
 	indicator_test_advance(1000U);
-	indicator_set_owner_lost(false);
+	publish_health(HEALTH_NORMAL, HEALTH_REASON_NONE, HEALTH_REASON_NONE, 0U, 0U);
 	snap = snapshot();
 
 	zassert_equal(snap.rgb, INDICATOR_RGB_READY);
@@ -313,7 +318,8 @@ ZTEST(indicator, test_owner_lost_buzzer_is_three_fault_pulses_when_enabled)
 		ztest_test_skip();
 	}
 
-	indicator_set_owner_lost(true);
+	publish_health(HEALTH_DEGRADED, HEALTH_REASON_COMM_OWNER_TIMEOUT,
+		       HEALTH_REASON_COMM_OWNER_TIMEOUT, 0U, 0U);
 	snap = snapshot();
 	zassert_equal(snap.buzzer, INDICATOR_BUZZER_OWNER_LOST);
 	zassert_true(snap.buzzer_on);
@@ -364,7 +370,8 @@ ZTEST(indicator, test_owner_lost_buzzer_does_not_repeat_while_latched)
 		ztest_test_skip();
 	}
 
-	indicator_set_owner_lost(true);
+	publish_health(HEALTH_DEGRADED, HEALTH_REASON_COMM_OWNER_TIMEOUT,
+		       HEALTH_REASON_COMM_OWNER_TIMEOUT, 0U, 0U);
 	snap = snapshot();
 	zassert_equal(snap.buzzer, INDICATOR_BUZZER_OWNER_LOST);
 
@@ -377,12 +384,14 @@ ZTEST(indicator, test_owner_lost_buzzer_does_not_repeat_while_latched)
 	indicator_test_get_snapshot(&snap);
 	zassert_equal(snap.buzzer, INDICATOR_BUZZER_SILENT);
 
-	indicator_set_owner_lost(true);
+	publish_health(HEALTH_DEGRADED, HEALTH_REASON_COMM_OWNER_TIMEOUT,
+		       HEALTH_REASON_COMM_OWNER_TIMEOUT, 0U, 0U);
 	snap = snapshot();
 	zassert_equal(snap.buzzer, INDICATOR_BUZZER_SILENT);
 
-	indicator_set_owner_lost(false);
-	indicator_set_owner_lost(true);
+	publish_health(HEALTH_NORMAL, HEALTH_REASON_NONE, HEALTH_REASON_NONE, 0U, 0U);
+	publish_health(HEALTH_DEGRADED, HEALTH_REASON_COMM_OWNER_TIMEOUT,
+		       HEALTH_REASON_COMM_OWNER_TIMEOUT, 0U, 0U);
 	snap = snapshot();
 	zassert_equal(snap.buzzer, INDICATOR_BUZZER_OWNER_LOST);
 }
@@ -391,9 +400,10 @@ ZTEST(indicator, test_reboot_pending_priority)
 {
 	struct indicator_test_snapshot snap;
 
-	indicator_set_ready(true);
+	publish_health(HEALTH_NORMAL, HEALTH_REASON_NONE, HEALTH_REASON_NONE, 0U, 0U);
 	indicator_record_command(INDICATOR_COMMAND_REJECTED);
-	indicator_set_reboot_pending(true);
+	publish_health(HEALTH_RECOVERY_PENDING, HEALTH_REASON_HOST_REBOOT_PENDING,
+		       HEALTH_REASON_HOST_REBOOT_PENDING, 0U, 0U);
 	snap = snapshot();
 
 	zassert_equal(snap.rgb, INDICATOR_RGB_REBOOT_PENDING);
@@ -404,10 +414,13 @@ ZTEST(indicator, test_fault_highest_priority)
 {
 	struct indicator_test_snapshot snap;
 
-	indicator_set_ready(true);
-	indicator_set_relay_state(BIT(0), 0U);
-	indicator_set_reboot_pending(true);
-	indicator_set_fault(true);
+	publish_health(HEALTH_NORMAL, HEALTH_REASON_NONE, HEALTH_REASON_NONE, 0U, 0U);
+	publish_health(HEALTH_RELAY_ACTIVE, HEALTH_REASON_NONE, HEALTH_REASON_NONE,
+		       BIT(0), 0U);
+	publish_health(HEALTH_RECOVERY_PENDING, HEALTH_REASON_HOST_REBOOT_PENDING,
+		       HEALTH_REASON_HOST_REBOOT_PENDING, 0U, 0U);
+	publish_health(HEALTH_FAULT, HEALTH_REASON_RELAY_IO_FAILED,
+		       HEALTH_REASON_RELAY_IO_FAILED, 0U, 0U);
 	snap = snapshot();
 
 	zassert_equal(snap.rgb, INDICATOR_RGB_FAULT);
@@ -450,11 +463,13 @@ ZTEST(indicator, test_buzzer_feedback_mapping_when_enabled)
 	snap = snapshot();
 	zassert_equal(snap.buzzer, INDICATOR_BUZZER_REJECTED);
 
-	indicator_set_owner_lost(true);
+	publish_health(HEALTH_DEGRADED, HEALTH_REASON_COMM_OWNER_TIMEOUT,
+		       HEALTH_REASON_COMM_OWNER_TIMEOUT, 0U, 0U);
 	snap = snapshot();
 	zassert_equal(snap.buzzer, INDICATOR_BUZZER_OWNER_LOST);
 
-	indicator_set_reboot_pending(true);
+	publish_health(HEALTH_RECOVERY_PENDING, HEALTH_REASON_HOST_REBOOT_PENDING,
+		       HEALTH_REASON_HOST_REBOOT_PENDING, 0U, 0U);
 	snap = snapshot();
 	zassert_equal(snap.buzzer, INDICATOR_BUZZER_REBOOT_PENDING);
 }
@@ -491,7 +506,7 @@ ZTEST(indicator, test_display_post_success_and_ready_render)
 	indicator_test_configure_display(true, true, 128U, 64U,
 					 PIXEL_FORMAT_MONO01, false, false, false);
 	indicator_test_reset();
-	indicator_set_ready(true);
+	publish_health(HEALTH_NORMAL, HEALTH_REASON_NONE, HEALTH_REASON_NONE, 0U, 0U);
 	snap = snapshot();
 
 	zassert_equal(snap.display_state, INDICATOR_DISPLAY_READY);
@@ -535,7 +550,7 @@ ZTEST(indicator, test_display_draws_static_usb_annunciator)
 	indicator_test_configure_display(true, true, 128U, 64U,
 					 PIXEL_FORMAT_MONO01, false, false, false);
 	indicator_test_reset();
-	indicator_set_ready(true);
+	publish_health(HEALTH_NORMAL, HEALTH_REASON_NONE, HEALTH_REASON_NONE, 0U, 0U);
 	(void)snapshot();
 
 	zassert_true(indicator_test_display_pixel_is_set(3U, 3U));
@@ -552,7 +567,8 @@ ZTEST(indicator, test_display_draws_active_annunciator_for_pulse_only_state)
 	indicator_test_configure_display(true, true, 128U, 64U,
 					 PIXEL_FORMAT_MONO01, false, false, false);
 	indicator_test_reset();
-	indicator_set_relay_state(0U, BIT(1));
+	publish_health(HEALTH_RELAY_ACTIVE, HEALTH_REASON_NONE, HEALTH_REASON_NONE,
+		       0U, BIT(1));
 	snap = snapshot();
 
 	zassert_equal(snap.display_mode, INDICATOR_DISPLAY_MODE_ACTIVE);
@@ -567,7 +583,8 @@ ZTEST(indicator, test_display_status_band_aligns_to_inset_column)
 	indicator_test_configure_display(true, true, 128U, 64U,
 					 PIXEL_FORMAT_MONO01, false, false, false);
 	indicator_test_reset();
-	indicator_set_relay_state(BIT(0), 0U);
+	publish_health(HEALTH_RELAY_ACTIVE, HEALTH_REASON_NONE, HEALTH_REASON_NONE,
+		       BIT(0), 0U);
 	(void)snapshot();
 
 	zassert_true(indicator_test_display_pixel_is_set(4U, 54U));
@@ -582,7 +599,7 @@ ZTEST(indicator, test_display_draws_floorplan_rules_and_cell_origins)
 	indicator_test_configure_display(true, true, 128U, 64U,
 					 PIXEL_FORMAT_MONO01, false, false, false);
 	indicator_test_reset();
-	indicator_set_ready(true);
+	publish_health(HEALTH_NORMAL, HEALTH_REASON_NONE, HEALTH_REASON_NONE, 0U, 0U);
 	(void)snapshot();
 
 	zassert_true(indicator_test_display_pixel_is_set(3U, 13U));
@@ -675,13 +692,14 @@ ZTEST(indicator, test_display_render_failure_fails_until_reboot)
 	writes_before = snap.display_write_count;
 
 	indicator_test_set_display_render_failure(true);
-	indicator_set_ready(true);
+	publish_health(HEALTH_NORMAL, HEALTH_REASON_NONE, HEALTH_REASON_NONE, 0U, 0U);
 	snap = snapshot();
 	zassert_equal(snap.display_state, INDICATOR_DISPLAY_FAILED);
 	zassert_equal(snap.display_write_count, writes_before);
 
 	indicator_test_set_display_render_failure(false);
-	indicator_set_relay_state(BIT(0), 0U);
+	publish_health(HEALTH_RELAY_ACTIVE, HEALTH_REASON_NONE, HEALTH_REASON_NONE,
+		       BIT(0), 0U);
 	snap = snapshot();
 	zassert_equal(snap.display_state, INDICATOR_DISPLAY_FAILED);
 	zassert_equal(snap.display_write_count, writes_before);
@@ -694,8 +712,9 @@ ZTEST(indicator, test_display_relay_cells_and_pulse_detail)
 	indicator_test_configure_display(true, true, 128U, 64U,
 					 PIXEL_FORMAT_MONO01, false, false, false);
 	indicator_test_reset();
-	indicator_set_ready(true);
-	indicator_set_relay_state(BIT(0) | BIT(5), BIT(1));
+	publish_health(HEALTH_NORMAL, HEALTH_REASON_NONE, HEALTH_REASON_NONE, 0U, 0U);
+	publish_health(HEALTH_RELAY_ACTIVE, HEALTH_REASON_NONE, HEALTH_REASON_NONE,
+		       BIT(0) | BIT(5), BIT(1));
 	snap = snapshot();
 
 	zassert_equal(snap.display_state, INDICATOR_DISPLAY_READY);
@@ -712,8 +731,9 @@ ZTEST(indicator, test_display_active_overrides_accepted_command_transient)
 	indicator_test_configure_display(true, true, 128U, 64U,
 					 PIXEL_FORMAT_MONO01, false, false, false);
 	indicator_test_reset();
-	indicator_set_ready(true);
-	indicator_set_relay_state(BIT(0), 0U);
+	publish_health(HEALTH_NORMAL, HEALTH_REASON_NONE, HEALTH_REASON_NONE, 0U, 0U);
+	publish_health(HEALTH_RELAY_ACTIVE, HEALTH_REASON_NONE, HEALTH_REASON_NONE,
+		       BIT(0), 0U);
 	indicator_record_command(INDICATOR_COMMAND_ACCEPTED);
 	snap = snapshot();
 
@@ -731,8 +751,9 @@ ZTEST(indicator, test_display_pulse_detail_overrides_accepted_command_transient)
 	indicator_test_configure_display(true, true, 128U, 64U,
 					 PIXEL_FORMAT_MONO01, false, false, false);
 	indicator_test_reset();
-	indicator_set_ready(true);
-	indicator_set_relay_state(0U, BIT(1));
+	publish_health(HEALTH_NORMAL, HEALTH_REASON_NONE, HEALTH_REASON_NONE, 0U, 0U);
+	publish_health(HEALTH_RELAY_ACTIVE, HEALTH_REASON_NONE, HEALTH_REASON_NONE,
+		       0U, BIT(1));
 	indicator_record_command(INDICATOR_COMMAND_ACCEPTED);
 	snap = snapshot();
 
@@ -748,7 +769,8 @@ ZTEST(indicator, test_display_reverses_labels_in_filled_relay_cells)
 	indicator_test_configure_display(true, true, 128U, 64U,
 					 PIXEL_FORMAT_MONO01, false, false, false);
 	indicator_test_reset();
-	indicator_set_relay_state(BIT(0), 0U);
+	publish_health(HEALTH_RELAY_ACTIVE, HEALTH_REASON_NONE, HEALTH_REASON_NONE,
+		       BIT(0), 0U);
 	(void)snapshot();
 
 	zassert_true(indicator_test_display_pixel_is_set(3U, 18U));
@@ -762,7 +784,8 @@ ZTEST(indicator, test_display_draws_visible_pulse_mark)
 	indicator_test_configure_display(true, true, 128U, 64U,
 					 PIXEL_FORMAT_MONO01, false, false, false);
 	indicator_test_reset();
-	indicator_set_relay_state(0U, BIT(0));
+	publish_health(HEALTH_RELAY_ACTIVE, HEALTH_REASON_NONE, HEALTH_REASON_NONE,
+		       0U, BIT(0));
 	(void)snapshot();
 
 	zassert_true(indicator_test_display_pixel_is_set(3U, 18U));
@@ -782,7 +805,8 @@ ZTEST(indicator, test_display_blinks_pulse_mark_without_clearing_cell)
 	indicator_test_configure_display(true, true, 128U, 64U,
 					 PIXEL_FORMAT_MONO01, false, false, false);
 	indicator_test_reset();
-	indicator_set_relay_state(0U, BIT(0));
+	publish_health(HEALTH_RELAY_ACTIVE, HEALTH_REASON_NONE, HEALTH_REASON_NONE,
+		       0U, BIT(0));
 	snap = snapshot();
 	writes_before = snap.display_write_count;
 
@@ -812,6 +836,8 @@ ZTEST(indicator, test_display_draws_full_pulse_countdown_lane)
 	indicator_test_configure_display(true, true, 128U, 64U,
 					 PIXEL_FORMAT_MONO01, false, false, false);
 	indicator_test_reset();
+	publish_health(HEALTH_RELAY_ACTIVE, HEALTH_REASON_NONE, HEALTH_REASON_NONE,
+		       0U, BIT(0));
 	indicator_set_relay_timed_state(0U, BIT(0), timing);
 	(void)snapshot();
 
@@ -823,6 +849,30 @@ ZTEST(indicator, test_display_draws_full_pulse_countdown_lane)
 	zassert_false(indicator_test_display_pixel_is_set(11U, 48U));
 }
 
+ZTEST(indicator, test_display_timing_metadata_does_not_change_health_masks)
+{
+	struct indicator_pulse_timing timing[6] = {
+		[0] = { .duration_ms = 1000U, .remaining_ms = 1000U },
+	};
+	struct indicator_test_snapshot snap;
+
+	indicator_test_configure_display(true, true, 128U, 64U,
+					 PIXEL_FORMAT_MONO01, false, false, false);
+	indicator_test_reset();
+	publish_health(HEALTH_NORMAL, HEALTH_REASON_NONE, HEALTH_REASON_NONE,
+		       0U, 0U);
+	indicator_set_relay_timed_state(BIT(0), BIT(0), timing);
+	snap = snapshot();
+
+	zassert_equal(snap.rgb, INDICATOR_RGB_READY);
+	zassert_equal(snap.display_mode, INDICATOR_DISPLAY_MODE_READY);
+	zassert_equal(snap.relay_state_mask, 0U);
+	zassert_equal(snap.pulse_mask, 0U);
+	zassert_equal(snap.display_filled_mask, 0U);
+	zassert_equal(snap.display_pulse_mask, 0U);
+	zassert_false(indicator_test_display_pixel_is_set(4U, 46U));
+}
+
 ZTEST(indicator, test_display_center_drains_pulse_countdown_lane)
 {
 	struct indicator_pulse_timing timing[6] = {
@@ -832,6 +882,8 @@ ZTEST(indicator, test_display_center_drains_pulse_countdown_lane)
 	indicator_test_configure_display(true, true, 128U, 64U,
 					 PIXEL_FORMAT_MONO01, false, false, false);
 	indicator_test_reset();
+	publish_health(HEALTH_RELAY_ACTIVE, HEALTH_REASON_NONE, HEALTH_REASON_NONE,
+		       0U, BIT(0));
 	indicator_set_relay_timed_state(0U, BIT(0), timing);
 	(void)snapshot();
 
@@ -853,6 +905,8 @@ ZTEST(indicator, test_display_removes_elapsed_pulse_countdown_lane)
 	indicator_test_configure_display(true, true, 128U, 64U,
 					 PIXEL_FORMAT_MONO01, false, false, false);
 	indicator_test_reset();
+	publish_health(HEALTH_RELAY_ACTIVE, HEALTH_REASON_NONE, HEALTH_REASON_NONE,
+		       0U, BIT(0));
 	indicator_set_relay_timed_state(0U, BIT(0), timing);
 	(void)snapshot();
 
@@ -874,6 +928,8 @@ ZTEST(indicator, test_display_draws_countdown_for_each_pulsing_cell)
 	indicator_test_configure_display(true, true, 128U, 64U,
 					 PIXEL_FORMAT_MONO01, false, false, false);
 	indicator_test_reset();
+	publish_health(HEALTH_RELAY_ACTIVE, HEALTH_REASON_NONE, HEALTH_REASON_NONE,
+		       0U, BIT(0) | BIT(3));
 	indicator_set_relay_timed_state(0U, BIT(0) | BIT(3), timing);
 	(void)snapshot();
 
@@ -893,7 +949,8 @@ ZTEST(indicator, test_display_multiple_pulses_render_p_star)
 	indicator_test_configure_display(true, true, 128U, 64U,
 					 PIXEL_FORMAT_MONO01, false, false, false);
 	indicator_test_reset();
-	indicator_set_relay_state(0U, BIT(0) | BIT(3));
+	publish_health(HEALTH_RELAY_ACTIVE, HEALTH_REASON_NONE, HEALTH_REASON_NONE,
+		       0U, BIT(0) | BIT(3));
 	snap = snapshot();
 
 	zassert_equal(snap.display_mode, INDICATOR_DISPLAY_MODE_ACTIVE);
@@ -908,7 +965,7 @@ ZTEST(indicator, test_display_attention_reboot_and_fault_priority)
 	indicator_test_configure_display(true, true, 128U, 64U,
 					 PIXEL_FORMAT_MONO01, false, false, false);
 	indicator_test_reset();
-	indicator_set_ready(true);
+	publish_health(HEALTH_NORMAL, HEALTH_REASON_NONE, HEALTH_REASON_NONE, 0U, 0U);
 	indicator_record_command(INDICATOR_COMMAND_REJECTED);
 	snap = snapshot();
 	zassert_equal(snap.display_mode, INDICATOR_DISPLAY_MODE_ATTN);
@@ -919,17 +976,20 @@ ZTEST(indicator, test_display_attention_reboot_and_fault_priority)
 	zassert_equal(snap.display_mode, INDICATOR_DISPLAY_MODE_ATTN);
 	zassert_equal(snap.display_detail, INDICATOR_DISPLAY_DETAIL_E_BUSY);
 
-	indicator_set_owner_lost(true);
+	publish_health(HEALTH_DEGRADED, HEALTH_REASON_COMM_OWNER_TIMEOUT,
+		       HEALTH_REASON_COMM_OWNER_TIMEOUT, 0U, 0U);
 	snap = snapshot();
 	zassert_equal(snap.display_mode, INDICATOR_DISPLAY_MODE_ATTN);
 	zassert_equal(snap.display_detail, INDICATOR_DISPLAY_DETAIL_OWNER);
 
-	indicator_set_reboot_pending(true);
+	publish_health(HEALTH_RECOVERY_PENDING, HEALTH_REASON_HOST_REBOOT_PENDING,
+		       HEALTH_REASON_HOST_REBOOT_PENDING, 0U, 0U);
 	snap = snapshot();
 	zassert_equal(snap.display_mode, INDICATOR_DISPLAY_MODE_REBOOT);
 	zassert_equal(snap.display_detail, INDICATOR_DISPLAY_DETAIL_HOLD);
 
-	indicator_set_fault(true);
+	publish_health(HEALTH_FAULT, HEALTH_REASON_RELAY_IO_FAILED,
+		       HEALTH_REASON_RELAY_IO_FAILED, 0U, 0U);
 	snap = snapshot();
 	zassert_equal(snap.display_mode, INDICATOR_DISPLAY_MODE_FAULT);
 	zassert_equal(snap.display_detail, INDICATOR_DISPLAY_DETAIL_E_IO);

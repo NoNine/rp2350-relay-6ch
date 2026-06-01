@@ -86,7 +86,6 @@ static void publish_indicator_state(
 	indicator_set_health_snapshot(&snapshot);
 
 	if (pulse_timing == NULL) {
-		indicator_set_relay_state(state_mask, pulse_mask);
 		return;
 	}
 
@@ -401,9 +400,6 @@ int relay_init(void)
 	(void)k_work_cancel_delayable(&comm_loss_work);
 	(void)k_work_cancel_delayable(&comm_loss_reboot_pending_indication_work);
 	(void)k_work_cancel_delayable(&comm_loss_reboot_work);
-	indicator_set_owner_lost(false);
-	indicator_set_reboot_pending(false);
-	indicator_set_comm_loss_reboot_pending(false);
 	health_set_comm_owner_timed_out(false);
 	health_set_comm_reboot_pending(false);
 	if (IS_ENABLED(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_ALWAYS_ON_OWNER)) {

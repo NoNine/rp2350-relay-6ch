@@ -174,15 +174,17 @@ controller state, follow the compact health model contract in
 code publish facts to health, and the indicator consumes a health-derived
 summary. Presentation-only command feedback remains local to the indicator.
 
-Before the health model is implemented, existing firmware publishes domain
-facts through the typed indicator APIs:
+Stable controller facts flow through:
 
-- `indicator_set_ready(bool ready)`
-- `indicator_set_relay_state(uint8_t state_mask, uint8_t pulse_mask)`
-- `indicator_record_command(enum indicator_command_result result)`
-- `indicator_set_degraded(bool degraded)`
-- `indicator_set_fault(bool fault)`
-- `indicator_set_reboot_pending(bool pending)`
+- `indicator_set_health_snapshot(const struct health_snapshot *snapshot)`
+
+Presentation-only inputs may remain indicator-local:
+
+- `indicator_record_command(enum indicator_command_result result)` for short
+  accepted, rejected, and busy feedback.
+- `indicator_set_relay_timed_state(...)` for OLED pulse countdown timing. The
+  authoritative commanded relay and pulse masks still come from the health
+  snapshot.
 
 The display is a local output backend next to the RGB LED and buzzer. Relay and
 RPC paths must not perform OLED I/O directly.

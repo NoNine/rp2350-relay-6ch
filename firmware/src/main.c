@@ -27,7 +27,6 @@ int main(void)
 		health_record_relay_gpio_init_failed();
 		health_snapshot(&snapshot);
 		indicator_set_health_snapshot(&snapshot);
-		indicator_set_fault(true);
 		return ret;
 	}
 

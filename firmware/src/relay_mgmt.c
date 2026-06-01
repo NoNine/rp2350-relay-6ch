@@ -70,7 +70,6 @@ static void record_error_indicator(enum rp2350_relay_6ch_mgmt_err error)
 		indicator_record_command(INDICATOR_COMMAND_BUSY);
 		break;
 	case RP2350_RELAY_6CH_MGMT_ERR_RELAY_IO:
-		indicator_set_fault(true);
 		break;
 	case RP2350_RELAY_6CH_MGMT_ERR_OK:
 	default:
@@ -519,7 +518,7 @@ static int reboot_handler(struct smp_streamer *ctxt)
 
 #ifdef CONFIG_REBOOT
 	counter_inc(RELAY_MGMT_COUNTER_SUCCEEDED);
-	indicator_set_host_reboot_pending(true);
+	relay_mgmt_publish_health();
 #else
 	record_error_indicator(RP2350_RELAY_6CH_MGMT_ERR_REBOOT_UNAVAILABLE);
 #endif
@@ -759,7 +758,7 @@ void relay_mgmt_test_cancel_reboot(void)
 #ifdef CONFIG_REBOOT
 	(void)k_work_cancel_delayable(&reboot_work);
 	health_set_host_reboot_pending(false);
-	indicator_set_host_reboot_pending(false);
+	relay_mgmt_publish_health();
 #endif
 }
 #endif

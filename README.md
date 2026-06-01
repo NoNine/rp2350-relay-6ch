@@ -371,10 +371,6 @@ Use [CLI utility](docs/cli.md) for full session mode, Linux daemon mode,
 [Host library](docs/host-library.md) for Python discovery, direct clients,
 daemon clients, and multi-device automation examples.
 
-## Usage Preview
-
-These previews use the same grouping as the architecture diagrams.
-
 ### Linux Daemon-Based Host Control
 
 #### Daemon Deployment

@@ -106,18 +106,10 @@ struct indicator_test_snapshot {
 
 void indicator_init(void);
 void indicator_set_health_snapshot(const struct health_snapshot *snapshot);
-void indicator_set_ready(bool ready);
-void indicator_set_relay_state(uint8_t state_mask, uint8_t pulse_mask);
 void indicator_set_relay_timed_state(
 	uint8_t state_mask, uint8_t pulse_mask,
 	const struct indicator_pulse_timing pulse_timing[6]);
 void indicator_record_command(enum indicator_command_result result);
-void indicator_set_degraded(bool degraded);
-void indicator_set_owner_lost(bool owner_lost);
-void indicator_set_fault(bool fault);
-void indicator_set_host_reboot_pending(bool pending);
-void indicator_set_comm_loss_reboot_pending(bool pending);
-void indicator_set_reboot_pending(bool pending);
 
 #ifdef CONFIG_ZTEST
 void indicator_test_reset(void);

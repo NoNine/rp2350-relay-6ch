@@ -1292,18 +1292,6 @@ void indicator_init(void)
 	schedule_render_now();
 }
 
-void indicator_set_ready(bool ready)
-{
-	ensure_initialized();
-	k_mutex_lock(&state.lock, K_FOREVER);
-	if (ready && !state.ready) {
-		set_buzzer_locked(INDICATOR_BUZZER_BOOT_READY);
-	}
-	state.ready = ready;
-	k_mutex_unlock(&state.lock);
-	schedule_render_now();
-}
-
 void indicator_set_health_snapshot(const struct health_snapshot *snapshot)
 {
 	if (snapshot == NULL) {
@@ -1317,28 +1305,18 @@ void indicator_set_health_snapshot(const struct health_snapshot *snapshot)
 	schedule_render_now();
 }
 
-void indicator_set_relay_state(uint8_t state_mask, uint8_t pulse_mask)
-{
-	ensure_initialized();
-	k_mutex_lock(&state.lock, K_FOREVER);
-	state.relay_state_mask = state_mask;
-	state.pulse_mask = pulse_mask;
-	memset(state.pulse_duration_ms, 0, sizeof(state.pulse_duration_ms));
-	memset(state.pulse_end_ms, 0, sizeof(state.pulse_end_ms));
-	k_mutex_unlock(&state.lock);
-	schedule_render_now();
-}
-
 void indicator_set_relay_timed_state(
 	uint8_t state_mask, uint8_t pulse_mask,
 	const struct indicator_pulse_timing pulse_timing[DISPLAY_PULSE_CHANNELS])
 {
 	const int64_t now = indicator_now();
+	uint8_t active_pulse_mask;
+
+	ARG_UNUSED(state_mask);
 
 	ensure_initialized();
 	k_mutex_lock(&state.lock, K_FOREVER);
-	state.relay_state_mask = state_mask;
-	state.pulse_mask = pulse_mask;
+	active_pulse_mask = pulse_mask & state.pulse_mask;
 	memset(state.pulse_duration_ms, 0, sizeof(state.pulse_duration_ms));
 	memset(state.pulse_end_ms, 0, sizeof(state.pulse_end_ms));
 
@@ -1346,7 +1324,7 @@ void indicator_set_relay_timed_state(
 		for (uint8_t channel = 0U; channel < DISPLAY_PULSE_CHANNELS; channel++) {
 			uint8_t bit = BIT(channel);
 
-			if ((pulse_mask & bit) == 0U ||
+			if ((active_pulse_mask & bit) == 0U ||
 			    pulse_timing[channel].duration_ms == 0U ||
 			    pulse_timing[channel].remaining_ms == 0U) {
 				continue;
@@ -1386,65 +1364,6 @@ void indicator_record_command(enum indicator_command_result result)
 		state.attention_detail = INDICATOR_DISPLAY_DETAIL_E_ARG;
 		set_buzzer_locked(INDICATOR_BUZZER_REJECTED);
 		break;
-	}
-	k_mutex_unlock(&state.lock);
-	schedule_render_now();
-}
-
-void indicator_set_degraded(bool degraded)
-{
-	ensure_initialized();
-	k_mutex_lock(&state.lock, K_FOREVER);
-	state.degraded = degraded;
-	k_mutex_unlock(&state.lock);
-	schedule_render_now();
-}
-
-void indicator_set_owner_lost(bool owner_lost)
-{
-	ensure_initialized();
-	k_mutex_lock(&state.lock, K_FOREVER);
-	if (owner_lost && !state.owner_lost) {
-		set_buzzer_locked(INDICATOR_BUZZER_OWNER_LOST);
-	}
-	state.owner_lost = owner_lost;
-	k_mutex_unlock(&state.lock);
-	schedule_render_now();
-}
-
-void indicator_set_fault(bool fault)
-{
-	ensure_initialized();
-	k_mutex_lock(&state.lock, K_FOREVER);
-	state.fault = fault;
-	k_mutex_unlock(&state.lock);
-	schedule_render_now();
-}
-
-void indicator_set_reboot_pending(bool pending)
-{
-	indicator_set_host_reboot_pending(pending);
-}
-
-void indicator_set_host_reboot_pending(bool pending)
-{
-	ensure_initialized();
-	k_mutex_lock(&state.lock, K_FOREVER);
-	state.host_reboot_pending = pending;
-	if (pending) {
-		set_buzzer_locked(INDICATOR_BUZZER_REBOOT_PENDING);
-	}
-	k_mutex_unlock(&state.lock);
-	schedule_render_now();
-}
-
-void indicator_set_comm_loss_reboot_pending(bool pending)
-{
-	ensure_initialized();
-	k_mutex_lock(&state.lock, K_FOREVER);
-	state.comm_loss_reboot_pending = pending;
-	if (pending) {
-		set_buzzer_locked(INDICATOR_BUZZER_REBOOT_PENDING);
 	}
 	k_mutex_unlock(&state.lock);
 	schedule_render_now();
