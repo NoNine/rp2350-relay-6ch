@@ -110,7 +110,21 @@ class FakeClient:
 
     def get_status(self) -> dict[str, Any]:
         self.calls.append(("get_status", ()))
-        return {"state": 0, "pulsing": 0, "request_count": 12, "last_error": 0}
+        return {
+            "state": 0,
+            "pulsing": 0,
+            "health": "degraded",
+            "health_reasons": 8,
+            "health_primary_reason": "comm_owner_timeout",
+            "health_transitions": 3,
+            "busy": 0,
+            "comm_loss_reboot_on_timeout": False,
+            "request_count": 12,
+            "last_error": 0,
+            "transport": "usb_cdc_acm_smp",
+            "usb_cdc_acm": True,
+            "smp_uart": True,
+        }
 
     def reboot(self) -> dict[str, Any]:
         self.calls.append(("reboot", ()))
@@ -461,13 +475,25 @@ def test_status_human_output_groups_relay_and_transport_fields(
     captured = capsys.readouterr()
 
     assert rc == cli.EXIT_OK
-    assert "relays:\n" in captured.out
-    assert "  state:    0x00" in captured.out
-    assert "  on:       none" in captured.out
-    assert "  pulsing:  none" in captured.out
-    assert "transport:\n" in captured.out
-    assert "  last_error:     0" in captured.out
-    assert "  request_count:  12" in captured.out
+    assert captured.out == (
+        "[relays]\n"
+        "state:                        0x00\n"
+        "on:                           none\n"
+        "pulsing:                      none\n"
+        "\n"
+        "[health]\n"
+        "state:                        degraded\n"
+        "primary_reason:               comm_owner_timeout\n"
+        "reasons:                      8\n"
+        "transitions:                  3\n"
+        "\n"
+        "[transport]\n"
+        "busy:                         0\n"
+        "comm_loss_reboot_on_timeout:  False\n"
+        "last_error:                   0\n"
+        "request_count:                12\n"
+        "transport:                    usb_cdc_acm_smp\n"
+    )
 
 
 def test_status_json_output_is_unchanged(capsys: pytest.CaptureFixture[str]) -> None:
@@ -476,7 +502,13 @@ def test_status_json_output_is_unchanged(capsys: pytest.CaptureFixture[str]) -> 
     captured = capsys.readouterr()
 
     assert rc == cli.EXIT_OK
-    assert captured.out.strip() == '{"last_error": 0, "pulsing": 0, "request_count": 12, "state": 0}'
+    assert captured.out.strip() == (
+        '{"busy": 0, "comm_loss_reboot_on_timeout": false, "health": "degraded", '
+        '"health_primary_reason": "comm_owner_timeout", "health_reasons": 8, '
+        '"health_transitions": 3, "last_error": 0, "pulsing": 0, '
+        '"request_count": 12, "smp_uart": true, "state": 0, '
+        '"transport": "usb_cdc_acm_smp", "usb_cdc_acm": true}'
+    )
 
 
 def test_missing_port_returns_argument_exit(capsys: pytest.CaptureFixture[str]) -> None:

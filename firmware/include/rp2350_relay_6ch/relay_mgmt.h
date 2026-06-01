@@ -52,6 +52,7 @@ struct rp2350_relay_6ch_mgmt_counters {
 
 void relay_mgmt_get_counters(struct rp2350_relay_6ch_mgmt_counters *counters);
 void relay_mgmt_reset_counters(void);
+void relay_mgmt_publish_health(void);
 
 #ifdef CONFIG_ZTEST
 int relay_mgmt_test_handle(uint8_t command_id, bool write, const uint8_t *request,

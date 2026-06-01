@@ -76,5 +76,5 @@ target_include_directories(app PRIVATE
   include
   ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
-target_sources(app PRIVATE src/main.c src/relay.c src/relay_mgmt.c src/indicator.c)
+target_sources(app PRIVATE src/main.c src/health.c src/relay.c src/relay_mgmt.c src/indicator.c)
 target_sources_ifdef(CONFIG_SHELL app PRIVATE src/relay_shell.c)

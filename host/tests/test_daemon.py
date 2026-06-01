@@ -64,7 +64,14 @@ class FakeRelayClient:
 
     def get_status(self) -> dict[str, Any]:
         self.calls.append(("get_status", ()))
-        return {"state": self.relay_state, "pulsing": 0}
+        return {
+            "state": self.relay_state,
+            "pulsing": 0,
+            "health": "degraded",
+            "health_reasons": 8,
+            "health_primary_reason": "comm_owner_timeout",
+            "health_transitions": 3,
+        }
 
     def get_relays(self, channel: int | None = None) -> dict[str, Any]:
         self.calls.append(("get_relays", (channel,)))
@@ -463,6 +470,23 @@ def test_persistent_socket_requests_are_serialized(tmp_path: Any) -> None:
 
     assert first == {"id": "1", "ok": True, "result": {"state": 1, "pulsing": 0}}
     assert second == {"id": "2", "ok": True, "result": {"state": 1, "pulsing": 0}}
+
+
+def test_status_preserves_additive_health_fields(tmp_path: Any) -> None:
+    daemon = make_daemon(tmp_path)
+    daemon._initial_connect()
+
+    request = parse_request_line(b'{"id":"1","command":"status"}', 1)
+    response = daemon._handle_request(request)
+
+    assert response == {
+        "state": 0,
+        "pulsing": 0,
+        "health": "degraded",
+        "health_reasons": 8,
+        "health_primary_reason": "comm_owner_timeout",
+        "health_transitions": 3,
+    }
 
 
 def test_oversized_frame_returns_protocol_error(tmp_path: Any) -> None:

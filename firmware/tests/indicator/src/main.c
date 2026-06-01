@@ -5,6 +5,7 @@
 #include <zephyr/ztest.h>
 #include <zephyr/drivers/display.h>
 
+#include <rp2350_relay_6ch/health.h>
 #include <rp2350_relay_6ch/indicator.h>
 
 static struct indicator_test_snapshot snapshot(void)
@@ -14,6 +15,21 @@ static struct indicator_test_snapshot snapshot(void)
 	indicator_test_force_render();
 	indicator_test_get_snapshot(&snap);
 	return snap;
+}
+
+static void publish_health(enum health_state state, uint32_t reasons,
+			   enum health_reason primary_reason, uint8_t relay_mask,
+			   uint8_t pulse_mask)
+{
+	const struct health_snapshot health = {
+		.state = state,
+		.reasons = reasons,
+		.primary_reason = primary_reason,
+		.relay_state_mask = relay_mask,
+		.pulse_mask = pulse_mask,
+	};
+
+	indicator_set_health_snapshot(&health);
 }
 
 static void indicator_before(void *fixture)
@@ -43,6 +59,78 @@ ZTEST(indicator, test_booting_to_ready)
 	} else {
 		zassert_equal(snap.buzzer, INDICATOR_BUZZER_SILENT);
 	}
+}
+
+ZTEST(indicator, test_health_snapshots_drive_stable_states)
+{
+	struct indicator_test_snapshot snap;
+
+	publish_health(HEALTH_NORMAL, HEALTH_REASON_NONE, HEALTH_REASON_NONE, 0U, 0U);
+	snap = snapshot();
+	zassert_equal(snap.rgb, INDICATOR_RGB_READY);
+	zassert_true(snap.ready);
+
+	publish_health(HEALTH_RELAY_ACTIVE, HEALTH_REASON_NONE, HEALTH_REASON_NONE,
+		       BIT(1), 0U);
+	snap = snapshot();
+	zassert_equal(snap.rgb, INDICATOR_RGB_RELAY_ACTIVE);
+	zassert_equal(snap.relay_state_mask, BIT(1));
+
+	publish_health(HEALTH_DEGRADED, HEALTH_REASON_COMM_OWNER_TIMEOUT,
+		       HEALTH_REASON_COMM_OWNER_TIMEOUT, 0U, 0U);
+	snap = snapshot();
+	zassert_equal(snap.rgb, INDICATOR_RGB_ATTENTION);
+	zassert_true(snap.degraded);
+	zassert_true(snap.owner_lost);
+
+	publish_health(HEALTH_FAULT, HEALTH_REASON_RELAY_IO_FAILED,
+		       HEALTH_REASON_RELAY_IO_FAILED, 0U, 0U);
+	snap = snapshot();
+	zassert_equal(snap.rgb, INDICATOR_RGB_FAULT);
+	zassert_true(snap.fault);
+
+	publish_health(HEALTH_RECOVERY_PENDING, HEALTH_REASON_HOST_REBOOT_PENDING,
+		       HEALTH_REASON_HOST_REBOOT_PENDING, 0U, 0U);
+	snap = snapshot();
+	zassert_equal(snap.rgb, INDICATOR_RGB_REBOOT_PENDING);
+	zassert_true(snap.reboot_pending);
+}
+
+ZTEST(indicator, test_fault_snapshot_from_boot_does_not_mark_ready)
+{
+	struct indicator_test_snapshot snap;
+
+	publish_health(HEALTH_FAULT, HEALTH_REASON_RELAY_GPIO_INIT_FAILED,
+		       HEALTH_REASON_RELAY_GPIO_INIT_FAILED, 0U, 0U);
+	snap = snapshot();
+
+	zassert_equal(snap.rgb, INDICATOR_RGB_FAULT);
+	zassert_false(snap.ready);
+	zassert_true(snap.fault);
+	zassert_not_equal(snap.buzzer, INDICATOR_BUZZER_BOOT_READY);
+}
+
+ZTEST(indicator, test_command_transients_do_not_override_degraded_fault_or_recovery)
+{
+	struct indicator_test_snapshot snap;
+
+	publish_health(HEALTH_DEGRADED, HEALTH_REASON_COMM_OWNER_TIMEOUT,
+		       HEALTH_REASON_COMM_OWNER_TIMEOUT, 0U, 0U);
+	indicator_record_command(INDICATOR_COMMAND_ACCEPTED);
+	snap = snapshot();
+	zassert_equal(snap.rgb, INDICATOR_RGB_ATTENTION);
+
+	publish_health(HEALTH_FAULT, HEALTH_REASON_RELAY_IO_FAILED,
+		       HEALTH_REASON_RELAY_IO_FAILED, 0U, 0U);
+	indicator_record_command(INDICATOR_COMMAND_ACCEPTED);
+	snap = snapshot();
+	zassert_equal(snap.rgb, INDICATOR_RGB_FAULT);
+
+	publish_health(HEALTH_RECOVERY_PENDING, HEALTH_REASON_HOST_REBOOT_PENDING,
+		       HEALTH_REASON_HOST_REBOOT_PENDING, 0U, 0U);
+	indicator_record_command(INDICATOR_COMMAND_REJECTED);
+	snap = snapshot();
+	zassert_equal(snap.rgb, INDICATOR_RGB_REBOOT_PENDING);
 }
 
 ZTEST(indicator, test_boot_ready_buzzer_is_long_when_enabled)
@@ -845,4 +933,29 @@ ZTEST(indicator, test_display_attention_reboot_and_fault_priority)
 	snap = snapshot();
 	zassert_equal(snap.display_mode, INDICATOR_DISPLAY_MODE_FAULT);
 	zassert_equal(snap.display_detail, INDICATOR_DISPLAY_DETAIL_E_IO);
+}
+
+ZTEST(indicator, test_display_health_snapshot_preserves_owner_timeout_detail)
+{
+	struct indicator_test_snapshot snap;
+
+	indicator_test_configure_display(true, true, 128U, 64U,
+					 PIXEL_FORMAT_MONO01, false, false, false);
+	indicator_test_reset();
+
+	publish_health(HEALTH_DEGRADED, HEALTH_REASON_INDICATOR_DEGRADED,
+		       HEALTH_REASON_INDICATOR_DEGRADED, 0U, 0U);
+	snap = snapshot();
+	zassert_equal(snap.display_mode, INDICATOR_DISPLAY_MODE_ATTN);
+	zassert_true(snap.degraded);
+	zassert_false(snap.owner_lost);
+	zassert_equal(snap.display_detail, INDICATOR_DISPLAY_DETAIL_E_IO);
+
+	publish_health(HEALTH_DEGRADED, HEALTH_REASON_COMM_OWNER_TIMEOUT,
+		       HEALTH_REASON_COMM_OWNER_TIMEOUT, 0U, 0U);
+	snap = snapshot();
+	zassert_equal(snap.display_mode, INDICATOR_DISPLAY_MODE_ATTN);
+	zassert_true(snap.degraded);
+	zassert_true(snap.owner_lost);
+	zassert_equal(snap.display_detail, INDICATOR_DISPLAY_DETAIL_OWNER);
 }

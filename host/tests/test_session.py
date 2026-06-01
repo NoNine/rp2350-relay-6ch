@@ -86,6 +86,14 @@ class SessionFakeClient:
         if self.fail_status:
             raise RelayTransportError("lost")
         status = {"state": self.relay_state, "pulsing": self.relay_pulsing}
+        status.update(
+            {
+                "health": "degraded",
+                "health_reasons": 8,
+                "health_primary_reason": "comm_owner_timeout",
+                "health_transitions": 3,
+            }
+        )
         if self.status_uptimes:
             uptime = self.status_uptimes.pop(0)
             if uptime is not None:
@@ -625,6 +633,15 @@ def test_disconnected_mode_rejects_relay_commands_and_allows_connect() -> None:
 
     assert "not connected" in output.getvalue()
     assert session.connected is True
+
+
+def test_status_prints_compact_health_line() -> None:
+    session, output = make_session(port="COM7")
+    session._connect_from_options(session.options)
+
+    session.handle_line("status")
+
+    assert "Health: degraded (comm_owner_timeout)" in output.getvalue()
 
 
 def test_connect_port_attaches_matching_usb_metadata() -> None:

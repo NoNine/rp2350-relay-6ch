@@ -8,6 +8,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include <rp2350_relay_6ch/health.h>
+
 #ifdef CONFIG_ZTEST
 #include <zephyr/drivers/display.h>
 #endif
@@ -103,6 +105,7 @@ struct indicator_test_snapshot {
 };
 
 void indicator_init(void);
+void indicator_set_health_snapshot(const struct health_snapshot *snapshot);
 void indicator_set_ready(bool ready);
 void indicator_set_relay_state(uint8_t state_mask, uint8_t pulse_mask);
 void indicator_set_relay_timed_state(

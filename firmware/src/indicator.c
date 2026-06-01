@@ -16,6 +16,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/util.h>
 
+#include <rp2350_relay_6ch/health.h>
 #include <rp2350_relay_6ch/indicator.h>
 
 LOG_MODULE_REGISTER(rp2350_relay_indicator, LOG_LEVEL_INF);
@@ -98,6 +99,8 @@ struct indicator_state {
 };
 
 static struct indicator_state state;
+
+static void set_buzzer_locked(enum indicator_buzzer_pattern pattern);
 
 #if IS_ENABLED(CONFIG_RP2350_RELAY_6CH_INDICATORS) && DT_HAS_ALIAS(led_strip)
 static const struct device *const rgb_led = DEVICE_DT_GET_OR_NULL(RGB_NODE);
@@ -292,12 +295,12 @@ static enum indicator_display_detail display_detail_locked(enum indicator_rgb_pa
 	}
 
 	if (pattern == INDICATOR_RGB_ATTENTION) {
-		if (state.degraded) {
-			return INDICATOR_DISPLAY_DETAIL_E_IO;
-		}
-
 		if (state.owner_lost) {
 			return INDICATOR_DISPLAY_DETAIL_OWNER;
+		}
+
+		if (state.degraded) {
+			return INDICATOR_DISPLAY_DETAIL_E_IO;
 		}
 
 		if (state.attention_detail != INDICATOR_DISPLAY_DETAIL_NONE) {
@@ -524,6 +527,42 @@ static void schedule_render_now(void)
 	if (IS_ENABLED(CONFIG_RP2350_RELAY_6CH_INDICATORS)) {
 		(void)k_work_schedule(&state.work, K_NO_WAIT);
 	}
+}
+
+static void apply_health_snapshot_locked(const struct health_snapshot *snapshot)
+{
+	bool ready = snapshot->state == HEALTH_NORMAL ||
+		     snapshot->state == HEALTH_RELAY_ACTIVE ||
+		     snapshot->state == HEALTH_DEGRADED ||
+		     snapshot->state == HEALTH_RECOVERY_PENDING;
+	bool degraded = snapshot->state == HEALTH_DEGRADED;
+	bool owner_lost =
+		(snapshot->reasons & HEALTH_REASON_COMM_OWNER_TIMEOUT) != 0U;
+	bool fault = snapshot->state == HEALTH_FAULT;
+	bool host_reboot_pending =
+		(snapshot->reasons & HEALTH_REASON_HOST_REBOOT_PENDING) != 0U;
+	bool comm_loss_reboot_pending =
+		(snapshot->reasons & HEALTH_REASON_COMM_REBOOT_PENDING) != 0U;
+
+	if (ready && !state.ready) {
+		set_buzzer_locked(INDICATOR_BUZZER_BOOT_READY);
+	}
+	if (owner_lost && !state.owner_lost) {
+		set_buzzer_locked(INDICATOR_BUZZER_OWNER_LOST);
+	}
+	if ((host_reboot_pending && !state.host_reboot_pending) ||
+	    (comm_loss_reboot_pending && !state.comm_loss_reboot_pending)) {
+		set_buzzer_locked(INDICATOR_BUZZER_REBOOT_PENDING);
+	}
+
+	state.ready = ready;
+	state.degraded = degraded;
+	state.owner_lost = owner_lost;
+	state.fault = fault;
+	state.host_reboot_pending = host_reboot_pending;
+	state.comm_loss_reboot_pending = comm_loss_reboot_pending;
+	state.relay_state_mask = snapshot->relay_state_mask;
+	state.pulse_mask = snapshot->pulse_mask;
 }
 
 static const char *display_mode_text(enum indicator_display_mode mode)
@@ -1261,6 +1300,19 @@ void indicator_set_ready(bool ready)
 		set_buzzer_locked(INDICATOR_BUZZER_BOOT_READY);
 	}
 	state.ready = ready;
+	k_mutex_unlock(&state.lock);
+	schedule_render_now();
+}
+
+void indicator_set_health_snapshot(const struct health_snapshot *snapshot)
+{
+	if (snapshot == NULL) {
+		return;
+	}
+
+	ensure_initialized();
+	k_mutex_lock(&state.lock, K_FOREVER);
+	apply_health_snapshot_locked(snapshot);
 	k_mutex_unlock(&state.lock);
 	schedule_render_now();
 }

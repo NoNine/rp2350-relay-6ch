@@ -12,6 +12,7 @@
 #include <zephyr/sys/reboot.h>
 #include <zephyr/sys/util.h>
 
+#include <rp2350_relay_6ch/health.h>
 #include <rp2350_relay_6ch/indicator.h>
 #include <rp2350_relay_6ch/relay.h>
 
@@ -78,12 +79,26 @@ static void publish_indicator_state(
 	uint8_t state_mask, uint8_t pulse_mask,
 	const struct indicator_pulse_timing pulse_timing[RP2350_RELAY_6CH_CHANNEL_COUNT])
 {
+	struct health_snapshot snapshot;
+
+	health_set_relay_state(state_mask, pulse_mask);
+	health_snapshot(&snapshot);
+	indicator_set_health_snapshot(&snapshot);
+
 	if (pulse_timing == NULL) {
 		indicator_set_relay_state(state_mask, pulse_mask);
 		return;
 	}
 
 	indicator_set_relay_timed_state(state_mask, pulse_mask, pulse_timing);
+}
+
+static void publish_health_snapshot(void)
+{
+	struct health_snapshot snapshot;
+
+	health_snapshot(&snapshot);
+	indicator_set_health_snapshot(&snapshot);
 }
 
 static void snapshot_pulse_timing_locked(
@@ -112,6 +127,7 @@ static int apply_state_locked(uint8_t state_mask)
 
 		if (ret < 0) {
 			LOG_ERR("Failed to set relay %u: %d", (unsigned int)i + 1U, ret);
+			health_record_relay_io_error();
 			return ret;
 		}
 	}
@@ -177,7 +193,8 @@ static void comm_loss_schedule_reboot_pending_indication(void)
 	uint32_t delay_ms = relay_comm_loss_reboot_delay_ms();
 
 	if (delay_ms <= COMM_LOSS_REBOOT_PENDING_INDICATION_MS) {
-		indicator_set_comm_loss_reboot_pending(true);
+		health_set_comm_reboot_pending(true);
+		publish_health_snapshot();
 		return;
 	}
 
@@ -214,6 +231,7 @@ static int set_channel_locked(uint8_t channel, bool on)
 		relay_state_mask = next_state;
 	} else {
 		LOG_ERR("Failed to set relay %u: %d", (unsigned int)channel + 1U, ret);
+		health_record_relay_io_error();
 	}
 
 	return ret;
@@ -264,8 +282,7 @@ static void comm_loss_expired(struct k_work *work)
 	uint8_t pulse_mask = 0U;
 	struct indicator_pulse_timing pulse_timing[RP2350_RELAY_6CH_CHANNEL_COUNT];
 	bool publish = false;
-	bool owner_lost = false;
-	bool reboot_pending = false;
+	bool schedule_reboot = false;
 	int ret = 0;
 
 	ARG_UNUSED(work);
@@ -282,13 +299,13 @@ static void comm_loss_expired(struct k_work *work)
 		state_mask = relay_state_mask;
 		pulse_mask = relay_pulse_mask;
 		snapshot_pulse_timing_locked(pulse_mask, pulse_timing);
+		health_set_comm_owner_timed_out(true);
 		if (IS_ENABLED(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_ALWAYS_ON_OWNER)) {
-			owner_lost = true;
 			if (relay_comm_loss_reboot_on_timeout()) {
 				comm_loss_armed = false;
 				comm_loss_reboot_scheduled = true;
 				comm_loss_reboot_pending_indication_scheduled = true;
-				reboot_pending = true;
+				schedule_reboot = true;
 			} else {
 				comm_loss_schedule_locked();
 			}
@@ -303,11 +320,7 @@ static void comm_loss_expired(struct k_work *work)
 		publish_indicator_state(state_mask, pulse_mask, pulse_timing);
 	}
 
-	if (owner_lost) {
-		indicator_set_owner_lost(true);
-	}
-
-	if (reboot_pending) {
+	if (schedule_reboot) {
 		comm_loss_schedule_reboot_pending_indication();
 		(void)k_work_schedule(&comm_loss_reboot_work,
 				      K_MSEC(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_REBOOT_DELAY_MS));
@@ -320,6 +333,8 @@ static void comm_loss_expired(struct k_work *work)
 
 static void comm_loss_reboot_pending_indication_expired(struct k_work *work)
 {
+	bool publish = false;
+
 	ARG_UNUSED(work);
 
 	k_mutex_lock(&relay_lock, K_FOREVER);
@@ -330,8 +345,13 @@ static void comm_loss_reboot_pending_indication_expired(struct k_work *work)
 	}
 
 	comm_loss_reboot_pending_indication_scheduled = false;
+	health_set_comm_reboot_pending(true);
+	publish = true;
 	k_mutex_unlock(&relay_lock);
-	indicator_set_comm_loss_reboot_pending(true);
+
+	if (publish) {
+		publish_health_snapshot();
+	}
 }
 
 static void comm_loss_reboot_expired(struct k_work *work)
@@ -360,6 +380,7 @@ int relay_init(void)
 
 		if (!gpio_is_ready_dt(&relays[i])) {
 			LOG_ERR("Relay %u GPIO device is not ready", (unsigned int)i + 1U);
+			health_record_relay_gpio_init_failed();
 			return -ENODEV;
 		}
 
@@ -367,6 +388,7 @@ int relay_init(void)
 		if (ret < 0) {
 			LOG_ERR("Failed to configure relay %u GPIO: %d",
 				(unsigned int)i + 1U, ret);
+			health_record_relay_gpio_init_failed();
 			return ret;
 		}
 	}
@@ -382,6 +404,8 @@ int relay_init(void)
 	indicator_set_owner_lost(false);
 	indicator_set_reboot_pending(false);
 	indicator_set_comm_loss_reboot_pending(false);
+	health_set_comm_owner_timed_out(false);
+	health_set_comm_reboot_pending(false);
 	if (IS_ENABLED(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_ALWAYS_ON_OWNER)) {
 		k_mutex_lock(&relay_lock, K_FOREVER);
 		comm_loss_schedule_locked();
@@ -465,16 +489,16 @@ int relay_set(uint8_t channel, bool on)
 		pulse_mask = relay_pulse_mask;
 		snapshot_pulse_timing_locked(pulse_mask, pulse_timing);
 		reboot_canceled = comm_loss_cancel_reboot_locked();
+		health_set_comm_owner_timed_out(false);
+		if (reboot_canceled) {
+			health_set_comm_reboot_pending(false);
+		}
 		comm_loss_schedule_locked();
 	}
 	k_mutex_unlock(&relay_lock);
 
 	if (ret == 0) {
 		publish_indicator_state(state_mask, pulse_mask, pulse_timing);
-		indicator_set_owner_lost(false);
-		if (reboot_canceled) {
-			indicator_set_comm_loss_reboot_pending(false);
-		}
 	}
 
 	return ret;
@@ -500,16 +524,16 @@ int relay_set_all(uint8_t state_mask)
 		pulse_mask = relay_pulse_mask;
 		snapshot_pulse_timing_locked(pulse_mask, pulse_timing);
 		reboot_canceled = comm_loss_cancel_reboot_locked();
+		health_set_comm_owner_timed_out(false);
+		if (reboot_canceled) {
+			health_set_comm_reboot_pending(false);
+		}
 		comm_loss_schedule_locked();
 	}
 	k_mutex_unlock(&relay_lock);
 
 	if (ret == 0) {
 		publish_indicator_state(next_state_mask, pulse_mask, pulse_timing);
-		indicator_set_owner_lost(false);
-		if (reboot_canceled) {
-			indicator_set_comm_loss_reboot_pending(false);
-		}
 	}
 
 	return ret;
@@ -557,6 +581,10 @@ int relay_pulse(uint8_t channel, uint32_t duration_ms)
 			pulse_mask = relay_pulse_mask;
 			snapshot_pulse_timing_locked(pulse_mask, pulse_timing);
 			reboot_canceled = comm_loss_cancel_reboot_locked();
+			health_set_comm_owner_timed_out(false);
+			if (reboot_canceled) {
+				health_set_comm_reboot_pending(false);
+			}
 			comm_loss_schedule_locked();
 		}
 	}
@@ -564,10 +592,6 @@ int relay_pulse(uint8_t channel, uint32_t duration_ms)
 
 	if (ret >= 0) {
 		publish_indicator_state(state_mask, pulse_mask, pulse_timing);
-		indicator_set_owner_lost(false);
-		if (reboot_canceled) {
-			indicator_set_comm_loss_reboot_pending(false);
-		}
 	}
 
 	return ret < 0 ? ret : 0;
@@ -579,12 +603,13 @@ void relay_comm_loss_renew(void)
 
 	k_mutex_lock(&relay_lock, K_FOREVER);
 	reboot_canceled = comm_loss_cancel_reboot_locked();
+	health_set_comm_owner_timed_out(false);
+	if (reboot_canceled) {
+		health_set_comm_reboot_pending(false);
+	}
 	comm_loss_schedule_locked();
 	k_mutex_unlock(&relay_lock);
-	indicator_set_owner_lost(false);
-	if (reboot_canceled) {
-		indicator_set_comm_loss_reboot_pending(false);
-	}
+	publish_health_snapshot();
 }
 
 const char *relay_comm_loss_policy(void)

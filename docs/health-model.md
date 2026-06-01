@@ -92,7 +92,8 @@ Overall health states:
 First-cut domains:
 
 - `relay_gpio`: relay GPIO subsystem initialized and commanded state is known.
-- `rpc`: relay management service is initialized and able to answer status.
+- `rpc`: relay management service is registered/initialized and able to serve
+  management commands. Status is the minimum observable proof of readiness.
 - `comm_owner`: host ownership or heartbeat freshness for profiles that enable
   communication-loss supervision.
 - `indicator`: explicitly supported local LED, buzzer, or display health. This
@@ -120,7 +121,7 @@ Reason flags:
 | 1 | `relay_io_failed` | Relay GPIO operation failed after initialization. |
 | 2 | `rpc_not_ready` | Relay management service is not ready. |
 | 3 | `comm_owner_timeout` | Communication-loss owner deadline expired. |
-| 4 | `comm_reboot_pending` | Autonomous communication-loss reboot is pending. |
+| 4 | `comm_reboot_pending` | Autonomous communication-loss reboot final warning is active. |
 | 5 | `indicator_degraded` | Explicitly supported local indicator path is degraded. |
 | 6 | `host_reboot_pending` | Host-requested controlled reboot is pending. |
 
@@ -149,12 +150,19 @@ Do not reuse or renumber existing bits.
 - Publishes `comm_owner_timeout` when communication-loss timeout expires.
 - Clears `comm_owner_timeout` when a successful heartbeat or relay-control
   command restores ownership.
-- Publishes `comm_reboot_pending` when autonomous communication-loss reboot is
-  scheduled, and clears it if ownership recovery cancels the pending reboot.
+- If autonomous communication-loss reboot is scheduled after owner timeout,
+  leaves health in `comm_owner_timeout` during the owner-loss attention phase.
+- Publishes `comm_reboot_pending` when the final reboot-pending warning phase
+  starts. If the configured reboot delay is shorter than or equal to that
+  warning window, this happens immediately.
+- Clears `comm_reboot_pending` if ownership recovery cancels the pending
+  reboot.
 
 `relay_mgmt.c`:
 
-- Calls `health_set_rpc_ready(true)` before serving status responses.
+- Records when the relay management service is registered/initialized and able
+  to serve management commands, then publishes `health_set_rpc_ready(true)`
+  after `health_init()` has completed.
 - Publishes `host_reboot_pending` when host-requested reboot is accepted, and
   clears it if the pending reboot is canceled in tests before reboot occurs.
 - Extends `status` with health fields.
@@ -314,8 +322,8 @@ Use that priority after evaluating facts:
 - If initialization is incomplete, state is `booting` unless a higher-priority
   reason is active.
 - If relay GPIO initialization or relay I/O fails, state is `fault`.
-- If communication-owner timeout is active, state is `degraded` unless
-  communication-loss recovery has also scheduled reboot. Clear the timeout when
+- If communication-owner timeout is active, state is `degraded` until the
+  final autonomous reboot warning phase starts. Clear the timeout when
   ownership recovery succeeds.
 - If autonomous communication-loss reboot or host-requested reboot is pending,
   state is `recovery_pending`.
@@ -380,9 +388,11 @@ Firmware health tests must cover:
   `relay_gpio_init_failed`;
 - relay I/O failure becomes `fault` with `relay_io_failed`;
 - communication-owner timeout becomes `degraded` with `comm_owner_timeout`;
-- ownership recovery clears `comm_owner_timeout`;
-- autonomous communication-loss reboot pending becomes `recovery_pending` with
-  `comm_reboot_pending`;
+- autonomous communication-loss reboot scheduling leaves owner timeout as
+  `degraded` until the final warning phase starts;
+- autonomous communication-loss reboot final warning becomes
+  `recovery_pending` with `comm_reboot_pending`;
+- ownership recovery clears `comm_owner_timeout` and `comm_reboot_pending`;
 - host-requested reboot pending becomes `recovery_pending` with
   `host_reboot_pending`;
 - communication-loss reboot pending outranks host reboot pending as the primary

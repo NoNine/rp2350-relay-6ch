@@ -78,6 +78,7 @@ target_include_directories(app PRIVATE
 )
 target_sources(app PRIVATE
   src/main.c
+  ../../src/health.c
   ../../src/relay.c
   ../../src/indicator.c
   ../../src/relay_mgmt.c

@@ -63,8 +63,8 @@ def _state_channels(state: int) -> list[str]:
     return [f"CH{channel + 1}" for channel in range(RELAY_COUNT) if state & (1 << channel)]
 
 
-def _format_key_value_rows(rows: list[tuple[str, object]]) -> str:
-    key_width = max(len(key) for key, _value in rows)
+def _format_key_value_rows(rows: list[tuple[str, object]], key_width: int | None = None) -> str:
+    key_width = key_width if key_width is not None else max(len(key) for key, _value in rows)
     return "\n".join(f"{key + ':':<{key_width + 1}}  {value}" for key, value in rows)
 
 
@@ -79,7 +79,7 @@ def _format_single_channel(payload: dict[str, Any]) -> str:
     return _format_key_value_rows(fields)
 
 
-def _format_relay_masks(payload: dict[str, Any]) -> str:
+def _relay_mask_rows(payload: dict[str, Any]) -> list[tuple[str, object]]:
     state = int(payload.get("state", 0))
     pulsing = int(payload.get("pulsing", 0))
     on_channels = _state_channels(state)
@@ -90,20 +90,54 @@ def _format_relay_masks(payload: dict[str, Any]) -> str:
     ]
     if "pulsing" in payload:
         fields.append(("pulsing", ", ".join(pulse_channels) if pulse_channels else "none"))
+    return fields
+
+
+def _format_relay_masks(payload: dict[str, Any]) -> str:
+    fields = _relay_mask_rows(payload)
     return _format_key_value_rows(fields)
 
 
 def _format_status(payload: dict[str, Any]) -> str:
     relay_keys = {"state", "pulsing"}
-    transport = {key: payload[key] for key in sorted(payload) if key not in relay_keys}
-    lines = ["relays:"]
-    lines.extend(f"  {line}" for line in _format_relay_masks(payload).splitlines())
+    health_keys = {
+        "health",
+        "health_primary_reason",
+        "health_reasons",
+        "health_transitions",
+    }
+    hidden_transport_keys = {"smp_uart", "usb_cdc_acm"}
+    transport = {
+        key: payload[key]
+        for key in sorted(payload)
+        if key not in relay_keys and key not in health_keys and key not in hidden_transport_keys
+    }
+    relay_rows = _relay_mask_rows(payload)
+    health_rows = [
+        ("state", _format_human_value(payload.get("health"))),
+        (
+            "primary_reason",
+            _format_human_value(payload.get("health_primary_reason")),
+        ),
+        ("reasons", _format_human_value(payload.get("health_reasons"))),
+        ("transitions", _format_human_value(payload.get("health_transitions"))),
+    ]
+    transport_rows = list(transport.items())
+    key_width = max(
+        len(key)
+        for rows in (relay_rows, health_rows, transport_rows)
+        for key, _value in rows
+    )
+    lines = ["[relays]"]
+    lines.extend(_format_key_value_rows(relay_rows, key_width).splitlines())
+    if "health" in payload:
+        lines.append("")
+        lines.append("[health]")
+        lines.extend(_format_key_value_rows(health_rows, key_width).splitlines())
     if transport:
         lines.append("")
-        lines.append("transport:")
-        lines.extend(
-            f"  {line}" for line in _format_key_value_rows(list(transport.items())).splitlines()
-        )
+        lines.append("[transport]")
+        lines.extend(_format_key_value_rows(transport_rows, key_width).splitlines())
     return "\n".join(lines)
 
 

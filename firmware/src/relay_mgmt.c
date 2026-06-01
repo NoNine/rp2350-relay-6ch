@@ -25,6 +25,7 @@
 #include <zcbor_encode.h>
 
 #include <rp2350_relay_6ch/build_info.h>
+#include <rp2350_relay_6ch/health.h>
 #include <rp2350_relay_6ch/indicator.h>
 #include <rp2350_relay_6ch/relay.h>
 #include <rp2350_relay_6ch/relay_mgmt.h>
@@ -44,6 +45,7 @@ enum relay_mgmt_counter {
 };
 
 static atomic_t counters[RELAY_MGMT_COUNTER_COUNT];
+static bool relay_mgmt_registered;
 
 static void counter_inc(enum relay_mgmt_counter counter)
 {
@@ -139,6 +141,34 @@ static bool encode_state(zcbor_state_t *zse)
 	       zcbor_uint32_put(zse, state_mask) &&
 	       zcbor_tstr_put_lit(zse, "pulsing") &&
 	       zcbor_uint32_put(zse, pulse_mask);
+}
+
+static bool encode_health_status(zcbor_state_t *zse,
+				 const struct health_snapshot *snapshot)
+{
+	const char *health = health_state_name(snapshot->state);
+	const char *primary_reason = health_reason_name(snapshot->primary_reason);
+	const struct zcbor_string health_string = {
+		.value = health,
+		.len = strlen(health),
+	};
+	const struct zcbor_string primary_reason_string = {
+		.value = primary_reason,
+		.len = strlen(primary_reason),
+	};
+
+	return zcbor_tstr_put_lit(zse, "state") &&
+	       zcbor_uint32_put(zse, snapshot->relay_state_mask) &&
+	       zcbor_tstr_put_lit(zse, "pulsing") &&
+	       zcbor_uint32_put(zse, snapshot->pulse_mask) &&
+	       zcbor_tstr_put_lit(zse, "health") &&
+	       zcbor_tstr_encode(zse, &health_string) &&
+	       zcbor_tstr_put_lit(zse, "health_reasons") &&
+	       zcbor_uint32_put(zse, snapshot->reasons) &&
+	       zcbor_tstr_put_lit(zse, "health_primary_reason") &&
+	       zcbor_tstr_encode(zse, &primary_reason_string) &&
+	       zcbor_tstr_put_lit(zse, "health_transitions") &&
+	       zcbor_uint32_put(zse, snapshot->transitions);
 }
 
 static bool encode_transport_status(zcbor_state_t *zse)
@@ -411,6 +441,7 @@ static int status_handler(struct smp_streamer *ctxt)
 {
 	zcbor_state_t *zsd = ctxt->reader->zs;
 	zcbor_state_t *zse = ctxt->writer->zs;
+	struct health_snapshot snapshot;
 	bool ok;
 
 	counter_inc(RELAY_MGMT_COUNTER_RECEIVED);
@@ -419,7 +450,9 @@ static int status_handler(struct smp_streamer *ctxt)
 		return error_response(zse, RP2350_RELAY_6CH_MGMT_ERR_DECODE);
 	}
 
-	ok = encode_state(zse) &&
+	health_snapshot(&snapshot);
+
+	ok = encode_health_status(zse, &snapshot) &&
 	     encode_transport_status(zse) &&
 	     encode_comm_loss_policy(zse) &&
 	     zcbor_tstr_put_lit(zse, "uptime_ms") &&
@@ -474,6 +507,7 @@ static int reboot_handler(struct smp_streamer *ctxt)
 
 #ifdef CONFIG_REBOOT
 	(void)k_work_schedule(&reboot_work, K_MSEC(REBOOT_PENDING_INDICATION_MS));
+	health_set_host_reboot_pending(true);
 	ok = zcbor_tstr_put_lit(zse, "ok") && zcbor_bool_put(zse, true);
 #else
 	ok = encode_relay_error(zse, RP2350_RELAY_6CH_MGMT_ERR_REBOOT_UNAVAILABLE);
@@ -631,9 +665,15 @@ static struct mgmt_group relay_mgmt_group = {
 static void relay_mgmt_register_group(void)
 {
 	mgmt_register_group(&relay_mgmt_group);
+	relay_mgmt_registered = true;
 }
 
 MCUMGR_HANDLER_DEFINE(rp2350_relay_mgmt, relay_mgmt_register_group);
+
+void relay_mgmt_publish_health(void)
+{
+	health_set_rpc_ready(relay_mgmt_registered);
+}
 
 void relay_mgmt_get_counters(struct rp2350_relay_6ch_mgmt_counters *out)
 {
@@ -718,6 +758,7 @@ void relay_mgmt_test_cancel_reboot(void)
 {
 #ifdef CONFIG_REBOOT
 	(void)k_work_cancel_delayable(&reboot_work);
+	health_set_host_reboot_pending(false);
 	indicator_set_host_reboot_pending(false);
 #endif
 }

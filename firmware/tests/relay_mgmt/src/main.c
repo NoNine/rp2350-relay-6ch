@@ -11,6 +11,7 @@
 #include <zcbor_decode.h>
 #include <zcbor_encode.h>
 
+#include <rp2350_relay_6ch/health.h>
 #include <rp2350_relay_6ch/indicator.h>
 #include <rp2350_relay_6ch/relay.h>
 #include <rp2350_relay_6ch/relay_mgmt.h>
@@ -217,6 +218,17 @@ static void assert_tstr_equal(size_t response_len, const char *key, const char *
 	zassert_equal(memcmp(actual.value, expected, actual.len), 0);
 }
 
+static void assert_health(size_t response_len, const char *health,
+			  uint32_t reasons, const char *primary_reason)
+{
+	uint32_t actual_reasons = UINT32_MAX;
+
+	assert_tstr_equal(response_len, "health", health);
+	assert_tstr_equal(response_len, "health_primary_reason", primary_reason);
+	zassert_true(decode_u32(response_len, "health_reasons", &actual_reasons));
+	zassert_equal(actual_reasons, reasons);
+}
+
 static void assert_error(size_t response_len,
 			 enum rp2350_relay_6ch_mgmt_err expected_error)
 {
@@ -230,7 +242,10 @@ static void assert_error(size_t response_len,
 
 static void *relay_mgmt_suite_setup(void)
 {
+	health_test_reset();
 	zassert_equal(relay_init(), 0, "relay_init failed");
+	health_set_relay_gpio_ready(true);
+	health_set_rpc_ready(true);
 	return NULL;
 }
 
@@ -238,9 +253,12 @@ static void relay_mgmt_before(void *fixture)
 {
 	ARG_UNUSED(fixture);
 
+	health_test_reset();
 	indicator_test_reset();
 	relay_mgmt_test_cancel_reboot();
 	zassert_equal(relay_off_all(), 0);
+	health_set_relay_gpio_ready(true);
+	health_set_rpc_ready(true);
 	relay_mgmt_reset_counters();
 }
 
@@ -265,6 +283,19 @@ ZTEST(relay_mgmt, test_group_registered)
 	zassert_not_null(mgmt_get_handler(group, RP2350_RELAY_6CH_MGMT_CMD_INFO));
 	zassert_not_null(mgmt_get_handler(group, RP2350_RELAY_6CH_MGMT_CMD_BUILD_INFO));
 	zassert_not_null(mgmt_get_handler(group, RP2350_RELAY_6CH_MGMT_CMD_HEARTBEAT));
+}
+
+ZTEST(relay_mgmt, test_registered_management_service_publishes_rpc_ready)
+{
+	struct health_snapshot snap;
+
+	health_test_reset();
+	relay_mgmt_publish_health();
+	health_set_relay_gpio_ready(true);
+	health_snapshot(&snap);
+
+	zassert_equal(snap.state, HEALTH_NORMAL);
+	zassert_equal(snap.reasons, HEALTH_REASON_NONE);
 }
 
 ZTEST(relay_mgmt, test_info_reports_capabilities)
@@ -520,6 +551,25 @@ ZTEST(relay_mgmt, test_status_reports_counters)
 	zassert_equal(invalid_args, 1U);
 	zassert_false(usb_cdc_acm);
 	zassert_false(smp_uart);
+	assert_health(response_len, "normal", HEALTH_REASON_NONE, "none");
+}
+
+ZTEST(relay_mgmt, test_status_reports_health_fields_from_one_snapshot)
+{
+	size_t response_len;
+	uint32_t transitions = 0U;
+
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_SET, true,
+				    encode_set_request(2U, true));
+	assert_state(response_len, BIT(2), 0U);
+
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_STATUS, false,
+				    encode_empty_request());
+
+	assert_state(response_len, BIT(2), 0U);
+	assert_health(response_len, "relay_active", HEALTH_REASON_NONE, "none");
+	zassert_true(decode_u32(response_len, "health_transitions", &transitions));
+	zassert_true(transitions > 0U);
 }
 
 #if IS_ENABLED(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_ENERGIZED_ONLY) && \
@@ -535,6 +585,12 @@ ZTEST(relay_mgmt, test_comm_loss_energized_only_expires_outputs)
 	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET, false,
 				    encode_empty_request());
 	assert_state(response_len, 0U, 0U);
+
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_STATUS, false,
+				    encode_empty_request());
+	assert_state(response_len, 0U, 0U);
+	assert_health(response_len, "degraded", HEALTH_REASON_COMM_OWNER_TIMEOUT,
+		      "comm_owner_timeout");
 }
 
 ZTEST(relay_mgmt, test_comm_loss_heartbeat_renews_lease)

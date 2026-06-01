@@ -1,0 +1,7 @@
+tests:
+  rp2350_relay_6ch.health:
+    platform_allow:
+      - native_sim
+    tags:
+      - health
+    harness: ztest

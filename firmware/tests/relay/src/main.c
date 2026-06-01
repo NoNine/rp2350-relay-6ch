@@ -4,11 +4,15 @@
 
 #include <zephyr/ztest.h>
 
+#include <rp2350_relay_6ch/health.h>
 #include <rp2350_relay_6ch/relay.h>
 
 static void *relay_suite_setup(void)
 {
+	health_test_reset();
 	zassert_equal(relay_init(), 0, "relay_init failed");
+	health_set_relay_gpio_ready(true);
+	health_set_rpc_ready(true);
 	return NULL;
 }
 
@@ -16,7 +20,10 @@ static void relay_before(void *fixture)
 {
 	ARG_UNUSED(fixture);
 
+	health_test_reset();
 	zassert_equal(relay_off_all(), 0, "relay_off_all failed");
+	health_set_relay_gpio_ready(true);
+	health_set_rpc_ready(true);
 }
 
 static void relay_after(void *fixture)
@@ -41,8 +48,13 @@ ZTEST(relay, test_set_one)
 {
 	bool on = false;
 	uint8_t state_mask;
+	struct health_snapshot snap;
 
 	zassert_equal(relay_set(0U, true), 0);
+	health_snapshot(&snap);
+	zassert_equal(snap.state, HEALTH_RELAY_ACTIVE);
+	zassert_equal(snap.relay_state_mask, BIT(0));
+	zassert_equal(snap.pulse_mask, 0U);
 	zassert_equal(relay_get(0U, &on), 0);
 	zassert_true(on);
 
@@ -50,6 +62,9 @@ ZTEST(relay, test_set_one)
 	zassert_equal(state_mask, BIT(0));
 
 	zassert_equal(relay_set(0U, false), 0);
+	health_snapshot(&snap);
+	zassert_equal(snap.state, HEALTH_NORMAL);
+	zassert_equal(snap.relay_state_mask, 0U);
 	zassert_equal(relay_get(0U, &on), 0);
 	zassert_false(on);
 }
@@ -57,8 +72,12 @@ ZTEST(relay, test_set_one)
 ZTEST(relay, test_set_all)
 {
 	uint8_t state_mask;
+	struct health_snapshot snap;
 
 	zassert_equal(relay_set_all(BIT_MASK(RP2350_RELAY_6CH_CHANNEL_COUNT)), 0);
+	health_snapshot(&snap);
+	zassert_equal(snap.state, HEALTH_RELAY_ACTIVE);
+	zassert_equal(snap.relay_state_mask, BIT_MASK(RP2350_RELAY_6CH_CHANNEL_COUNT));
 	zassert_equal(relay_get_all(&state_mask), 0);
 	zassert_equal(state_mask, BIT_MASK(RP2350_RELAY_6CH_CHANNEL_COUNT));
 }
@@ -66,9 +85,14 @@ ZTEST(relay, test_set_all)
 ZTEST(relay, test_off_all)
 {
 	uint8_t state_mask;
+	struct health_snapshot snap;
 
 	zassert_equal(relay_set_all(BIT_MASK(RP2350_RELAY_6CH_CHANNEL_COUNT)), 0);
 	zassert_equal(relay_off_all(), 0);
+	health_snapshot(&snap);
+	zassert_equal(snap.state, HEALTH_NORMAL);
+	zassert_equal(snap.relay_state_mask, 0U);
+	zassert_equal(snap.pulse_mask, 0U);
 	zassert_equal(relay_get_all(&state_mask), 0);
 	zassert_equal(state_mask, 0U);
 }
@@ -97,8 +121,13 @@ ZTEST(relay, test_pulse_turns_on_then_off)
 {
 	bool on = false;
 	bool pulsing = false;
+	struct health_snapshot snap;
 
 	zassert_equal(relay_pulse(0U, RP2350_RELAY_6CH_PULSE_MIN_MS), 0);
+	health_snapshot(&snap);
+	zassert_equal(snap.state, HEALTH_RELAY_ACTIVE);
+	zassert_equal(snap.relay_state_mask, BIT(0));
+	zassert_equal(snap.pulse_mask, BIT(0));
 	zassert_equal(relay_get(0U, &on), 0);
 	zassert_true(on);
 	zassert_equal(relay_is_pulsing(0U, &pulsing), 0);
@@ -106,6 +135,10 @@ ZTEST(relay, test_pulse_turns_on_then_off)
 
 	k_msleep(RP2350_RELAY_6CH_PULSE_MIN_MS + 10U);
 
+	health_snapshot(&snap);
+	zassert_equal(snap.state, HEALTH_NORMAL);
+	zassert_equal(snap.relay_state_mask, 0U);
+	zassert_equal(snap.pulse_mask, 0U);
 	zassert_equal(relay_get(0U, &on), 0);
 	zassert_false(on);
 	zassert_equal(relay_is_pulsing(0U, &pulsing), 0);
@@ -140,9 +173,14 @@ ZTEST(relay, test_off_all_cancels_pulse)
 {
 	bool on = false;
 	bool pulsing = false;
+	struct health_snapshot snap;
 
 	zassert_equal(relay_pulse(0U, 100U), 0);
 	zassert_equal(relay_off_all(), 0);
+	health_snapshot(&snap);
+	zassert_equal(snap.state, HEALTH_NORMAL);
+	zassert_equal(snap.relay_state_mask, 0U);
+	zassert_equal(snap.pulse_mask, 0U);
 
 	zassert_equal(relay_get(0U, &on), 0);
 	zassert_false(on);
