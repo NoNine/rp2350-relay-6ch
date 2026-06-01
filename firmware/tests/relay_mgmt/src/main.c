@@ -3,6 +3,7 @@
  */
 
 #include <string.h>
+#include <errno.h>
 
 #include <zephyr/mgmt/mcumgr/mgmt/mgmt.h>
 #include <zephyr/ztest.h>
@@ -572,6 +573,62 @@ ZTEST(relay_mgmt, test_status_reports_health_fields_from_one_snapshot)
 	zassert_true(transitions > 0U);
 }
 
+#if IS_ENABLED(CONFIG_REBOOT)
+ZTEST(relay_mgmt, test_host_reboot_success_sets_pending_health)
+{
+	size_t response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_REBOOT, true,
+					   encode_empty_request());
+	bool ok = false;
+	struct health_snapshot snap;
+
+	zassert_true(decode_bool(response_len, "ok", &ok));
+	zassert_true(ok);
+	health_snapshot(&snap);
+	zassert_equal(snap.state, HEALTH_RECOVERY_PENDING);
+	zassert_equal(snap.primary_reason, HEALTH_REASON_HOST_REBOOT_PENDING);
+}
+
+ZTEST(relay_mgmt, test_host_reboot_schedule_failure_returns_reboot_failed)
+{
+	size_t response_len;
+	struct health_snapshot snap;
+
+	relay_mgmt_test_force_reboot_schedule_result(-EINVAL);
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_REBOOT, true,
+				    encode_empty_request());
+
+	assert_error(response_len, RP2350_RELAY_6CH_MGMT_ERR_REBOOT_FAILED);
+	health_snapshot(&snap);
+	zassert_equal(snap.state, HEALTH_FAULT);
+	zassert_equal(snap.primary_reason, HEALTH_REASON_REBOOT_FAILED);
+}
+
+ZTEST(relay_mgmt, test_host_reboot_return_records_reboot_failed)
+{
+	struct health_snapshot snap;
+
+	relay_mgmt_test_force_reboot_return(true);
+	relay_mgmt_test_run_reboot_work();
+
+	health_snapshot(&snap);
+	zassert_equal(snap.state, HEALTH_FAULT);
+	zassert_equal(snap.primary_reason, HEALTH_REASON_REBOOT_FAILED);
+}
+
+ZTEST(relay_mgmt, test_host_reboot_off_all_failure_records_reboot_failed)
+{
+	struct health_snapshot snap;
+
+	relay_test_force_next_off_all_result(-EIO);
+	relay_mgmt_test_run_reboot_work();
+
+	health_snapshot(&snap);
+	zassert_equal(snap.state, HEALTH_FAULT);
+	zassert_true((snap.reasons & HEALTH_REASON_REBOOT_FAILED) != 0U);
+	zassert_equal(snap.primary_reason, HEALTH_REASON_REBOOT_FAILED);
+}
+#endif
+
 #if IS_ENABLED(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_ENERGIZED_ONLY) && \
 	CONFIG_RP2350_RELAY_6CH_COMM_LOSS_TIMEOUT_MS <= 100
 ZTEST(relay_mgmt, test_comm_loss_energized_only_expires_outputs)
@@ -899,5 +956,43 @@ ZTEST(relay_mgmt, test_comm_loss_reboot_pending_control_cancels_reboot)
 	indicator_test_get_snapshot(&snap);
 	zassert_false(snap.owner_lost);
 	zassert_false(snap.reboot_pending);
+}
+
+ZTEST(relay_mgmt, test_comm_loss_reboot_schedule_failure_records_reboot_failed)
+{
+	size_t response_len;
+
+	relay_comm_loss_test_force_reboot_schedule_result(-EINVAL);
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_SET, true,
+				    encode_set_request(0U, true));
+	assert_state(response_len, BIT(0), 0U);
+	k_msleep(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_TIMEOUT_MS + 20U);
+
+	zassert_false(relay_comm_loss_test_reboot_scheduled());
+	zassert_false(relay_comm_loss_test_reboot_pending_indication_scheduled());
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_STATUS, false,
+				    encode_empty_request());
+	assert_health(response_len, "fault",
+		      HEALTH_REASON_COMM_OWNER_TIMEOUT | HEALTH_REASON_REBOOT_FAILED,
+		      "reboot_failed");
+}
+
+ZTEST(relay_mgmt, test_comm_loss_reboot_return_records_reboot_failed)
+{
+	size_t response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_SET, true,
+					   encode_set_request(0U, true));
+
+	assert_state(response_len, BIT(0), 0U);
+	k_msleep(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_TIMEOUT_MS + 20U);
+	zassert_true(relay_comm_loss_test_reboot_scheduled());
+
+	relay_comm_loss_test_force_reboot_return(true);
+	relay_comm_loss_test_run_reboot_work();
+
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_STATUS, false,
+				    encode_empty_request());
+	assert_health(response_len, "fault",
+		      HEALTH_REASON_COMM_OWNER_TIMEOUT | HEALTH_REASON_REBOOT_FAILED,
+		      "reboot_failed");
 }
 #endif

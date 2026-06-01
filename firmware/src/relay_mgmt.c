@@ -64,6 +64,7 @@ static void record_error_indicator(enum rp2350_relay_6ch_mgmt_err error)
 	case RP2350_RELAY_6CH_MGMT_ERR_INVALID_ARGUMENT:
 	case RP2350_RELAY_6CH_MGMT_ERR_DECODE:
 	case RP2350_RELAY_6CH_MGMT_ERR_REBOOT_UNAVAILABLE:
+	case RP2350_RELAY_6CH_MGMT_ERR_REBOOT_FAILED:
 		indicator_record_command(INDICATOR_COMMAND_REJECTED);
 		break;
 	case RP2350_RELAY_6CH_MGMT_ERR_BUSY:
@@ -482,13 +483,32 @@ static int status_handler(struct smp_streamer *ctxt)
 static void reboot_work_handler(struct k_work *work);
 
 static K_WORK_DELAYABLE_DEFINE(reboot_work, reboot_work_handler);
+#ifdef CONFIG_ZTEST
+static int test_reboot_schedule_result = 1;
+static bool test_reboot_return;
+#endif
 
 static void reboot_work_handler(struct k_work *work)
 {
+	int ret;
+
 	ARG_UNUSED(work);
 
-	(void)relay_off_all();
+	ret = relay_off_all();
+	if (ret < 0) {
+		health_record_reboot_failed();
+		relay_mgmt_publish_health();
+		return;
+	}
+#ifdef CONFIG_ZTEST
+	if (!test_reboot_return) {
+		return;
+	}
+#else
 	sys_reboot(SYS_REBOOT_COLD);
+#endif
+	health_record_reboot_failed();
+	relay_mgmt_publish_health();
 }
 #endif
 
@@ -505,7 +525,23 @@ static int reboot_handler(struct smp_streamer *ctxt)
 	}
 
 #ifdef CONFIG_REBOOT
-	(void)k_work_schedule(&reboot_work, K_MSEC(REBOOT_PENDING_INDICATION_MS));
+	int schedule_ret;
+
+#ifdef CONFIG_ZTEST
+	schedule_ret = test_reboot_schedule_result;
+	test_reboot_schedule_result = 1;
+	if (schedule_ret >= 0) {
+		schedule_ret = k_work_schedule(
+			&reboot_work, K_MSEC(REBOOT_PENDING_INDICATION_MS));
+	}
+#else
+	schedule_ret = k_work_schedule(&reboot_work, K_MSEC(REBOOT_PENDING_INDICATION_MS));
+#endif
+	if (schedule_ret < 0) {
+		health_record_reboot_failed();
+		relay_mgmt_publish_health();
+		return error_response(zse, RP2350_RELAY_6CH_MGMT_ERR_REBOOT_FAILED);
+	}
 	health_set_host_reboot_pending(true);
 	ok = zcbor_tstr_put_lit(zse, "ok") && zcbor_bool_put(zse, true);
 #else
@@ -642,6 +678,7 @@ static int relay_mgmt_translate_error_code(uint16_t error)
 	case RP2350_RELAY_6CH_MGMT_ERR_BUSY:
 		return MGMT_ERR_EBUSY;
 	case RP2350_RELAY_6CH_MGMT_ERR_REBOOT_UNAVAILABLE:
+	case RP2350_RELAY_6CH_MGMT_ERR_REBOOT_FAILED:
 		return MGMT_ERR_ENOTSUP;
 	default:
 		return MGMT_ERR_EUNKNOWN;
@@ -759,6 +796,32 @@ void relay_mgmt_test_cancel_reboot(void)
 	(void)k_work_cancel_delayable(&reboot_work);
 	health_set_host_reboot_pending(false);
 	relay_mgmt_publish_health();
+#endif
+}
+
+void relay_mgmt_test_force_reboot_schedule_result(int result)
+{
+#ifdef CONFIG_REBOOT
+	test_reboot_schedule_result = result;
+#else
+	ARG_UNUSED(result);
+#endif
+}
+
+void relay_mgmt_test_run_reboot_work(void)
+{
+#ifdef CONFIG_REBOOT
+	reboot_work_handler(&reboot_work.work);
+	test_reboot_return = false;
+#endif
+}
+
+void relay_mgmt_test_force_reboot_return(bool enabled)
+{
+#ifdef CONFIG_REBOOT
+	test_reboot_return = enabled;
+#else
+	ARG_UNUSED(enabled);
 #endif
 }
 #endif

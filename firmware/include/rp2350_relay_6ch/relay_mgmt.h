@@ -40,6 +40,7 @@ enum rp2350_relay_6ch_mgmt_err {
 	RP2350_RELAY_6CH_MGMT_ERR_BUSY = 3,
 	RP2350_RELAY_6CH_MGMT_ERR_RELAY_IO = 4,
 	RP2350_RELAY_6CH_MGMT_ERR_REBOOT_UNAVAILABLE = 5,
+	RP2350_RELAY_6CH_MGMT_ERR_REBOOT_FAILED = 6,
 };
 
 struct rp2350_relay_6ch_mgmt_counters {
@@ -60,6 +61,9 @@ int relay_mgmt_test_handle(uint8_t command_id, bool write, const uint8_t *reques
 			   size_t *response_len);
 uint32_t relay_mgmt_test_reboot_delay_ms(void);
 void relay_mgmt_test_cancel_reboot(void);
+void relay_mgmt_test_force_reboot_schedule_result(int result);
+void relay_mgmt_test_run_reboot_work(void);
+void relay_mgmt_test_force_reboot_return(bool enabled);
 #endif
 
 #ifdef __cplusplus

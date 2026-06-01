@@ -44,6 +44,11 @@ static uint8_t relay_pulse_mask;
 static bool comm_loss_armed;
 static bool comm_loss_reboot_scheduled;
 static bool comm_loss_reboot_pending_indication_scheduled;
+#ifdef CONFIG_ZTEST
+static int comm_loss_test_reboot_schedule_result = 1;
+static bool comm_loss_test_reboot_return;
+static int test_next_off_all_result;
+#endif
 
 struct relay_pulse_work {
 	struct k_work_delayable work;
@@ -320,9 +325,33 @@ static void comm_loss_expired(struct k_work *work)
 	}
 
 	if (schedule_reboot) {
-		comm_loss_schedule_reboot_pending_indication();
-		(void)k_work_schedule(&comm_loss_reboot_work,
-				      K_MSEC(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_REBOOT_DELAY_MS));
+		int schedule_ret;
+
+#ifdef CONFIG_ZTEST
+		schedule_ret = comm_loss_test_reboot_schedule_result;
+		comm_loss_test_reboot_schedule_result = 1;
+		if (schedule_ret >= 0) {
+			schedule_ret = k_work_schedule(
+				&comm_loss_reboot_work,
+				K_MSEC(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_REBOOT_DELAY_MS));
+		}
+#else
+		schedule_ret = k_work_schedule(
+			&comm_loss_reboot_work,
+			K_MSEC(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_REBOOT_DELAY_MS));
+#endif
+		if (schedule_ret < 0) {
+			k_mutex_lock(&relay_lock, K_FOREVER);
+			comm_loss_reboot_scheduled = false;
+			comm_loss_reboot_pending_indication_scheduled = false;
+			(void)k_work_cancel_delayable(
+				&comm_loss_reboot_pending_indication_work);
+			health_record_reboot_failed();
+			k_mutex_unlock(&relay_lock);
+			publish_health_snapshot();
+		} else {
+			comm_loss_schedule_reboot_pending_indication();
+		}
 	}
 
 	if (ret < 0) {
@@ -358,12 +387,16 @@ static void comm_loss_reboot_expired(struct k_work *work)
 	ARG_UNUSED(work);
 
 #ifdef CONFIG_ZTEST
-	return;
+	if (!comm_loss_test_reboot_return) {
+		return;
+	}
 #elif defined(CONFIG_REBOOT)
 	sys_reboot(SYS_REBOOT_COLD);
 #else
 	return;
 #endif
+	health_record_reboot_failed();
+	publish_health_snapshot();
 }
 
 int relay_init(void)
@@ -537,6 +570,15 @@ int relay_set_all(uint8_t state_mask)
 
 int relay_off_all(void)
 {
+#ifdef CONFIG_ZTEST
+	if (test_next_off_all_result < 0) {
+		int ret = test_next_off_all_result;
+
+		test_next_off_all_result = 0;
+		health_record_relay_io_error();
+		return ret;
+	}
+#endif
 	return relay_set_all(0U);
 }
 
@@ -662,5 +704,26 @@ uint32_t relay_comm_loss_test_reboot_remaining_ms(void)
 bool relay_comm_loss_test_reboot_pending_indication_scheduled(void)
 {
 	return comm_loss_reboot_pending_indication_scheduled;
+}
+
+void relay_comm_loss_test_force_reboot_schedule_result(int result)
+{
+	comm_loss_test_reboot_schedule_result = result;
+}
+
+void relay_comm_loss_test_run_reboot_work(void)
+{
+	comm_loss_reboot_expired(&comm_loss_reboot_work.work);
+	comm_loss_test_reboot_return = false;
+}
+
+void relay_comm_loss_test_force_reboot_return(bool enabled)
+{
+	comm_loss_test_reboot_return = enabled;
+}
+
+void relay_test_force_next_off_all_result(int result)
+{
+	test_next_off_all_result = result;
 }
 #endif

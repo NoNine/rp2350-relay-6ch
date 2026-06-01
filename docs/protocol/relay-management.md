@@ -60,6 +60,7 @@ Relay group errors are returned with Zephyr SMP v2 group error payloads:
 | 3 | `busy` | Relay is already running a pulse. |
 | 4 | `relay_io` | Relay GPIO operation failed. |
 | 5 | `reboot_unavailable` | Reboot command was requested without Zephyr reboot support. |
+| 6 | `reboot_failed` | Reboot was supported but could not be scheduled or complete safely. |
 
 ## Request And Response Fields
 
@@ -197,9 +198,12 @@ Response:
 | `ok` | bool | Present and true when reboot was scheduled. |
 
 If Zephyr reboot support is not enabled, the command returns
-`reboot_unavailable`. When reboot support is enabled, firmware shows
-reboot-pending local indication immediately and performs the cold reboot after
-1000 ms.
+`reboot_unavailable`. If reboot support is enabled but the reboot cannot be
+scheduled before acceptance, the command returns `reboot_failed`. When reboot
+support is enabled and scheduling succeeds, firmware shows reboot-pending local
+indication immediately and performs the cold reboot after 1000 ms. If the
+accepted reboot later cannot turn all relays off or the reboot call returns
+unexpectedly, status reports `health="fault"` with `reboot_failed`.
 
 ### `heartbeat`
 

@@ -137,6 +137,33 @@ ZTEST(health, test_recovery_pending_and_primary_reason_priority)
 	zassert_equal(snap.primary_reason, HEALTH_REASON_HOST_REBOOT_PENDING);
 }
 
+ZTEST(health, test_reboot_failed_is_fault_and_clears_pending_reasons)
+{
+	struct health_snapshot snap;
+
+	health_set_relay_gpio_ready(true);
+	health_set_rpc_ready(true);
+	health_set_host_reboot_pending(true);
+	health_set_comm_reboot_pending(true);
+	health_record_reboot_failed();
+	snap = snapshot();
+
+	zassert_equal(snap.state, HEALTH_FAULT);
+	zassert_true((snap.reasons & HEALTH_REASON_REBOOT_FAILED) != 0U);
+	zassert_false((snap.reasons & HEALTH_REASON_HOST_REBOOT_PENDING) != 0U);
+	zassert_false((snap.reasons & HEALTH_REASON_COMM_REBOOT_PENDING) != 0U);
+	zassert_equal(snap.primary_reason, HEALTH_REASON_REBOOT_FAILED);
+	zassert_equal(strcmp(health_reason_name(snap.primary_reason), "reboot_failed"), 0);
+
+	health_set_host_reboot_pending(false);
+	health_set_comm_reboot_pending(false);
+	snap = snapshot();
+
+	zassert_equal(snap.state, HEALTH_FAULT);
+	zassert_true((snap.reasons & HEALTH_REASON_REBOOT_FAILED) != 0U);
+	zassert_equal(snap.primary_reason, HEALTH_REASON_REBOOT_FAILED);
+}
+
 ZTEST(health, test_indicator_degraded_is_advisory_degraded)
 {
 	struct health_snapshot snap;

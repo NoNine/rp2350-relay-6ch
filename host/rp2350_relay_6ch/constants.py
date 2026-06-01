@@ -33,6 +33,7 @@ ERR_INVALID_ARGUMENT = 2
 ERR_BUSY = 3
 ERR_RELAY_IO = 4
 ERR_REBOOT_UNAVAILABLE = 5
+ERR_REBOOT_FAILED = 6
 
 DEVICE_ERROR_NAMES = {
     ERR_DECODE: "decode",
@@ -40,4 +41,5 @@ DEVICE_ERROR_NAMES = {
     ERR_BUSY: "busy",
     ERR_RELAY_IO: "relay_io",
     ERR_REBOOT_UNAVAILABLE: "reboot_unavailable",
+    ERR_REBOOT_FAILED: "reboot_failed",
 }

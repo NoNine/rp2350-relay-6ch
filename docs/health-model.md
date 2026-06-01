@@ -124,6 +124,7 @@ Reason flags:
 | 4 | `comm_reboot_pending` | Autonomous communication-loss reboot final warning is active. |
 | 5 | `indicator_degraded` | Explicitly supported local indicator path is degraded. |
 | 6 | `host_reboot_pending` | Host-requested controlled reboot is pending. |
+| 7 | `reboot_failed` | Accepted host or autonomous reboot could not be scheduled or complete safely. |
 
 Reason flags are stable once exposed. Add new flags only by appending new bits.
 Do not reuse or renumber existing bits.
@@ -157,6 +158,9 @@ Do not reuse or renumber existing bits.
   warning window, this happens immediately.
 - Clears `comm_reboot_pending` if ownership recovery cancels the pending
   reboot.
+- Records latched `reboot_failed` and clears communication-loss reboot
+  bookkeeping if autonomous reboot cannot be scheduled or if a reboot call
+  unexpectedly returns.
 
 `relay_mgmt.c`:
 
@@ -165,6 +169,9 @@ Do not reuse or renumber existing bits.
   after `health_init()` has completed.
 - Publishes `host_reboot_pending` when host-requested reboot is accepted, and
   clears it if the pending reboot is canceled in tests before reboot occurs.
+- Records latched `reboot_failed` and clears reboot-pending health reasons if
+  host-requested reboot cannot be scheduled, pre-reboot all-off fails, or a
+  reboot call unexpectedly returns.
 - Extends `status` with health fields.
 - Keeps existing command counters as counters, not health reasons, unless a
   later contract defines thresholds.
@@ -343,16 +350,18 @@ Primary reason priority is:
 
 1. `comm_reboot_pending`
 2. `host_reboot_pending`
-3. `relay_gpio_init_failed`
-4. `relay_io_failed`
-5. `comm_owner_timeout`
-6. `rpc_not_ready`
-7. `indicator_degraded`
-8. `none`
+3. `reboot_failed`
+4. `relay_gpio_init_failed`
+5. `relay_io_failed`
+6. `comm_owner_timeout`
+7. `rpc_not_ready`
+8. `indicator_degraded`
+9. `none`
 
 Reason lifecycle:
 
-- Latched reasons: `relay_gpio_init_failed` and `relay_io_failed`.
+- Latched reasons: `relay_gpio_init_failed`, `relay_io_failed`, and
+  `reboot_failed`.
 - Live reasons: `rpc_not_ready`, `comm_owner_timeout`,
   `comm_reboot_pending`, `indicator_degraded`, and `host_reboot_pending`.
 - Live reasons are set and cleared by their owning domain. Latched reasons
@@ -387,6 +396,8 @@ Firmware health tests must cover:
 - relay GPIO initialization failure becomes `fault` with
   `relay_gpio_init_failed`;
 - relay I/O failure becomes `fault` with `relay_io_failed`;
+- reboot failure becomes `fault` with `reboot_failed` and clears reboot-pending
+  reasons;
 - communication-owner timeout becomes `degraded` with `comm_owner_timeout`;
 - autonomous communication-loss reboot scheduling leaves owner timeout as
   `degraded` until the final warning phase starts;

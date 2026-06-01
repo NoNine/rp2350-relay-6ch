@@ -15,9 +15,11 @@ from rp2350_relay_6ch.constants import (
     CMD_SET,
     CMD_SET_ALL,
     ERR_BUSY,
+    ERR_REBOOT_FAILED,
     GROUP_RELAY,
     OP_READ_RSP,
     OP_WRITE_RSP,
+    DEVICE_ERROR_NAMES,
 )
 from rp2350_relay_6ch.exceptions import (
     RelayDeviceError,
@@ -260,6 +262,11 @@ def test_device_error_payload_raises_structured_exception() -> None:
     assert exc.value.group == GROUP_RELAY
     assert exc.value.rc == ERR_BUSY
     assert "busy" in str(exc.value)
+
+
+def test_reboot_failed_error_name_is_mapped() -> None:
+    assert ERR_REBOOT_FAILED == 6
+    assert DEVICE_ERROR_NAMES[ERR_REBOOT_FAILED] == "reboot_failed"
 
 
 def test_mismatched_response_header_raises_protocol_error() -> None:
