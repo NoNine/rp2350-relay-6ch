@@ -1305,6 +1305,14 @@ void indicator_set_health_snapshot(const struct health_snapshot *snapshot)
 	schedule_render_now();
 }
 
+void indicator_publish_health_snapshot(void)
+{
+	struct health_snapshot snapshot;
+
+	health_snapshot(&snapshot);
+	indicator_set_health_snapshot(&snapshot);
+}
+
 void indicator_set_relay_timed_state(
 	uint8_t state_mask, uint8_t pulse_mask,
 	const struct indicator_pulse_timing pulse_timing[DISPLAY_PULSE_CHANNELS])

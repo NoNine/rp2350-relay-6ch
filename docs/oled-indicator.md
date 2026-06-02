@@ -177,6 +177,8 @@ summary. Presentation-only command feedback remains local to the indicator.
 Stable controller facts flow through:
 
 - `indicator_set_health_snapshot(const struct health_snapshot *snapshot)`
+- `indicator_publish_health_snapshot()` when the caller only needs to publish
+  the current health model to indicators.
 
 Presentation-only inputs may remain indicator-local:
 
@@ -245,6 +247,13 @@ The POST diagnostic write is not a splash screen:
 POST cannot prove that OLED pixels are lit, the panel is visible, the panel
 glass is intact, the relay contacts closed, load voltage exists, or current is
 flowing.
+
+The Zephyr SSD1306 driver may briefly initialize and unblank the panel before
+application `indicator_init()` runs. If a non-rotated frame remains visible
+before `indicator_init()` in rotated product builds, handle it as postponed
+follow-up work: use a separate devicetree/build-composition change so the
+SSD1306 starts with the correct physical segment and COM mapping from driver
+init.
 
 ## Failure Contract
 

@@ -84,11 +84,8 @@ static void publish_indicator_state(
 	uint8_t state_mask, uint8_t pulse_mask,
 	const struct indicator_pulse_timing pulse_timing[RP2350_RELAY_6CH_CHANNEL_COUNT])
 {
-	struct health_snapshot snapshot;
-
 	health_set_relay_state(state_mask, pulse_mask);
-	health_snapshot(&snapshot);
-	indicator_set_health_snapshot(&snapshot);
+	indicator_publish_health_snapshot();
 
 	if (pulse_timing == NULL) {
 		return;
@@ -99,10 +96,7 @@ static void publish_indicator_state(
 
 static void publish_health_snapshot(void)
 {
-	struct health_snapshot snapshot;
-
-	health_snapshot(&snapshot);
-	indicator_set_health_snapshot(&snapshot);
+	indicator_publish_health_snapshot();
 }
 
 static void snapshot_pulse_timing_locked(

@@ -96,6 +96,24 @@ ZTEST(indicator, test_health_snapshots_drive_stable_states)
 	zassert_true(snap.reboot_pending);
 }
 
+ZTEST(indicator, test_publish_health_snapshot_uses_current_health_model)
+{
+	struct indicator_test_snapshot snap;
+
+	health_test_reset();
+	health_set_relay_gpio_ready(true);
+	health_set_rpc_ready(true);
+	health_set_host_reboot_pending(true);
+	indicator_publish_health_snapshot();
+	indicator_test_force_render();
+	indicator_test_get_snapshot(&snap);
+
+	zassert_true(snap.reboot_pending);
+	zassert_equal(snap.rgb, INDICATOR_RGB_REBOOT_PENDING);
+	zassert_equal(snap.display_mode, INDICATOR_DISPLAY_MODE_REBOOT);
+	zassert_equal(snap.display_detail, INDICATOR_DISPLAY_DETAIL_HOLD);
+}
+
 ZTEST(indicator, test_fault_snapshot_from_boot_does_not_mark_ready)
 {
 	struct indicator_test_snapshot snap;

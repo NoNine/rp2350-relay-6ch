@@ -648,7 +648,7 @@ static void reboot_work_handler(struct k_work *work)
 	ret = relay_off_all();
 	if (ret < 0) {
 		health_record_reboot_failed();
-		relay_mgmt_publish_health();
+		indicator_publish_health_snapshot();
 		return;
 	}
 #ifdef CONFIG_ZTEST
@@ -659,7 +659,7 @@ static void reboot_work_handler(struct k_work *work)
 	sys_reboot(SYS_REBOOT_COLD);
 #endif
 	health_record_reboot_failed();
-	relay_mgmt_publish_health();
+	indicator_publish_health_snapshot();
 }
 #endif
 
@@ -690,7 +690,7 @@ static int reboot_handler(struct smp_streamer *ctxt)
 #endif
 	if (schedule_ret < 0) {
 		health_record_reboot_failed();
-		relay_mgmt_publish_health();
+		indicator_publish_health_snapshot();
 		return error_response(zse, RP2350_RELAY_6CH_MGMT_ERR_REBOOT_FAILED);
 	}
 	health_set_host_reboot_pending(true);
@@ -705,7 +705,7 @@ static int reboot_handler(struct smp_streamer *ctxt)
 
 #ifdef CONFIG_REBOOT
 	counter_inc(RELAY_MGMT_COUNTER_SUCCEEDED);
-	relay_mgmt_publish_health();
+	indicator_publish_health_snapshot();
 #else
 	record_error_indicator(RP2350_RELAY_6CH_MGMT_ERR_REBOOT_UNAVAILABLE);
 #endif
@@ -969,7 +969,7 @@ void relay_mgmt_test_cancel_reboot(void)
 #ifdef CONFIG_REBOOT
 	(void)k_work_cancel_delayable(&reboot_work);
 	health_set_host_reboot_pending(false);
-	relay_mgmt_publish_health();
+	indicator_publish_health_snapshot();
 #endif
 }
 

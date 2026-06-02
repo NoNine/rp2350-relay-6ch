@@ -106,6 +106,7 @@ struct indicator_test_snapshot {
 
 void indicator_init(void);
 void indicator_set_health_snapshot(const struct health_snapshot *snapshot);
+void indicator_publish_health_snapshot(void);
 void indicator_set_relay_timed_state(
 	uint8_t state_mask, uint8_t pulse_mask,
 	const struct indicator_pulse_timing pulse_timing[6]);

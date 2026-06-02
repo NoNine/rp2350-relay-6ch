@@ -722,12 +722,19 @@ ZTEST(relay_mgmt, test_host_reboot_success_sets_pending_health)
 					   encode_empty_request());
 	bool ok = false;
 	struct health_snapshot snap;
+	struct indicator_test_snapshot indicator_snap;
 
 	zassert_true(decode_bool(response_len, "ok", &ok));
 	zassert_true(ok);
 	health_snapshot(&snap);
 	zassert_equal(snap.state, HEALTH_RECOVERY_PENDING);
 	zassert_equal(snap.primary_reason, HEALTH_REASON_HOST_REBOOT_PENDING);
+	indicator_test_force_render();
+	indicator_test_get_snapshot(&indicator_snap);
+	zassert_true(indicator_snap.reboot_pending);
+	zassert_equal(indicator_snap.rgb, INDICATOR_RGB_REBOOT_PENDING);
+	zassert_equal(indicator_snap.display_mode, INDICATOR_DISPLAY_MODE_REBOOT);
+	zassert_equal(indicator_snap.display_detail, INDICATOR_DISPLAY_DETAIL_HOLD);
 }
 
 ZTEST(relay_mgmt, test_host_reboot_schedule_failure_returns_reboot_failed)

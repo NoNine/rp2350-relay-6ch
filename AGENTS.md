@@ -87,6 +87,12 @@ Minimal change gate:
 - Before editing, state the requested behavior in one sentence.
 - After editing, inspect `git diff` and remove changes not required for that
   behavior.
+- During diff review, scan for repeated adjacent call patterns introduced or
+  touched by the change. If the pattern appears more than once and represents
+  one concept, either replace it with an existing helper/API or add the smallest
+  clearly named helper/API that matches the ownership boundary. If the
+  abstraction is not directly needed for the requested behavior, leave it out
+  and mention it as follow-up work.
 - Do not add helpers, validation, abstractions, docs, or tests unless they are
   directly required by the request.
 - If a useful cleanup is found, leave it out and mention it as follow-up work.

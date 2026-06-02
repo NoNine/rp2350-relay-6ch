@@ -166,9 +166,11 @@ Do not reuse or renumber existing bits.
 
 - Records when the relay management service is registered/initialized and able
   to serve management commands, then publishes `health_set_rpc_ready(true)`
-  after `health_init()` has completed.
+  through `relay_mgmt_publish_health()` after `health_init()` has completed.
 - Publishes `host_reboot_pending` when host-requested reboot is accepted, and
   clears it if the pending reboot is canceled in tests before reboot occurs.
+- Publishes current health to local indicators after management-owned reboot
+  health changes so host-initiated reboot immediately shows reboot hold.
 - Records latched `reboot_failed` and clears reboot-pending health reasons if
   host-requested reboot cannot be scheduled, pre-reboot all-off fails, or a
   reboot call unexpectedly returns.
@@ -263,10 +265,11 @@ and health must not require callers to hold those locks. Health setters may
 derive state and increment transition counters, but they must remain in-memory
 fact updates only.
 
-Indicator integration should prefer one stable-summary entry point:
+Indicator integration should use stable-summary entry points:
 
 ```c
 void indicator_set_health_snapshot(const struct health_snapshot *snapshot);
+void indicator_publish_health_snapshot(void);
 ```
 
 Keep `indicator_record_command()` for short accepted, rejected, and busy
