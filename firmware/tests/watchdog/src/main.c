@@ -6,6 +6,8 @@
 
 #include <rp2350_relay_6ch/health.h>
 #include <rp2350_relay_6ch/watchdog_supervisor.h>
+#include <rp2350_relay_6ch_test/health.h>
+#include <rp2350_relay_6ch_test/watchdog_supervisor.h>
 
 static struct watchdog_supervisor_snapshot snapshot(void)
 {

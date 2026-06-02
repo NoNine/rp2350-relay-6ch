@@ -7,5 +7,5 @@ set(KCONFIG_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../../Kconfig)
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(rp2350_relay_6ch_relay_tests)
 
-target_include_directories(app PRIVATE ../../include)
+target_include_directories(app PRIVATE ../../include ../support/include)
 target_sources(app PRIVATE src/main.c ../../src/health.c ../../src/relay.c ../../src/indicator.c)

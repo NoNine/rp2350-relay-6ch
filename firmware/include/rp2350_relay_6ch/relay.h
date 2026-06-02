@@ -31,16 +31,6 @@ uint32_t relay_comm_loss_timeout_ms(void);
 bool relay_comm_loss_reboot_on_timeout(void);
 uint32_t relay_comm_loss_reboot_delay_ms(void);
 
-#ifdef CONFIG_ZTEST
-bool relay_comm_loss_test_reboot_scheduled(void);
-uint32_t relay_comm_loss_test_reboot_remaining_ms(void);
-bool relay_comm_loss_test_reboot_pending_indication_scheduled(void);
-void relay_comm_loss_test_force_reboot_schedule_result(int result);
-void relay_comm_loss_test_run_reboot_work(void);
-void relay_comm_loss_test_force_reboot_return(bool enabled);
-void relay_test_force_next_off_all_result(int result);
-#endif
-
 #ifdef __cplusplus
 }
 #endif

@@ -85,6 +85,10 @@ output. Prefer deriving expected versions from the authoritative declaration.
 Minimal change gate:
 
 - Before editing, state the requested behavior in one sentence.
+- When asking the user to choose from options, never infer or guess their
+  answer unless they directly select an option or clearly state an equivalent
+  choice. If the answer is ambiguous, ask again instead of proceeding with a
+  recommended default.
 - After editing, inspect `git diff` and remove changes not required for that
   behavior.
 - During diff review, scan for repeated adjacent call patterns introduced or

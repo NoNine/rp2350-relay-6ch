@@ -5,6 +5,7 @@
 #include <zephyr/ztest.h>
 
 #include <rp2350_relay_6ch/health.h>
+#include <rp2350_relay_6ch_test/health.h>
 
 static struct health_snapshot snapshot(void)
 {

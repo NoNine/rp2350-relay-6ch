@@ -18,6 +18,9 @@
 
 #include <rp2350_relay_6ch/health.h>
 #include <rp2350_relay_6ch/indicator.h>
+#ifdef CONFIG_ZTEST
+#include <rp2350_relay_6ch_test/indicator.h>
+#endif
 
 LOG_MODULE_REGISTER(rp2350_relay_indicator, LOG_LEVEL_INF);
 

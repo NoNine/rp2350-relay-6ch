@@ -6,6 +6,7 @@
 
 #include <rp2350_relay_6ch/health.h>
 #include <rp2350_relay_6ch/relay.h>
+#include <rp2350_relay_6ch_test/health.h>
 
 static void *relay_suite_setup(void)
 {

@@ -63,17 +63,6 @@ void relay_mgmt_get_counters(struct rp2350_relay_6ch_mgmt_counters *counters);
 void relay_mgmt_reset_counters(void);
 void relay_mgmt_publish_health(void);
 
-#ifdef CONFIG_ZTEST
-int relay_mgmt_test_handle(uint8_t command_id, bool write, const uint8_t *request,
-			   size_t request_len, uint8_t *response, size_t response_size,
-			   size_t *response_len);
-uint32_t relay_mgmt_test_reboot_delay_ms(void);
-void relay_mgmt_test_cancel_reboot(void);
-void relay_mgmt_test_force_reboot_schedule_result(int result);
-void relay_mgmt_test_run_reboot_work(void);
-void relay_mgmt_test_force_reboot_return(bool enabled);
-#endif
-
 #ifdef __cplusplus
 }
 #endif

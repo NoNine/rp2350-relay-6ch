@@ -10,10 +10,6 @@
 
 #include <rp2350_relay_6ch/health.h>
 
-#ifdef CONFIG_ZTEST
-#include <zephyr/drivers/display.h>
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -83,27 +79,6 @@ struct indicator_pulse_timing {
 	uint32_t remaining_ms;
 };
 
-struct indicator_test_snapshot {
-	enum indicator_rgb_pattern rgb;
-	enum indicator_buzzer_pattern buzzer;
-	enum indicator_display_state display_state;
-	enum indicator_display_mode display_mode;
-	enum indicator_display_detail display_detail;
-	bool ready;
-	bool degraded;
-	bool owner_lost;
-	bool fault;
-	bool reboot_pending;
-	uint8_t relay_state_mask;
-	uint8_t pulse_mask;
-	uint8_t display_filled_mask;
-	uint8_t display_pulse_mask;
-	uint16_t display_post_write_count;
-	uint16_t display_write_count;
-	bool buzzer_on;
-	uint8_t beeps_remaining;
-};
-
 void indicator_init(void);
 void indicator_set_health_snapshot(const struct health_snapshot *snapshot);
 void indicator_publish_health_snapshot(void);
@@ -111,24 +86,6 @@ void indicator_set_relay_timed_state(
 	uint8_t state_mask, uint8_t pulse_mask,
 	const struct indicator_pulse_timing pulse_timing[6]);
 void indicator_record_command(enum indicator_command_result result);
-
-#ifdef CONFIG_ZTEST
-void indicator_test_reset(void);
-void indicator_test_get_snapshot(struct indicator_test_snapshot *snapshot);
-void indicator_test_force_render(void);
-void indicator_test_advance(uint32_t ms);
-bool indicator_test_display_pixel_is_set(uint8_t x, uint8_t y);
-bool indicator_test_display_glyph_supported(char c);
-void indicator_test_configure_display(bool supported, bool ready,
-				      uint16_t width, uint16_t height,
-				      uint32_t pixel_formats,
-				      bool blanking_fails,
-				      bool post_write_fails,
-				      bool render_write_fails);
-void indicator_test_set_display_render_failure(bool render_write_fails);
-void indicator_test_set_display_orientation_failure(bool orientation_fails);
-enum display_orientation indicator_test_display_orientation(void);
-#endif
 
 #ifdef __cplusplus
 }

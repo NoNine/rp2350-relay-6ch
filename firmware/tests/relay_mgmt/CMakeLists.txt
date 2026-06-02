@@ -74,6 +74,7 @@ configure_file(
 
 target_include_directories(app PRIVATE
   ../../include
+  ../support/include
   ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
 target_sources(app PRIVATE

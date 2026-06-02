@@ -25,15 +25,6 @@ struct watchdog_supervisor_snapshot {
 void watchdog_supervisor_start(void);
 void watchdog_supervisor_snapshot(struct watchdog_supervisor_snapshot *snapshot);
 
-#ifdef CONFIG_ZTEST
-void watchdog_supervisor_test_reset(void);
-void watchdog_supervisor_test_set_device_ready(bool ready);
-void watchdog_supervisor_test_set_setup_result(int result);
-void watchdog_supervisor_test_set_feed_result(int result);
-void watchdog_supervisor_test_set_last_reset_watchdog(bool last_reset_watchdog);
-void watchdog_supervisor_test_run_once(void);
-#endif
-
 #ifdef __cplusplus
 }
 #endif

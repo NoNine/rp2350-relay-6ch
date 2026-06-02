@@ -17,6 +17,11 @@
 #include <rp2350_relay_6ch/relay.h>
 #include <rp2350_relay_6ch/relay_mgmt.h>
 #include <rp2350_relay_6ch/watchdog_supervisor.h>
+#include <rp2350_relay_6ch_test/health.h>
+#include <rp2350_relay_6ch_test/indicator.h>
+#include <rp2350_relay_6ch_test/relay.h>
+#include <rp2350_relay_6ch_test/relay_mgmt.h>
+#include <rp2350_relay_6ch_test/watchdog_supervisor.h>
 
 #define TEST_BUF_SIZE 256U
 

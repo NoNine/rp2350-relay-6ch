@@ -7,6 +7,8 @@
 
 #include <rp2350_relay_6ch/health.h>
 #include <rp2350_relay_6ch/indicator.h>
+#include <rp2350_relay_6ch_test/health.h>
+#include <rp2350_relay_6ch_test/indicator.h>
 
 static struct indicator_test_snapshot snapshot(void)
 {
