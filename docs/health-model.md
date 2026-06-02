@@ -432,7 +432,7 @@ Firmware indicator tests must cover:
 Protocol and host tests must cover:
 
 - `status` includes the four health fields and preserves all existing fields;
-- existing direct library `get_status()` returns health fields without custom
+- existing direct library `status()` returns health fields without custom
   decoding;
 - CLI JSON `status` preserves health fields unchanged;
 - CLI human `status` prints the compact health line;

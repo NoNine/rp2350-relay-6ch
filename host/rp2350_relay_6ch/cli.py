@@ -176,10 +176,10 @@ def _format_human(command: str, payload: dict[str, Any]) -> str:
     if command in {"identity", "capabilities", "health", "transport", "safety", "watchdog"}:
         return _format_key_values(payload)
 
-    if command == "get" and "channel" in payload:
+    if command == "get":
         return _format_single_channel(payload)
 
-    if command in {"get", "set", "set-all", "pulse", "off-all"}:
+    if command in {"get-all", "set", "set-all", "pulse", "off-all"}:
         return _format_relay_masks(payload)
 
     if command == "status":
@@ -266,7 +266,13 @@ def cmd_build_info(args: argparse.Namespace) -> dict[str, Any]:
 def cmd_get(args: argparse.Namespace) -> dict[str, Any]:
     _require_port(args)
     with _ready_client(args) as client:
-        return client.get_relays(args.channel)
+        return client.get_relay(args.channel)
+
+
+def cmd_get_all(args: argparse.Namespace) -> dict[str, Any]:
+    _require_port(args)
+    with _ready_client(args) as client:
+        return client.get_all_relays()
 
 
 def cmd_set(args: argparse.Namespace) -> dict[str, Any]:
@@ -290,7 +296,7 @@ def cmd_pulse(args: argparse.Namespace) -> dict[str, Any]:
 def cmd_off_all(args: argparse.Namespace) -> dict[str, Any]:
     _require_port(args)
     with _ready_client(args) as client:
-        return client.off_all()
+        return client.off_all_relays()
 
 
 def cmd_status(args: argparse.Namespace) -> dict[str, Any]:
@@ -340,6 +346,7 @@ COMMANDS = {
     "capabilities": cmd_capabilities,
     "build-info": cmd_build_info,
     "get": cmd_get,
+    "get-all": cmd_get_all,
     "set": cmd_set,
     "set-all": cmd_set_all,
     "pulse": cmd_pulse,
@@ -376,8 +383,9 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("capabilities", help="print relay controller capabilities")
     subparsers.add_parser("build-info", help="print firmware build information")
 
-    get_parser = subparsers.add_parser("get", help="get relay state")
-    get_parser.add_argument("channel", nargs="?", type=_parse_channel)
+    get_parser = subparsers.add_parser("get", help="get one relay state")
+    get_parser.add_argument("channel", type=_parse_channel)
+    subparsers.add_parser("get-all", help="get all relay states")
 
     set_parser = subparsers.add_parser("set", help="set one relay on or off")
     set_parser.add_argument("channel", type=_parse_channel)

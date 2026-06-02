@@ -64,12 +64,12 @@ class RelayDaemonClient:
     def build_info(self) -> dict[str, Any]:
         return self._request("build-info")
 
-    def get_relays(self, channel: int | None = None) -> dict[str, Any]:
-        args: dict[str, Any] = {}
-        if channel is not None:
-            self._validate_channel(channel)
-            args["channel"] = channel
-        return self._request("get", args)
+    def get_relay(self, channel: int) -> dict[str, Any]:
+        self._validate_channel(channel)
+        return self._request("get", {"channel": channel})
+
+    def get_all_relays(self) -> dict[str, Any]:
+        return self._request("get-all")
 
     def set_relay(self, channel: int, on: bool) -> dict[str, Any]:
         self._validate_channel(channel)
@@ -86,7 +86,7 @@ class RelayDaemonClient:
         self._validate_duration(duration_ms)
         return self._request("pulse", {"channel": channel, "duration_ms": duration_ms})
 
-    def off_all(self) -> dict[str, Any]:
+    def off_all_relays(self) -> dict[str, Any]:
         return self._request("off-all")
 
     def status(self) -> dict[str, Any]:
@@ -104,16 +104,10 @@ class RelayDaemonClient:
     def watchdog(self) -> dict[str, Any]:
         return self._request("watchdog")
 
-    def get_build_info(self) -> dict[str, Any]:
-        return self.build_info()
-
-    def get_status(self) -> dict[str, Any]:
-        return self.status()
-
     def reboot(self) -> dict[str, Any]:
         return self._request("reboot")
 
-    def get_daemon_status(self) -> dict[str, Any]:
+    def daemon_status(self) -> dict[str, Any]:
         return self._request("daemon-status")
 
     def _request(self, command: str, args: dict[str, Any] | None = None) -> dict[str, Any]:

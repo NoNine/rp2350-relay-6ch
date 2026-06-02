@@ -234,12 +234,13 @@ Implementation scope:
   matching.
 - Implement methods:
   - `get_info()`
-  - `get_relays()`
+  - `get_relay()`
+  - `get_all_relays()`
   - `set_relay()`
   - `set_all_relays()`
   - `pulse_relay()`
-  - `off_all()`
-  - `get_status()`
+  - `off_all_relays()`
+  - `status()`
   - `reboot()`
 - Add typed exceptions for transport, timeout, protocol, validation, and
   device errors.

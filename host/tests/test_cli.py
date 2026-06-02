@@ -19,7 +19,7 @@ class FakeClient:
     failure: Exception | None = None
     relay_state = 0x21
     relay_pulsing = 0
-    protocol_version = 7
+    protocol_version = 8
 
     def __init__(
         self,
@@ -88,15 +88,17 @@ class FakeClient:
             "compiler": "GNU 13.3.0",
         }
 
-    def get_relays(self, channel: int | None = None) -> dict[str, Any]:
-        self.calls.append(("get_relays", (channel,)))
-        if channel is None:
-            return {"state": self.relay_state, "pulsing": self.relay_pulsing}
+    def get_relay(self, channel: int) -> dict[str, Any]:
+        self.calls.append(("get_relay", (channel,)))
         return {
             "channel": channel,
             "on": (self.relay_state & (1 << channel)) != 0,
             "pulsing": (self.relay_pulsing & (1 << channel)) != 0,
         }
+
+    def get_all_relays(self) -> dict[str, Any]:
+        self.calls.append(("get_all_relays", ()))
+        return {"state": self.relay_state, "pulsing": self.relay_pulsing}
 
     def set_relay(self, channel: int, on: bool) -> dict[str, Any]:
         self.calls.append(("set_relay", (channel, on)))
@@ -110,8 +112,8 @@ class FakeClient:
         self.calls.append(("pulse_relay", (channel, duration_ms)))
         return {"state": 1 << channel, "pulsing": 1 << channel}
 
-    def off_all(self) -> dict[str, Any]:
-        self.calls.append(("off_all", ()))
+    def off_all_relays(self) -> dict[str, Any]:
+        self.calls.append(("off_all_relays", ()))
         return {"state": 0, "pulsing": 0}
 
     def status(self) -> dict[str, Any]:
@@ -146,10 +148,6 @@ class FakeClient:
         self.calls.append(("watchdog", ()))
         return {"watchdog_enabled": False}
 
-    def get_status(self) -> dict[str, Any]:
-        self.calls.append(("get_status", ()))
-        return self.status()
-
     def reboot(self) -> dict[str, Any]:
         self.calls.append(("reboot", ()))
         return {"reboot": True}
@@ -165,7 +163,7 @@ def fake_client(monkeypatch: pytest.MonkeyPatch) -> None:
     FakeClient.failure = None
     FakeClient.relay_state = 0x21
     FakeClient.relay_pulsing = 0
-    FakeClient.protocol_version = 7
+    FakeClient.protocol_version = 8
     monkeypatch.setattr(cli, "RelayClient", FakeClient)
 
 
@@ -206,7 +204,7 @@ def test_identity_human_output_lists_identity_fields(capsys: pytest.CaptureFixtu
     assert "hardware:" in captured.out
     assert "Waveshare RP2350-Relay-6CH" in captured.out
     assert "protocol_version:" in captured.out
-    assert "7" in captured.out
+    assert "8" in captured.out
     assert "relay_count:" in captured.out
 
 
@@ -408,7 +406,7 @@ def test_set_all_accepts_hex_mask() -> None:
 def test_get_all_human_output_names_enabled_relays(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    rc = cli.main(["--port", "COM7", "get"])
+    rc = cli.main(["--port", "COM7", "get-all"])
 
     captured = capsys.readouterr()
 
@@ -416,7 +414,7 @@ def test_get_all_human_output_names_enabled_relays(
     assert "state:    0x21" in captured.out
     assert "on:       CH1, CH6" in captured.out
     assert "pulsing:  none" in captured.out
-    assert FakeClient.instances[0].calls == [("identity", ()), ("get_relays", (None,))]
+    assert FakeClient.instances[0].calls == [("identity", ()), ("get_all_relays", ())]
 
 
 def test_get_channel_human_output_reports_on_channel(
@@ -430,7 +428,7 @@ def test_get_channel_human_output_reports_on_channel(
     assert "channel:  CH1" in captured.out
     assert "on:       true" in captured.out
     assert "pulsing:  false" in captured.out
-    assert FakeClient.instances[0].calls == [("identity", ()), ("get_relays", (0,))]
+    assert FakeClient.instances[0].calls == [("identity", ()), ("get_relay", (0,))]
 
 
 def test_get_channel_human_output_reports_off_channel(
@@ -591,7 +589,7 @@ def test_smoke_pulses_each_relay_and_forces_teardown(
         ("pulse_relay", (5, 25)),
     ]
     assert sleeps == [0.025] * 6
-    assert calls[-1:] == [("off_all", ())]
+    assert calls[-1:] == [("off_all_relays", ())]
     assert FakeClient.instances[0].closed is True
 
 

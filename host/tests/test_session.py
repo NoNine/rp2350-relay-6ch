@@ -78,7 +78,7 @@ class SessionFakeClient:
         return {
             "command_model_version": 2,
             "hardware": "Waveshare RP2350-Relay-6CH",
-            "protocol_version": 7,
+            "protocol_version": 8,
             "relay_count": 6,
         }
 
@@ -125,8 +125,16 @@ class SessionFakeClient:
         self.calls.append(("watchdog", ()))
         return {"watchdog_enabled": False}
 
-    def get_relays(self, channel: int | None = None) -> dict[str, Any]:
-        self.calls.append(("get_relays", (channel,)))
+    def get_relay(self, channel: int) -> dict[str, Any]:
+        self.calls.append(("get_relay", (channel,)))
+        return {
+            "channel": channel,
+            "on": (self.relay_state & (1 << channel)) != 0,
+            "pulsing": (self.relay_pulsing & (1 << channel)) != 0,
+        }
+
+    def get_all_relays(self) -> dict[str, Any]:
+        self.calls.append(("get_all_relays", ()))
         return {"state": self.relay_state, "pulsing": self.relay_pulsing}
 
     def set_relay(self, channel: int, on: bool) -> dict[str, Any]:
@@ -145,8 +153,8 @@ class SessionFakeClient:
         self.relay_pulsing = 1 << channel
         return {"state": self.relay_state, "pulsing": self.relay_pulsing}
 
-    def off_all(self) -> dict[str, Any]:
-        self.calls.append(("off_all", ()))
+    def off_all_relays(self) -> dict[str, Any]:
+        self.calls.append(("off_all_relays", ()))
         self.relay_state = 0
         self.relay_pulsing = 0
         return {"state": 0, "pulsing": 0}
@@ -261,7 +269,7 @@ def test_startup_opens_one_client_runs_identity_status_and_starts_heartbeat() ->
     assert "RP2350 Relay Session" in text
     assert "Connection:   connected" in text
     assert "Port:         COM7" in text
-    assert "Protocol:     7" in text
+    assert "Protocol:     8" in text
     assert "State:        0x00" in text
     assert "Pulsing:      none" in text
 
@@ -450,7 +458,7 @@ def test_session_commands_reuse_same_client_and_one_based_channels() -> None:
     session.handle_line("get 6")
 
     client = SessionFakeClient.instances[0]
-    assert client.calls[-2:] == [("set_relay", (5, True)), ("get_relays", (5,))]
+    assert client.calls[-2:] == [("set_relay", (5, True)), ("get_relay", (5,))]
     assert len(SessionFakeClient.instances) == 1
 
 
@@ -531,7 +539,7 @@ def test_session_smoke_pulses_each_relay_and_tears_down() -> None:
         ("pulse_relay", (5, 25)),
     ]
     assert sleeps == [0.025] * 6
-    assert calls[-1:] == [("off_all", ())]
+    assert calls[-1:] == [("off_all_relays", ())]
     assert "smoke test passed" in output.getvalue()
 
 
@@ -543,6 +551,7 @@ def test_connected_completion_suggests_all_session_commands() -> None:
         "capabilities",
         "build-info",
         "get",
+        "get-all",
         "set",
         "set-all",
         "pulse",
@@ -647,7 +656,7 @@ def test_disconnect_refuses_when_relay_is_on_and_force_closes_without_off_all() 
     client = SessionFakeClient.instances[0]
     assert session.connected is False
     assert client.closed is True
-    assert ("off_all", ()) not in client.calls
+    assert ("off_all_relays", ()) not in client.calls
     assert FakeHeartbeat.instances[0].stopped is True
 
 

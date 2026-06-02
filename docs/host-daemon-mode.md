@@ -232,17 +232,17 @@ from rp2350_relay_6ch import RelayDaemonClient
 
 with RelayDaemonClient.connect(timeout_s=2.0) as relay:
     relay.set_relay(0, True)
-    relay.off_all()
+    relay.off_all_relays()
 ```
 
 - `RelayDaemonClient.connect(socket_path, timeout_s=2.0)` requires an explicit
   daemon socket path.
 - Expose methods matching direct `RelayClient`: `identity()`,
-  `capabilities()`, `build_info()`, `get_relays(channel=None)`,
-  `set_relay(channel, on)`, `set_all_relays(state)`,
-  `pulse_relay(channel, duration_ms)`, `off_all()`, `status()`, `health()`,
-  `transport_status()`, `safety()`, `watchdog()`, and `reboot()`.
-- Expose `get_daemon_status()` for `daemon-status`.
+  `capabilities()`, `build_info()`, `get_relay(channel)`,
+  `get_all_relays()`, `set_relay(channel, on)`, `set_all_relays(state)`,
+  `pulse_relay(channel, duration_ms)`, `off_all_relays()`, `status()`,
+  `health()`, `transport_status()`, `safety()`, `watchdog()`, and `reboot()`.
+- Expose `daemon_status()` for `daemon-status`.
 - Keep channel numbers zero-based in the Python API.
 - Use the same host-side validation rules and typed exceptions as the direct
   client where practical.
@@ -262,7 +262,7 @@ rp2350-relayctl --socket <path> [--timeout 2.0] \
 ```
 
 - Commands mirror the direct CLI: `identity`, `capabilities`, `build-info`,
-  `get`, `set`, `set-all`, `pulse`, `off-all`, `status`, `health`,
+  `get`, `get-all`, `set`, `set-all`, `pulse`, `off-all`, `status`, `health`,
   `transport`, `safety`, `watchdog`, and `reboot`.
 - Add `daemon-status` for daemon process and connection state. While the daemon
   is running, `daemon-status` exits `0` even when the relay controller is

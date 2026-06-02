@@ -18,7 +18,7 @@ class SmokeRelayClient(Protocol):
 
     def pulse_relay(self, channel: int, duration_ms: int) -> dict[str, Any]: ...
 
-    def off_all(self) -> dict[str, Any]: ...
+    def off_all_relays(self) -> dict[str, Any]: ...
 
 
 def run_smoke_sequence(
@@ -45,8 +45,8 @@ def run_smoke_sequence(
                 }
             )
             sleep_fn(pulse_ms / 1000.0)
-        final = client.off_all()
+        final = client.off_all_relays()
         return {"ok": True, "results": results, "final": final}
     finally:
         if final is None:
-            client.off_all()
+            client.off_all_relays()

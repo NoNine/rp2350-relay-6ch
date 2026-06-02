@@ -42,8 +42,12 @@ class FakeDaemonClient:
         self.calls.append(("build_info", ()))
         return {"app_version": "0.8.0"}
 
-    def get_relays(self, channel: int | None = None) -> dict[str, Any]:
-        self.calls.append(("get_relays", (channel,)))
+    def get_relay(self, channel: int) -> dict[str, Any]:
+        self.calls.append(("get_relay", (channel,)))
+        return {"channel": channel, "on": True, "pulsing": False}
+
+    def get_all_relays(self) -> dict[str, Any]:
+        self.calls.append(("get_all_relays", ()))
         return {"state": 0x21, "pulsing": 0}
 
     def set_relay(self, channel: int, on: bool) -> dict[str, Any]:
@@ -58,8 +62,8 @@ class FakeDaemonClient:
         self.calls.append(("pulse_relay", (channel, duration_ms)))
         return {"state": 1 << channel, "pulsing": 1 << channel}
 
-    def off_all(self) -> dict[str, Any]:
-        self.calls.append(("off_all", ()))
+    def off_all_relays(self) -> dict[str, Any]:
+        self.calls.append(("off_all_relays", ()))
         return {"state": 0, "pulsing": 0}
 
     def status(self) -> dict[str, Any]:
@@ -82,16 +86,12 @@ class FakeDaemonClient:
         self.calls.append(("watchdog", ()))
         return {"watchdog_enabled": False}
 
-    def get_status(self) -> dict[str, Any]:
-        self.calls.append(("get_status", ()))
-        return self.status()
-
     def reboot(self) -> dict[str, Any]:
         self.calls.append(("reboot", ()))
         return {"reboot": True}
 
-    def get_daemon_status(self) -> dict[str, Any]:
-        self.calls.append(("get_daemon_status", ()))
+    def daemon_status(self) -> dict[str, Any]:
+        self.calls.append(("daemon_status", ()))
         return {
             "connected": False,
             "selector_type": "serial",
@@ -163,7 +163,7 @@ def test_relayctl_outputs_json(capsys: pytest.CaptureFixture[str]) -> None:
 
     assert rc == relayctl.EXIT_OK
     assert '"connected": false' in captured.out
-    assert FakeDaemonClient.instances[0].calls == [("get_daemon_status", ())]
+    assert FakeDaemonClient.instances[0].calls == [("daemon_status", ())]
 
 
 def test_relayctl_daemon_status_defaults_to_human_output(
@@ -185,7 +185,7 @@ def test_relayctl_daemon_status_defaults_to_human_output(
         "daemon_version:      0.8.0\n"
     )
     assert "{" not in captured.out
-    assert FakeDaemonClient.instances[0].calls == [("get_daemon_status", ())]
+    assert FakeDaemonClient.instances[0].calls == [("daemon_status", ())]
 
 
 def test_relayctl_smoke_pulses_each_relay_and_forces_teardown(
@@ -234,7 +234,7 @@ socket = "/tmp/bench-a.sock"
         ("pulse_relay", (5, 25)),
     ]
     assert sleeps == [0.025] * 6
-    assert calls[-1:] == [("off_all", ())]
+    assert calls[-1:] == [("off_all_relays", ())]
 
 
 def test_relayctl_rejects_direct_serial_options() -> None:

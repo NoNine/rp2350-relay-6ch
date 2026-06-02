@@ -14,7 +14,7 @@ Firmware tests continue to exercise the management group handlers on
 ## SMP Group
 
 - Group ID: `64`
-- Protocol version: `7`
+- Protocol version: `8`
 - Command model version: `2`
 - Hardware name: `Waveshare RP2350-Relay-6CH`
 - Relay channel indexes: zero-based, `0` through `5`
@@ -27,12 +27,13 @@ Firmware tests continue to exercise the management group handlers on
 | 0x00 | `identity` | Read | Return protocol, command model, hardware, and relay-count identity. |
 | 0x01 | `capabilities` | Read | Return operation capabilities and pulse bounds. |
 | 0x02 | `build_info` | Read | Return firmware build identity and traceability metadata. |
-| 0x10 | `get` | Read | Return all relay states, or one relay when `channel` is provided. |
-| 0x11 | `status` | Read | Return concise operator relay state, health, and uptime. |
-| 0x12 | `health` | Read | Return detailed health state and reasons. |
-| 0x13 | `transport` | Read | Return transport configuration and status. |
-| 0x14 | `safety` | Read | Return communication-loss safety policy. |
-| 0x15 | `watchdog` | Read | Return watchdog configuration and health. |
+| 0x10 | `get` | Read | Return one relay state. |
+| 0x11 | `get_all` | Read | Return all relay states. |
+| 0x12 | `status` | Read | Return concise operator relay state, health, and uptime. |
+| 0x13 | `health` | Read | Return detailed health state and reasons. |
+| 0x14 | `transport` | Read | Return transport configuration and status. |
+| 0x15 | `safety` | Read | Return communication-loss safety policy. |
+| 0x16 | `watchdog` | Read | Return watchdog configuration and health. |
 | 0x20 | `set` | Write | Set one relay on or off. |
 | 0x21 | `set_all` | Write | Set all relay states from one mask. |
 | 0x22 | `pulse` | Write | Pulse one relay for a bounded duration. |
@@ -46,17 +47,17 @@ Firmware tests continue to exercise the management group handlers on
 | Role | IDs | Commands | Host-callable | Purpose |
 | --- | --- | --- | --- | --- |
 | Identity | `0x00`-`0x02` | `identity`, `capabilities`, `build_info` | Yes | Describe the device, supported operations, and firmware build without reading or changing relay state. |
-| Observation | `0x10`-`0x15` | `get`, `status`, `health`, `transport`, `safety`, `watchdog` | Yes | Read relay state and role-specific operational details without claiming ownership or changing outputs. |
+| Observation | `0x10`-`0x16` | `get`, `get_all`, `status`, `health`, `transport`, `safety`, `watchdog` | Yes | Read relay state and role-specific operational details without claiming ownership or changing outputs. |
 | Control | `0x20`-`0x23` | `set`, `set_all`, `pulse`, `off_all` | Yes | Change relay outputs or cancel active pulse work. |
 | Ownership | `0x30` | `heartbeat` | Yes | Renew host ownership and the communication-loss lease without changing relay outputs. |
 | Maintenance | `0x40` | `reboot` | Yes | Request a controlled firmware reboot when reboot support is enabled. |
 | Reserved event | `0x7f` | `event` | No | Reserve a device-originated asynchronous event frame; hosts must not send requests to this command. |
 
-Protocol version `7` groups command IDs by command-model role: identity,
-observation, control, ownership, and maintenance. Control commands keep their
-original CBOR request and response definitions; only their wire command IDs
-move into the control range. Hosts must treat `event` as unavailable and use
-normal command responses and reconnect/status checks.
+Protocol version `8` groups command IDs by command-model role: identity,
+observation, control, ownership, and maintenance. It splits single-relay `get`
+from all-relay `get_all` so each command has one response shape. Hosts must
+match protocol version `8` before using these command IDs, treat `event` as
+unavailable, and use normal command responses and reconnect/status checks.
 
 ## Error Codes
 
@@ -106,7 +107,7 @@ Response:
 | --- | --- | --- |
 | `pulse_min_ms` | uint | Minimum pulse duration. |
 | `pulse_max_ms` | uint | Maximum pulse duration. |
-| `capabilities` | uint | Capability bit mask for get, set, set-all, pulse, and off-all. |
+| `capabilities` | uint | Capability bit mask for get, get-all, set, set-all, pulse, and off-all. |
 
 ### `build_info`
 
@@ -130,14 +131,7 @@ Request:
 
 | Field | Type | Required | Meaning |
 | --- | --- | --- | --- |
-| `channel` | uint | No | Relay channel `0` through `5`; omit to get all relays. |
-
-All-relay response:
-
-| Field | Type | Meaning |
-| --- | --- | --- |
-| `state` | uint | Current on/off relay state mask. |
-| `pulsing` | uint | Current pulse-active relay mask. |
+| `channel` | uint | Yes | Relay channel `0` through `5`. |
 
 Single-relay response:
 
@@ -146,6 +140,17 @@ Single-relay response:
 | `channel` | uint | Relay channel. |
 | `on` | bool | Current relay state. |
 | `pulsing` | bool | Whether a pulse is active on this relay. |
+
+### `get_all`
+
+Request: empty CBOR map.
+
+Response:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `state` | uint | Current on/off relay state mask. |
+| `pulsing` | uint | Current pulse-active relay mask. |
 
 ### `set`
 
@@ -158,6 +163,9 @@ Request:
 
 Response: all-relay `state` and `pulsing` masks.
 
+If the target relay is pulsing, `set` cancels that pulse before applying the
+requested state.
+
 ### `set_all`
 
 Request:
@@ -167,6 +175,8 @@ Request:
 | `state` | uint | Yes | Six-bit relay state mask. Bits outside `0x3f` are invalid. |
 
 Response: all-relay `state` and `pulsing` masks.
+
+`set_all` cancels all active pulses before applying the requested state mask.
 
 ### `pulse`
 
@@ -179,11 +189,16 @@ Request:
 
 Response: all-relay `state` and `pulsing` masks.
 
+`pulse` rejects a request only when the target relay is already pulsing. Other
+relays may pulse concurrently.
+
 ### `off_all`
 
 Request: empty CBOR map.
 
 Response: all-relay `state` and `pulsing` masks.
+
+`off_all` cancels all active pulses and turns every relay off.
 
 ### `status`
 
@@ -290,13 +305,13 @@ Response:
 | --- | --- | --- |
 | `ok` | bool | Present and true when the heartbeat request was accepted. |
 
-In protocol `7`, `heartbeat` renews the firmware communication-loss lease when
+In protocol `8`, `heartbeat` renews the firmware communication-loss lease when
 the active policy uses a timeout. It does not change relay outputs directly,
 emit events, expose heartbeat health state, or persist relay state.
 
 ## Communication-Loss Safety
 
-Protocol `7` defines build-time communication-loss policies:
+Protocol `8` defines build-time communication-loss policies:
 
 - `energized-only`: the timeout is armed or renewed by successful relay-control
   commands that leave any relay on or pulsing, and by `heartbeat` while relays

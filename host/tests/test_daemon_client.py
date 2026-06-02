@@ -62,8 +62,10 @@ def test_daemon_client_methods_send_expected_commands(tmp_path: Any) -> None:
         assert client.safety() == {"state": 1}
         assert client.watchdog() == {"state": 1}
         assert client.set_relay(0, True) == {"state": 1}
-        assert client.get_relays(0) == {"state": 1}
-        assert client.off_all() == {"state": 1}
+        assert client.get_relay(0) == {"state": 1}
+        assert client.get_all_relays() == {"state": 1}
+        assert client.off_all_relays() == {"state": 1}
+        assert client.daemon_status() == {"state": 1}
 
     thread.join(timeout=1.0)
 
@@ -78,7 +80,9 @@ def test_daemon_client_methods_send_expected_commands(tmp_path: Any) -> None:
         {"id": 8, "command": "watchdog"},
         {"id": 9, "command": "set", "args": {"channel": 0, "on": True}},
         {"id": 10, "command": "get", "args": {"channel": 0}},
-        {"id": 11, "command": "off-all"},
+        {"id": 11, "command": "get-all"},
+        {"id": 12, "command": "off-all"},
+        {"id": 13, "command": "daemon-status"},
     ]
 
 
@@ -133,6 +137,8 @@ def test_daemon_client_validates_host_arguments() -> None:
     client, peer = socket.socketpair()
     try:
         daemon_client = RelayDaemonClient(client)
+        with pytest.raises(RelayValidationError):
+            daemon_client.get_relay(6)
         with pytest.raises(RelayValidationError):
             daemon_client.set_relay(6, True)
         with pytest.raises(RelayValidationError):

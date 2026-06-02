@@ -27,11 +27,12 @@ CMD_IDENTITY = 0x00
 CMD_CAPABILITIES = 0x01
 CMD_BUILD_INFO = 0x02
 CMD_GET = 0x10
-CMD_STATUS = 0x11
-CMD_HEALTH = 0x12
-CMD_TRANSPORT = 0x13
-CMD_SAFETY = 0x14
-CMD_WATCHDOG = 0x15
+CMD_GET_ALL = 0x11
+CMD_STATUS = 0x12
+CMD_HEALTH = 0x13
+CMD_TRANSPORT = 0x14
+CMD_SAFETY = 0x15
+CMD_WATCHDOG = 0x16
 CMD_SET = 0x20
 CMD_SET_ALL = 0x21
 CMD_PULSE = 0x22
@@ -269,7 +270,7 @@ def run_one(args: argparse.Namespace) -> dict[str, Any]:
     op = OP_READ
     command = args.command_id
 
-    if args.action == "get" and args.channel is not None:
+    if args.action == "get":
         payload["channel"] = args.channel
     elif args.action == "set":
         op = OP_WRITE
@@ -300,7 +301,7 @@ def require(condition: bool, message: str) -> None:
 def run_smoke(args: argparse.Namespace) -> None:
     identity = call(args.port, args.baud, CMD_IDENTITY, OP_READ, {})
     print_response(identity)
-    require(identity.get("protocol_version") == 7, "protocol_version is not 7")
+    require(identity.get("protocol_version") == 8, "protocol_version is not 8")
     require(identity.get("command_model_version") == 2, "command_model_version is not 2")
     require(identity.get("relay_count") == 6, "relay_count is not 6")
     require(
@@ -350,6 +351,7 @@ def build_parser() -> argparse.ArgumentParser:
         ("identity", CMD_IDENTITY, "read device and protocol identity"),
         ("capabilities", CMD_CAPABILITIES, "read operation capabilities"),
         ("build-info", CMD_BUILD_INFO, "read firmware build information"),
+        ("get-all", CMD_GET_ALL, "read all relay states"),
         ("status", CMD_STATUS, "read relay operator status"),
         ("health", CMD_HEALTH, "read health details"),
         ("transport", CMD_TRANSPORT, "read transport details"),
@@ -363,8 +365,8 @@ def build_parser() -> argparse.ArgumentParser:
         child = subparsers.add_parser(name, help=help_text)
         child.set_defaults(command_id=command_id)
 
-    get = subparsers.add_parser("get", help="read all relays or one zero-based channel")
-    get.add_argument("--channel", type=int, choices=range(6))
+    get = subparsers.add_parser("get", help="read one zero-based relay channel")
+    get.add_argument("channel", type=int, choices=range(6))
     get.set_defaults(command_id=CMD_GET)
 
     set_one = subparsers.add_parser("set", help="set one zero-based relay channel")

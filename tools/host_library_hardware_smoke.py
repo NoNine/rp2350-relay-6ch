@@ -62,7 +62,7 @@ def run(args: argparse.Namespace) -> None:
         try:
             identity = client.identity()
             print_response("identity", identity)
-            require(identity.get("protocol_version") == 7, "protocol_version is not 7")
+            require(identity.get("protocol_version") == 8, "protocol_version is not 8")
             require(
                 identity.get("command_model_version") == 2,
                 "command_model_version is not 2",
@@ -77,28 +77,28 @@ def run(args: argparse.Namespace) -> None:
             print_response("capabilities", capabilities)
             require(capabilities.get("capabilities") is not None, "missing capabilities")
 
-            status = client.get_status()
+            status = client.status()
             print_response("status", status)
             require(status.get("state") == 0, "relays are not all off at start")
 
-            print_response("get all", client.get_relays())
+            print_response("get all", client.get_all_relays())
             print_response("set CH1 on", client.set_relay(0, True))
-            print_response("get CH1", client.get_relays(0))
+            print_response("get CH1", client.get_relay(0))
             print_response("set CH1 off", client.set_relay(0, False))
             print_response("set CH1 and CH6 on", client.set_all_relays(0x21))
-            print_response("off all", client.off_all())
+            print_response("off all", client.off_all_relays())
             print_response("pulse CH1", client.pulse_relay(0, args.pulse_ms))
-            print_response("get CH1 after pulse request", client.get_relays(0))
+            print_response("get CH1 after pulse request", client.get_relay(0))
 
             expect_device_error("invalid channel", lambda: send_invalid_channel(client), 2)
             expect_device_error("invalid pulse", lambda: send_invalid_pulse(client), 2)
 
-            print_response("final status", client.get_status())
+            print_response("final status", client.status())
         finally:
             final_off_attempted = True
-            print_response("final off all", client.off_all())
+            print_response("final off all", client.off_all_relays())
 
-    require(final_off_attempted, "final off_all was not attempted")
+    require(final_off_attempted, "final off_all_relays was not attempted")
     print("\nPython host library hardware test passed")
 
 

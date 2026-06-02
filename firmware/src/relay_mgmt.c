@@ -324,7 +324,8 @@ static int capabilities_handler(struct smp_streamer *ctxt)
 	     zcbor_tstr_put_lit(zse, "pulse_max_ms") &&
 	     zcbor_uint32_put(zse, RP2350_RELAY_6CH_PULSE_MAX_MS) &&
 	     zcbor_tstr_put_lit(zse, "capabilities") &&
-	     zcbor_uint32_put(zse, BIT(0) | BIT(1) | BIT(2) | BIT(3) | BIT(4));
+	     zcbor_uint32_put(zse, BIT(0) | BIT(1) | BIT(2) | BIT(3) | BIT(4) |
+				      BIT(5));
 
 	if (!ok) {
 		return MGMT_ERR_EMSGSIZE;
@@ -354,11 +355,8 @@ static int get_handler(struct smp_streamer *ctxt)
 		return error_response(zse, RP2350_RELAY_6CH_MGMT_ERR_DECODE);
 	}
 
-	if (!field_found(fields, ARRAY_SIZE(fields), "channel")) {
-		return encode_state_or_error(zse);
-	}
-
-	if (channel >= RP2350_RELAY_6CH_CHANNEL_COUNT) {
+	if (!field_found(fields, ARRAY_SIZE(fields), "channel") ||
+	    channel >= RP2350_RELAY_6CH_CHANNEL_COUNT) {
 		return error_response(zse, RP2350_RELAY_6CH_MGMT_ERR_INVALID_ARGUMENT);
 	}
 
@@ -385,6 +383,20 @@ static int get_handler(struct smp_streamer *ctxt)
 	counter_inc(RELAY_MGMT_COUNTER_SUCCEEDED);
 	indicator_record_command(INDICATOR_COMMAND_ACCEPTED);
 	return MGMT_ERR_EOK;
+}
+
+static int get_all_handler(struct smp_streamer *ctxt)
+{
+	zcbor_state_t *zsd = ctxt->reader->zs;
+	zcbor_state_t *zse = ctxt->writer->zs;
+
+	counter_inc(RELAY_MGMT_COUNTER_RECEIVED);
+
+	if (!validate_request_map(zsd)) {
+		return error_response(zse, RP2350_RELAY_6CH_MGMT_ERR_DECODE);
+	}
+
+	return encode_state_or_error(zse);
 }
 
 static int set_handler(struct smp_streamer *ctxt)
@@ -772,6 +784,10 @@ static const struct mgmt_handler relay_mgmt_handlers[] = {
 	},
 	[RP2350_RELAY_6CH_MGMT_CMD_GET] = {
 		.mh_read = get_handler,
+		.mh_write = NULL,
+	},
+	[RP2350_RELAY_6CH_MGMT_CMD_GET_ALL] = {
+		.mh_read = get_all_handler,
 		.mh_write = NULL,
 	},
 	[RP2350_RELAY_6CH_MGMT_CMD_SET] = {

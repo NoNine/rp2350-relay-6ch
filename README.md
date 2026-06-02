@@ -397,7 +397,7 @@ rp2350-relayctl --instance bench-a daemon-status
 #### Python RelayDaemonClient
 
 The daemon owns the serial port and polls heartbeat internally. Automation can
-use `get_daemon_status()` to observe daemon connection state.
+use `daemon_status()` to observe daemon connection state.
 
 ```python
 from rp2350_relay_6ch import RelayDaemonClient
@@ -406,7 +406,7 @@ from rp2350_relay_6ch.config import resolve_socket_for_instance
 socket_path = resolve_socket_for_instance(instance="bench-a")
 
 with RelayDaemonClient.connect(socket_path, timeout_s=2.0) as relay:
-    relay.get_daemon_status()
+    relay.daemon_status()
     relay.pulse_relay(0, 100)
 ```
 
@@ -425,7 +425,7 @@ Select device number, or q to cancel: 1
 │   Port:         /dev/ttyACM0                                 │
 │   Serial:       E6614C311F4B8B2F                             │
 │   Hardware:     Waveshare RP2350-Relay-6CH                   │
-│   Protocol:     7                                            │
+│   Protocol:     8                                            │
 │   Relay count:  6                                            │
 │   State:        0x00                                         │
 │   On:           <span style="color: #ff4dff;">none</span>                                         │
@@ -436,8 +436,8 @@ Inspect:
   identity                     show controller hardware and protocol information
   capabilities                 show controller capabilities
   build-info                   show firmware build details
-  get                          show all relay states
   get &lt;channel&gt;                show one relay state
+  get-all                      show all relay states
   status                       show relay state, health, and uptime
   health                       show health details
   transport                    show transport details
@@ -476,7 +476,7 @@ with RelayClient.connect(device.port, timeout_s=2.0, retries=1) as relay:
     relay.identity()
     relay.capabilities()
     relay.pulse_relay(0, 100)
-    relay.off_all()
+    relay.off_all_relays()
 ```
 
 See [CLI utility](docs/cli.md), [Host library](docs/host-library.md), and

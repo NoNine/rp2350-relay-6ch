@@ -53,6 +53,7 @@ DEVICE_COMMANDS = {
     "capabilities",
     "build-info",
     "get",
+    "get-all",
     "set",
     "set-all",
     "pulse",
@@ -161,6 +162,7 @@ def _validate_args(command: str, args: dict[str, Any]) -> None:
         "identity",
         "capabilities",
         "build-info",
+        "get-all",
         "off-all",
         "status",
         "health",
@@ -175,10 +177,8 @@ def _validate_args(command: str, args: dict[str, Any]) -> None:
         return
 
     if command == "get":
-        if set(args) - {"channel"}:
-            raise RelayValidationError("get accepts only channel")
-        if "channel" in args:
-            _validate_channel(args["channel"])
+        _require_keys(args, {"channel"}, command)
+        _validate_channel(args["channel"])
         return
 
     if command == "set":
@@ -301,7 +301,7 @@ class RelayDaemon:
             client = self.client
             if client is not None:
                 try:
-                    client.off_all()
+                    client.off_all_relays()
                     LOG.info("shutdown off-all completed")
                 except RelayError as exc:
                     LOG.warning("shutdown off-all failed: %s", exc)
@@ -332,7 +332,7 @@ class RelayDaemon:
         signal.signal(signal.SIGINT, handle_signal)
         signal.signal(signal.SIGTERM, handle_signal)
 
-    def get_daemon_status(self) -> dict[str, Any]:
+    def daemon_status(self) -> dict[str, Any]:
         with self._state_lock:
             return {
                 "connected": self.connected,
@@ -589,7 +589,7 @@ class RelayDaemon:
 
     def _handle_request(self, request: _Request) -> dict[str, Any]:
         if request.command == "daemon-status":
-            return self.get_daemon_status()
+            return self.daemon_status()
         with self._command_lock:
             client = self.client
             if client is None or not self.connected:
@@ -616,7 +616,9 @@ def _dispatch_device_command(
     if command == "build-info":
         return client.build_info()
     if command == "get":
-        return client.get_relays(args.get("channel"))
+        return client.get_relay(args["channel"])
+    if command == "get-all":
+        return client.get_all_relays()
     if command == "set":
         return client.set_relay(args["channel"], args["on"])
     if command == "set-all":
@@ -624,7 +626,7 @@ def _dispatch_device_command(
     if command == "pulse":
         return client.pulse_relay(args["channel"], args["duration_ms"])
     if command == "off-all":
-        return client.off_all()
+        return client.off_all_relays()
     if command == "status":
         return client.status()
     if command == "health":
@@ -695,7 +697,7 @@ def _prepare_socket_path(socket_path: str) -> None:
         probe.close()
     try:
         with RelayDaemonClient.connect(socket_path, timeout_s=0.2) as client:
-            client.get_daemon_status()
+            client.daemon_status()
     except RelayError as exc:
         raise RelayTransportError(f"socket path is in use by a non-daemon listener: {socket_path}") from exc
     raise RelayTransportError(f"relay daemon is already running at {socket_path}")

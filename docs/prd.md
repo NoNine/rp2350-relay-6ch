@@ -185,9 +185,10 @@ The host-side Python library shall implement the complete host protocol stack:
 - Test doubles or simulated transports for unit testing without hardware.
 
 The library shall hide packet details from callers. A caller should be able to
-call methods such as `get_info()`, `get_relays()`, `set_relay()`,
-`set_all_relays()`, `pulse_relay()`, `off_all()`, `upload_firmware()`,
-`test_image()`, `confirm_image()`, and `reboot()`.
+call methods such as `identity()`, `build_info()`, `get_relay()`,
+`get_all_relays()`, `set_relay()`, `set_all_relays()`, `pulse_relay()`,
+`off_all_relays()`, `upload_firmware()`, `test_image()`, `confirm_image()`,
+and `reboot()`.
 
 ### 6.2 CLI Utility
 
@@ -195,7 +196,8 @@ The CLI shall use the Python RPC library and provide commands suitable for
 manual testing, manufacturing checks, and debug:
 
 - `info`: print device, firmware, protocol, and boot/update status.
-- `get`: print one relay or all relay states.
+- `get`: print one relay state.
+- `get-all`: print all relay states.
 - `set`: set one relay on or off.
 - `set-all`: set all relay states.
 - `pulse`: pulse one relay for a requested duration.

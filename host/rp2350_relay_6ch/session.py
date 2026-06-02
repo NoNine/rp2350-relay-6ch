@@ -48,6 +48,7 @@ CONNECTED_COMMANDS = (
     "capabilities",
     "build-info",
     "get",
+    "get-all",
     "set",
     "set-all",
     "pulse",
@@ -607,10 +608,11 @@ class RelaySession:
                 _expect_arg_count(command, args, 0)
                 payload = client.build_info()
             elif command == "get":
-                if len(args) > 1:
-                    raise RelayValidationError("get takes zero or one channel")
-                channel = _parse_channel_arg(args[0]) if args else None
-                payload = client.get_relays(channel)
+                _expect_arg_count(command, args, 1)
+                payload = client.get_relay(_parse_channel_arg(args[0]))
+            elif command == "get-all":
+                _expect_arg_count(command, args, 0)
+                payload = client.get_all_relays()
             elif command == "set":
                 _expect_arg_count(command, args, 2)
                 payload = client.set_relay(
@@ -624,7 +626,7 @@ class RelaySession:
                 payload = client.pulse_relay(_parse_channel_arg(args[0]), _parse_int_arg(args[1]))
             elif command == "off-all":
                 _expect_arg_count(command, args, 0)
-                payload = client.off_all()
+                payload = client.off_all_relays()
             elif command == "status":
                 _expect_arg_count(command, args, 0)
                 payload = client.status()
@@ -712,8 +714,8 @@ class RelaySession:
         print(
             "Inspect:\n"
             "  status                       show relay state, transport counters, and last error\n"
-            "  get                          show all relay states\n"
             "  get <channel>                show one relay state\n"
+            "  get-all                      show all relay states\n"
             "  identity                     show controller hardware and protocol information\n"
             "  capabilities                 show controller capabilities\n"
             "  build-info                   show firmware build details\n"

@@ -31,7 +31,7 @@ the serial port open for the sequence and closes it when the block exits:
 ```python
 with RelayClient.connect("COM31", timeout_s=2.0, retries=1) as client:
     client.set_relay(0, False)
-    relays = client.get_relays()
+    relays = client.get_all_relays()
 ```
 
 The `rp2350-relay session` CLI uses the same direct connection model for
@@ -77,7 +77,7 @@ with RelayClient.connect(device.port, timeout_s=2.0, retries=1) as relay:
     identity = relay.identity()
     status = relay.status()
     relay.pulse_relay(0, 100)
-    relay.off_all()
+    relay.off_all_relays()
 ```
 
 `select_device_by_serial()` raises `RelayValidationError` when no relay
@@ -97,15 +97,15 @@ with RelayDaemonClient.connect(
     timeout_s=2.0,
 ) as relay:
     relay.set_relay(0, True)
-    relay.off_all()
+    relay.off_all_relays()
 ```
 
 The daemon client exposes the same relay methods as `RelayClient`, with
-zero-based channel numbers in Python. It also exposes `get_daemon_status()` for
+zero-based channel numbers in Python. It also exposes `daemon_status()` for
 daemon process and reconnect state:
 
 ```python
-status = relay.get_daemon_status()
+status = relay.daemon_status()
 ```
 
 Daemon-client timeouts cover connecting to the Unix socket and waiting for the
@@ -152,12 +152,12 @@ with RelayClient.connect(device.port, timeout_s=2.0, retries=1) as relay:
         stop.set()
         thread.join(timeout=6.0)
         with lock:
-            relay.off_all()
+            relay.off_all_relays()
 ```
 
 When using `RelayDaemonClient`, do not implement a direct serial heartbeat
 loop. The daemon owns the serial port, polls heartbeat internally, and exposes
-connection state through `get_daemon_status()`.
+connection state through `daemon_status()`.
 
 ## Multiple Devices
 
@@ -182,7 +182,7 @@ try:
 finally:
     for _device, client in clients:
         try:
-            client.off_all()
+            client.off_all_relays()
         finally:
             client.close()
 ```
@@ -198,7 +198,7 @@ from rp2350_relay_6ch.config import resolve_socket_for_instance
 socket_path = resolve_socket_for_instance(instance="bench-a")
 
 with RelayDaemonClient.connect(socket_path, timeout_s=2.0) as relay:
-    relay.get_daemon_status()
+    relay.daemon_status()
     relay.pulse_relay(0, 100)
 ```
 
@@ -215,17 +215,17 @@ health = client.health()
 transport = client.transport_status()
 safety = client.safety()
 watchdog = client.watchdog()
-relays = client.get_relays()
-channel_0 = client.get_relays(channel=0)
+relays = client.get_all_relays()
+channel_0 = client.get_relay(0)
 
 client.set_relay(0, True)
 client.set_relay(0, False)
 client.set_all_relays(0x21)
 client.pulse_relay(0, 100)
-client.off_all()
+client.off_all_relays()
 ```
 
-`get_info()` is not part of the protocol `7`, command model `2` host API.
+`get_info()` is not part of the protocol `8`, command model `2` host API.
 Call role-specific read methods directly; each method sends exactly one
 firmware command.
 
@@ -250,7 +250,8 @@ should remain compatible, while event-capable consumers use a callback or
 nonblocking drain API for advisory events.
 
 Event delivery will remain best effort. Library users must confirm critical
-state with normal commands such as `get_status()` after reconnect.
+state with normal commands such as `status()` or `get_all_relays()` after
+reconnect.
 
 ## Exceptions
 
@@ -291,6 +292,6 @@ The host test suite uses the simulated transport before requiring hardware.
 
 ## Safety
 
-Hardware scripts and manual sessions must finish with `off_all()`. Do not leave
-relays energized after tests, and keep hazardous relay loads disconnected during
-bring-up.
+Hardware scripts and manual sessions must finish with `off_all_relays()`. Do
+not leave relays energized after tests, and keep hazardous relay loads
+disconnected during bring-up.

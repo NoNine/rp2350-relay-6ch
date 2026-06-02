@@ -312,6 +312,7 @@ ZTEST(relay_mgmt, test_group_registered)
 	zassert_not_null(mgmt_get_handler(group, RP2350_RELAY_6CH_MGMT_CMD_BUILD_INFO));
 	zassert_not_null(mgmt_get_handler(group, RP2350_RELAY_6CH_MGMT_CMD_HEARTBEAT));
 	zassert_not_null(mgmt_get_handler(group, RP2350_RELAY_6CH_MGMT_CMD_GET));
+	zassert_not_null(mgmt_get_handler(group, RP2350_RELAY_6CH_MGMT_CMD_GET_ALL));
 	zassert_not_null(mgmt_get_handler(group, RP2350_RELAY_6CH_MGMT_CMD_SET));
 	zassert_is_null(mgmt_get_handler(group, 3U));
 }
@@ -341,26 +342,27 @@ ZTEST(relay_mgmt, test_identity_reports_protocol_metadata)
 	zassert_true(decode_u32(response_len, "command_model_version",
 				&command_model_version));
 	zassert_true(decode_u32(response_len, "relay_count", &relay_count));
-	zassert_equal(protocol_version, 7U);
+	zassert_equal(protocol_version, 8U);
 	zassert_equal(protocol_version, RP2350_RELAY_6CH_MGMT_PROTOCOL_VERSION);
 	zassert_equal(command_model_version, 2U);
 	zassert_equal(relay_count, RP2350_RELAY_6CH_CHANNEL_COUNT);
 	assert_tstr_equal(response_len, "hardware", RP2350_RELAY_6CH_HARDWARE_NAME);
 }
 
-ZTEST(relay_mgmt, test_role_command_ids_match_protocol_7_model_2)
+ZTEST(relay_mgmt, test_role_command_ids_match_protocol_8_model_2)
 {
-	zassert_equal(RP2350_RELAY_6CH_MGMT_PROTOCOL_VERSION, 7U);
+	zassert_equal(RP2350_RELAY_6CH_MGMT_PROTOCOL_VERSION, 8U);
 	zassert_equal(RP2350_RELAY_6CH_MGMT_COMMAND_MODEL_VERSION, 2U);
 	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_IDENTITY, 0x00U);
 	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_CAPABILITIES, 0x01U);
 	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_BUILD_INFO, 0x02U);
 	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_GET, 0x10U);
-	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_STATUS, 0x11U);
-	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_HEALTH, 0x12U);
-	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_TRANSPORT, 0x13U);
-	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_SAFETY, 0x14U);
-	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_WATCHDOG, 0x15U);
+	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_GET_ALL, 0x11U);
+	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_STATUS, 0x12U);
+	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_HEALTH, 0x13U);
+	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_TRANSPORT, 0x14U);
+	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_SAFETY, 0x15U);
+	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_WATCHDOG, 0x16U);
 	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_SET, 0x20U);
 	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_SET_ALL, 0x21U);
 	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_PULSE, 0x22U);
@@ -383,7 +385,7 @@ ZTEST(relay_mgmt, test_capabilities_reports_operations_only)
 	zassert_true(decode_u32(response_len, "capabilities", &capabilities));
 	zassert_equal(pulse_min, RP2350_RELAY_6CH_PULSE_MIN_MS);
 	zassert_equal(pulse_max, RP2350_RELAY_6CH_PULSE_MAX_MS);
-	zassert_equal(capabilities, BIT(0) | BIT(1) | BIT(2) | BIT(3) | BIT(4));
+	zassert_equal(capabilities, BIT(0) | BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5));
 	zassert_false(field_exists(response_len, "comm_loss_policy"));
 	zassert_false(field_exists(response_len, "comm_loss_timeout_ms"));
 	zassert_false(field_exists(response_len, "comm_loss_reboot_on_timeout"));
@@ -435,7 +437,7 @@ ZTEST(relay_mgmt, test_heartbeat_returns_ok_and_does_not_change_state)
 	zassert_false(field_exists(response_len, "comm_loss_reboot_on_timeout"));
 	zassert_false(field_exists(response_len, "comm_loss_reboot_delay_ms"));
 
-	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET, false,
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET_ALL, false,
 				    encode_empty_request());
 	assert_state(response_len, BIT(0), 0U);
 
@@ -446,10 +448,18 @@ ZTEST(relay_mgmt, test_heartbeat_returns_ok_and_does_not_change_state)
 
 ZTEST(relay_mgmt, test_get_all_default_off)
 {
-	size_t response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET, false,
+	size_t response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET_ALL, false,
 					   encode_empty_request());
 
 	assert_state(response_len, 0U, 0U);
+}
+
+ZTEST(relay_mgmt, test_get_requires_channel)
+{
+	size_t response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET, false,
+					   encode_empty_request());
+
+	assert_error(response_len, RP2350_RELAY_6CH_MGMT_ERR_INVALID_ARGUMENT);
 }
 
 ZTEST(relay_mgmt, test_set_and_get_one)
@@ -500,7 +510,7 @@ ZTEST(relay_mgmt, test_pulse_busy_and_final_off)
 
 	k_msleep(110U);
 
-	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET, false,
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET_ALL, false,
 				    encode_empty_request());
 	assert_state(response_len, 0U, 0U);
 }
@@ -562,7 +572,8 @@ ZTEST(relay_mgmt, test_status_reports_counters)
 {
 	size_t response_len;
 
-	(void)call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET, false, encode_empty_request());
+	(void)call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET_ALL, false,
+			   encode_empty_request());
 	(void)call_handler(RP2350_RELAY_6CH_MGMT_CMD_SET, true,
 			   encode_set_request(RP2350_RELAY_6CH_CHANNEL_COUNT, true));
 
@@ -770,7 +781,7 @@ ZTEST(relay_mgmt, test_comm_loss_energized_only_expires_outputs)
 	assert_state(response_len, BIT(0), 0U);
 	k_msleep(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_TIMEOUT_MS + 20U);
 
-	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET, false,
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET_ALL, false,
 				    encode_empty_request());
 	assert_state(response_len, 0U, 0U);
 
@@ -796,12 +807,12 @@ ZTEST(relay_mgmt, test_comm_loss_heartbeat_renews_lease)
 	zassert_true(ok);
 	k_msleep(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_TIMEOUT_MS / 3U);
 
-	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET, false,
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET_ALL, false,
 				    encode_empty_request());
 	assert_state(response_len, BIT(0), 0U);
 
 	k_msleep(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_TIMEOUT_MS + 20U);
-	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET, false,
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET_ALL, false,
 				    encode_empty_request());
 	assert_state(response_len, 0U, 0U);
 }
@@ -819,7 +830,7 @@ ZTEST(relay_mgmt, test_comm_loss_control_command_renews_lease)
 	assert_state(response_len, BIT(0) | BIT(1), 0U);
 	k_msleep(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_TIMEOUT_MS / 3U);
 
-	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET, false,
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET_ALL, false,
 				    encode_empty_request());
 	assert_state(response_len, BIT(0) | BIT(1), 0U);
 }
@@ -835,7 +846,7 @@ ZTEST(relay_mgmt, test_comm_loss_off_all_disarms_energized_only)
 	assert_state(response_len, 0U, 0U);
 
 	k_msleep(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_TIMEOUT_MS + 20U);
-	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET, false,
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET_ALL, false,
 				    encode_empty_request());
 	assert_state(response_len, 0U, 0U);
 }
@@ -848,7 +859,7 @@ ZTEST(relay_mgmt, test_comm_loss_cuts_long_pulse)
 	assert_state(response_len, BIT(0), BIT(0));
 	k_msleep(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_TIMEOUT_MS + 20U);
 
-	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET, false,
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET_ALL, false,
 				    encode_empty_request());
 	assert_state(response_len, 0U, 0U);
 }
@@ -862,7 +873,7 @@ ZTEST(relay_mgmt, test_comm_loss_short_pulse_finishes_before_timeout)
 	assert_state(response_len, BIT(0), BIT(0));
 	k_msleep(RP2350_RELAY_6CH_PULSE_MIN_MS + 20U);
 
-	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET, false,
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET_ALL, false,
 				    encode_empty_request());
 	assert_state(response_len, 0U, 0U);
 }
@@ -878,7 +889,7 @@ ZTEST(relay_mgmt, test_comm_loss_no_timeout_leaves_energized_outputs)
 	zassert_equal(relay_comm_loss_timeout_ms(), 0U);
 	k_msleep(70U);
 
-	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET, false,
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET_ALL, false,
 				    encode_empty_request());
 	assert_state(response_len, BIT(0), 0U);
 }
@@ -895,7 +906,7 @@ ZTEST(relay_mgmt, test_comm_loss_always_on_owner_expires_outputs)
 	assert_state(response_len, BIT(0), 0U);
 	k_msleep(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_TIMEOUT_MS + 20U);
 
-	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET, false,
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET_ALL, false,
 				    encode_empty_request());
 	assert_state(response_len, 0U, 0U);
 	indicator_test_force_render();
@@ -986,7 +997,7 @@ ZTEST(relay_mgmt, test_comm_loss_always_on_owner_reboot_on_timeout_reports_and_s
 	reboot_remaining_ms = relay_comm_loss_test_reboot_remaining_ms();
 	zassert_true(reboot_remaining_ms <= relay_comm_loss_reboot_delay_ms());
 	zassert_true(reboot_remaining_ms > relay_comm_loss_reboot_delay_ms() / 2U);
-	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET, false,
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET_ALL, false,
 				    encode_empty_request());
 	assert_state(response_len, 0U, 0U);
 }

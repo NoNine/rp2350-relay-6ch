@@ -56,7 +56,7 @@ class FakeRelayClient:
         self.calls.append(("identity", ()))
         if self.fail_info is not None:
             raise self.fail_info
-        return {"protocol_version": 7, "command_model_version": 2, "relay_count": 6}
+        return {"protocol_version": 8, "command_model_version": 2, "relay_count": 6}
 
     def capabilities(self) -> dict[str, Any]:
         self.calls.append(("capabilities", ()))
@@ -93,8 +93,16 @@ class FakeRelayClient:
         self.calls.append(("watchdog", ()))
         return {"watchdog_enabled": False}
 
-    def get_relays(self, channel: int | None = None) -> dict[str, Any]:
-        self.calls.append(("get_relays", (channel,)))
+    def get_relay(self, channel: int) -> dict[str, Any]:
+        self.calls.append(("get_relay", (channel,)))
+        return {
+            "channel": channel,
+            "on": (self.relay_state & (1 << channel)) != 0,
+            "pulsing": False,
+        }
+
+    def get_all_relays(self) -> dict[str, Any]:
+        self.calls.append(("get_all_relays", ()))
         return {"state": self.relay_state, "pulsing": 0}
 
     def set_relay(self, channel: int, on: bool) -> dict[str, Any]:
@@ -116,8 +124,8 @@ class FakeRelayClient:
         self.calls.append(("pulse_relay", (channel, duration_ms)))
         return {"state": 1 << channel, "pulsing": 1 << channel}
 
-    def off_all(self) -> dict[str, Any]:
-        self.calls.append(("off_all", ()))
+    def off_all_relays(self) -> dict[str, Any]:
+        self.calls.append(("off_all_relays", ()))
         self.relay_state = 0
         return {"state": 0, "pulsing": 0}
 
@@ -254,7 +262,7 @@ def test_heartbeat_does_not_run_while_disconnected(tmp_path: Any) -> None:
     daemon._heartbeat_once()
 
     assert FakeRelayClient.instances == []
-    assert daemon.get_daemon_status()["last_error"] == "lost"
+    assert daemon.daemon_status()["last_error"] == "lost"
 
 
 def test_heartbeat_failure_closes_client_and_marks_disconnected(tmp_path: Any) -> None:
@@ -333,7 +341,7 @@ def test_heartbeat_loop_runs_and_stops_on_shutdown(tmp_path: Any) -> None:
     time.sleep(0.05)
 
     assert client.calls.count(("heartbeat", ())) == heartbeat_count
-    assert client.calls[-1] == ("off_all", ())
+    assert client.calls[-1] == ("off_all_relays", ())
 
 
 def test_readiness_protocol_mismatch_is_configuration_error(tmp_path: Any) -> None:
@@ -366,8 +374,8 @@ def test_wait_device_starts_disconnected_for_missing_serial(tmp_path: Any) -> No
     daemon._initial_connect()
 
     assert daemon.connected is False
-    assert daemon.get_daemon_status()["reconnect_attempts"] == 1
-    assert daemon.get_daemon_status()["last_error"] == "no relay device found with USB serial abc"
+    assert daemon.daemon_status()["reconnect_attempts"] == 1
+    assert daemon.daemon_status()["last_error"] == "no relay device found with USB serial abc"
 
 
 def test_duplicate_serial_is_configuration_error_even_with_wait_device(tmp_path: Any) -> None:
@@ -438,7 +446,7 @@ def test_shutdown_runs_best_effort_off_all_and_removes_socket(tmp_path: Any) -> 
 
     daemon.shutdown()
 
-    assert FakeRelayClient.instances[0].calls[-1] == ("off_all", ())
+    assert FakeRelayClient.instances[0].calls[-1] == ("off_all_relays", ())
     assert FakeRelayClient.instances[0].closed is True
     assert not os.path.exists(socket_path)
 
@@ -481,7 +489,7 @@ def test_persistent_socket_requests_are_serialized(tmp_path: Any) -> None:
     client.connect(daemon.config.socket_path)
     with client, client.makefile("rb") as reader:
         client.sendall(b'{"id":"1","command":"set","args":{"channel":0,"on":true}}\n')
-        client.sendall(b'{"id":"2","command":"get"}\n')
+        client.sendall(b'{"id":"2","command":"get-all"}\n')
         first = json.loads(reader.readline().decode())
         second = json.loads(reader.readline().decode())
 

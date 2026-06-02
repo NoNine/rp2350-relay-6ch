@@ -63,7 +63,12 @@ def cmd_build_info(args: argparse.Namespace) -> dict[str, Any]:
 
 def cmd_get(args: argparse.Namespace) -> dict[str, Any]:
     with _client(args) as client:
-        return client.get_relays(args.channel)
+        return client.get_relay(args.channel)
+
+
+def cmd_get_all(args: argparse.Namespace) -> dict[str, Any]:
+    with _client(args) as client:
+        return client.get_all_relays()
 
 
 def cmd_set(args: argparse.Namespace) -> dict[str, Any]:
@@ -83,7 +88,7 @@ def cmd_pulse(args: argparse.Namespace) -> dict[str, Any]:
 
 def cmd_off_all(args: argparse.Namespace) -> dict[str, Any]:
     with _client(args) as client:
-        return client.off_all()
+        return client.off_all_relays()
 
 
 def cmd_status(args: argparse.Namespace) -> dict[str, Any]:
@@ -118,7 +123,7 @@ def cmd_reboot(args: argparse.Namespace) -> dict[str, Any]:
 
 def cmd_daemon_status(args: argparse.Namespace) -> dict[str, Any]:
     with _client(args) as client:
-        return client.get_daemon_status()
+        return client.daemon_status()
 
 
 def cmd_smoke(args: argparse.Namespace) -> dict[str, Any]:
@@ -145,6 +150,7 @@ COMMANDS = {
     "capabilities": cmd_capabilities,
     "build-info": cmd_build_info,
     "get": cmd_get,
+    "get-all": cmd_get_all,
     "set": cmd_set,
     "set-all": cmd_set_all,
     "pulse": cmd_pulse,
@@ -182,8 +188,9 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("capabilities", help="print relay controller capabilities")
     subparsers.add_parser("build-info", help="print firmware build information")
 
-    get_parser = subparsers.add_parser("get", help="get relay state")
-    get_parser.add_argument("channel", nargs="?", type=_parse_channel)
+    get_parser = subparsers.add_parser("get", help="get one relay state")
+    get_parser.add_argument("channel", type=_parse_channel)
+    subparsers.add_parser("get-all", help="get all relay states")
 
     set_parser = subparsers.add_parser("set", help="set one relay on or off")
     set_parser.add_argument("channel", type=_parse_channel)

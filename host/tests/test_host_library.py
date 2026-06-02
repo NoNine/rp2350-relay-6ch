@@ -10,9 +10,11 @@ from rp2350_relay_6ch.constants import (
     CMD_BUILD_INFO,
     CMD_CAPABILITIES,
     CMD_GET,
+    CMD_GET_ALL,
     CMD_HEARTBEAT,
     CMD_HEALTH,
     CMD_IDENTITY,
+    CMD_OFF_ALL,
     CMD_PULSE,
     CMD_SAFETY,
     CMD_SET,
@@ -177,7 +179,7 @@ def test_get_info_is_not_part_of_role_oriented_host_api() -> None:
         (
             "identity",
             CMD_IDENTITY,
-            {"protocol_version": 7, "command_model_version": 2, "relay_count": 6},
+            {"protocol_version": 8, "command_model_version": 2, "relay_count": 6},
         ),
         ("capabilities", CMD_CAPABILITIES, {"capabilities": 31}),
         ("build_info", CMD_BUILD_INFO, {"app_version": "0.8.0"}),
@@ -205,18 +207,19 @@ def test_role_read_methods_each_send_one_read_request(
     assert request_payload(transport) == {}
 
 
-def test_protocol_7_command_ids_are_grouped_by_role() -> None:
-    assert PROTOCOL_VERSION == 7
+def test_protocol_8_command_ids_are_grouped_by_role() -> None:
+    assert PROTOCOL_VERSION == 8
     assert COMMAND_MODEL_VERSION == 2
     assert CMD_IDENTITY == 0x00
     assert CMD_CAPABILITIES == 0x01
     assert CMD_BUILD_INFO == 0x02
     assert CMD_GET == 0x10
-    assert CMD_STATUS == 0x11
-    assert CMD_HEALTH == 0x12
-    assert CMD_TRANSPORT == 0x13
-    assert CMD_SAFETY == 0x14
-    assert CMD_WATCHDOG == 0x15
+    assert CMD_GET_ALL == 0x11
+    assert CMD_STATUS == 0x12
+    assert CMD_HEALTH == 0x13
+    assert CMD_TRANSPORT == 0x14
+    assert CMD_SAFETY == 0x15
+    assert CMD_WATCHDOG == 0x16
     assert CMD_SET == 0x20
     assert CMD_SET_ALL == 0x21
     assert CMD_PULSE == 0x22
@@ -264,11 +267,53 @@ def test_set_all_and_pulse_wrappers_validate_and_encode_payloads() -> None:
     assert request_payload(transport, 1) == {"channel": 0, "duration_ms": 100}
 
 
+def test_get_relay_sends_single_relay_read_request() -> None:
+    transport = SimulatedPacketTransport(
+        [response(CMD_GET, 0, {"channel": 0, "on": True, "pulsing": False})]
+    )
+    client = RelayClient(transport)
+
+    assert client.get_relay(0) == {"channel": 0, "on": True, "pulsing": False}
+
+    packet = decode_packet(transport.requests[0])
+    assert packet.op == 0
+    assert packet.command == CMD_GET
+    assert request_payload(transport) == {"channel": 0}
+
+
+def test_get_all_relays_sends_all_relay_read_request() -> None:
+    transport = SimulatedPacketTransport(
+        [response(CMD_GET_ALL, 0, {"state": 0x21, "pulsing": 0})]
+    )
+    client = RelayClient(transport)
+
+    assert client.get_all_relays() == {"state": 0x21, "pulsing": 0}
+
+    packet = decode_packet(transport.requests[0])
+    assert packet.op == 0
+    assert packet.command == CMD_GET_ALL
+    assert request_payload(transport) == {}
+
+
+def test_off_all_relays_sends_write_request() -> None:
+    transport = SimulatedPacketTransport(
+        [response(CMD_OFF_ALL, 0, {"state": 0, "pulsing": 0}, OP_WRITE_RSP)]
+    )
+    client = RelayClient(transport)
+
+    assert client.off_all_relays() == {"state": 0, "pulsing": 0}
+
+    packet = decode_packet(transport.requests[0])
+    assert packet.op == 2
+    assert packet.command == CMD_OFF_ALL
+    assert request_payload(transport) == {}
+
+
 def test_invalid_host_arguments_raise_validation_errors() -> None:
     client = RelayClient(SimulatedPacketTransport())
 
     with pytest.raises(RelayValidationError):
-        client.get_relays(6)
+        client.get_relay(6)
     with pytest.raises(RelayValidationError):
         client.set_relay(0, "on")  # type: ignore[arg-type]
     with pytest.raises(RelayValidationError):
@@ -308,19 +353,19 @@ def test_mismatched_response_header_raises_protocol_error() -> None:
     client = RelayClient(transport)
 
     with pytest.raises(RelayProtocolError, match="sequence"):
-        client.get_relays()
+        client.get_relay(0)
 
 
 def test_timeout_retries_before_success() -> None:
     transport = SimulatedPacketTransport(
         [
             RelayTimeoutError("first timeout"),
-            response(CMD_GET, 0, {"state": 0, "pulsing": 0}),
+            response(CMD_GET_ALL, 0, {"state": 0, "pulsing": 0}),
         ]
     )
     client = RelayClient(transport, retries=1)
 
-    assert client.get_relays() == {"state": 0, "pulsing": 0}
+    assert client.get_all_relays() == {"state": 0, "pulsing": 0}
     assert len(transport.requests) == 2
 
 
@@ -331,7 +376,7 @@ def test_timeout_after_retry_budget_is_exhausted() -> None:
     client = RelayClient(transport, retries=1)
 
     with pytest.raises(RelayTimeoutError, match="second timeout"):
-        client.get_relays()
+        client.get_all_relays()
 
 
 def test_serial_transport_reuses_open_serial_port(monkeypatch: pytest.MonkeyPatch) -> None:

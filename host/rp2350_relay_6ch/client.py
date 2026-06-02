@@ -8,6 +8,7 @@ from .constants import (
     CMD_BUILD_INFO,
     CMD_CAPABILITIES,
     CMD_GET,
+    CMD_GET_ALL,
     CMD_HEARTBEAT,
     CMD_HEALTH,
     CMD_IDENTITY,
@@ -100,12 +101,12 @@ class RelayClient:
     def build_info(self) -> dict[str, Any]:
         return self._request(CMD_BUILD_INFO, OP_READ, {})
 
-    def get_relays(self, channel: int | None = None) -> dict[str, Any]:
-        payload = {}
-        if channel is not None:
-            self._validate_channel(channel)
-            payload["channel"] = channel
-        return self._request(CMD_GET, OP_READ, payload)
+    def get_relay(self, channel: int) -> dict[str, Any]:
+        self._validate_channel(channel)
+        return self._request(CMD_GET, OP_READ, {"channel": channel})
+
+    def get_all_relays(self) -> dict[str, Any]:
+        return self._request(CMD_GET_ALL, OP_READ, {})
 
     def set_relay(self, channel: int, on: bool) -> dict[str, Any]:
         self._validate_channel(channel)
@@ -133,7 +134,7 @@ class RelayClient:
             {"channel": channel, "duration_ms": duration_ms},
         )
 
-    def off_all(self) -> dict[str, Any]:
+    def off_all_relays(self) -> dict[str, Any]:
         return self._request(CMD_OFF_ALL, OP_WRITE, {})
 
     def status(self) -> dict[str, Any]:
@@ -150,12 +151,6 @@ class RelayClient:
 
     def watchdog(self) -> dict[str, Any]:
         return self._request(CMD_WATCHDOG, OP_READ, {})
-
-    def get_build_info(self) -> dict[str, Any]:
-        return self.build_info()
-
-    def get_status(self) -> dict[str, Any]:
-        return self.status()
 
     def reboot(self) -> dict[str, Any]:
         return self._request(CMD_REBOOT, OP_WRITE, {})

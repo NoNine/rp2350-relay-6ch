@@ -190,6 +190,14 @@ rp2350-relay --port <serial-port> [options] <command>
 CLI channel arguments are one-based and match the board labels: `1` is `CH1`
 and `6` is `CH6`.
 
+`set-all <mask>` uses a six-bit relay state mask. Bit `0` controls `CH1` and
+bit `5` controls `CH6`. Common examples:
+
+- `0x01`: `CH1`
+- `0x21`: `CH1 + CH6`
+- `0x3f`: all relays on
+- `0x00`: all relays off; prefer `off-all` for explicit safety teardown.
+
 ## Session Mode
 
 Session mode is a long-lived manual operator workflow for Windows and Linux:
@@ -320,7 +328,7 @@ rp2350-relay session
 rp2350-relay --port <serial-port> identity
 rp2350-relay --port <serial-port> capabilities
 rp2350-relay --port <serial-port> build-info
-rp2350-relay --port <serial-port> get
+rp2350-relay --port <serial-port> get-all
 rp2350-relay --port <serial-port> get 1
 rp2350-relay --port <serial-port> set 1 on
 rp2350-relay --port <serial-port> set 1 off
