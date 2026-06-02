@@ -55,10 +55,13 @@ class RelayDaemonClient:
         finally:
             self._sock.close()
 
-    def get_info(self) -> dict[str, Any]:
-        return self._request("info")
+    def identity(self) -> dict[str, Any]:
+        return self._request("identity")
 
-    def get_build_info(self) -> dict[str, Any]:
+    def capabilities(self) -> dict[str, Any]:
+        return self._request("capabilities")
+
+    def build_info(self) -> dict[str, Any]:
         return self._request("build-info")
 
     def get_relays(self, channel: int | None = None) -> dict[str, Any]:
@@ -86,8 +89,26 @@ class RelayDaemonClient:
     def off_all(self) -> dict[str, Any]:
         return self._request("off-all")
 
-    def get_status(self) -> dict[str, Any]:
+    def status(self) -> dict[str, Any]:
         return self._request("status")
+
+    def health(self) -> dict[str, Any]:
+        return self._request("health")
+
+    def transport_status(self) -> dict[str, Any]:
+        return self._request("transport")
+
+    def safety(self) -> dict[str, Any]:
+        return self._request("safety")
+
+    def watchdog(self) -> dict[str, Any]:
+        return self._request("watchdog")
+
+    def get_build_info(self) -> dict[str, Any]:
+        return self.build_info()
+
+    def get_status(self) -> dict[str, Any]:
+        return self.status()
 
     def reboot(self) -> dict[str, Any]:
         return self._request("reboot")

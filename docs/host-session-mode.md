@@ -48,7 +48,7 @@ Discovery inspects USB metadata and must not probe arbitrary serial ports with
 relay protocol commands.
 
 Discovery returns relay USB candidates. A candidate becomes a confirmed relay
-controller only after the session opens the serial port and the startup `info`
+controller only after the session opens the serial port and the startup `identity`
 and `status` relay protocol requests succeed.
 
 Match relay USB candidates by:
@@ -97,7 +97,7 @@ Selection rules:
 - If a startup `--port` cannot be opened or queried, print the typed failure,
   list any currently available matching candidates, preserve the port as the
   preferred reconnect target, and enter disconnected mode.
-- A selected candidate must pass startup `info` and `status` before the session
+- A selected candidate must pass startup `identity` and `status` before the session
   prints a connected banner. A generic Pico 2 or other non-relay firmware may
   appear as an unverified candidate but must fail safely into disconnected mode
   if it does not speak the relay protocol.
@@ -107,8 +107,8 @@ Selection rules:
   substitute a different discovered port.
 
 USB serial numbers are expected to be unique because the firmware enables
-Zephyr hardware-info support for the RP Pico chip ID and the CDC ACM helper uses
-hardware info for the USB serial-number descriptor.
+Zephyr hardware-identity support for the RP Pico chip ID and the CDC ACM helper uses
+hardware identity for the USB serial-number descriptor.
 
 ## Session Startup
 
@@ -117,7 +117,7 @@ the session disconnects or exits.
 
 On successful connection:
 
-- Run `info`.
+- Run `identity`.
 - Run `status`.
 - Print a `/status`-style boxed startup summary containing port, USB serial
   when known, hardware, protocol version, relay count, current state mask,
@@ -126,7 +126,7 @@ On successful connection:
   [REPL Plus CLI UX contract](host-cli-ux-repl-plus.md).
 - Do not send `off-all` during startup.
 
-If startup `info` or `status` fails after the serial port opens, print the
+If startup `identity` or `status` fails after the serial port opens, print the
 typed error using the existing CLI labels, close the client, and enter
 disconnected mode.
 
@@ -142,7 +142,8 @@ batch-file execution, or stdin batch mode in Phase 8a.
 Supported commands while connected:
 
 ```text
-info
+identity
+capabilities
 build-info
 get [channel]
 set <channel> <on|off>
@@ -150,6 +151,10 @@ set-all <mask>
 pulse <channel> <duration-ms>
 off-all
 status
+health
+transport
+safety
+watchdog
 reboot
 disconnect [--force]
 connect [--port <serial-port>|--serial <usb-serial>]
@@ -206,7 +211,7 @@ Disconnected state is entered when:
 
 - Session launch finds no matching device.
 - Session launch cannot find the requested USB serial number.
-- Startup `info` or `status` fails after the serial port opens.
+- Startup `identity` or `status` fails after the serial port opens.
 - `disconnect` or `disconnect --force` closes the current client.
 - `reboot` closes the current client and reconnect by known USB serial number
   does not complete.
@@ -331,7 +336,7 @@ Reconnect after reboot:
 - Rediscovery uses the same VID, PID, product, and exact serial matching rules
   as startup discovery.
 - If exactly one matching serial-number device appears, connect and run the
-  normal startup `info` and `status` banner.
+  normal startup `identity` and `status` banner.
 - If reconnect fails or no matching serial-number device appears, enter
   disconnected mode.
 - Do not queue relay-control commands across reboot or reconnect.
@@ -342,7 +347,7 @@ Future event-capable firmware and host-library versions may deliver the planned
 available, session mode may print `reset executing` and suppress expected
 heartbeat noise during the intentional reset window. The event is advisory;
 session reconnect must still confirm the new boot through normal startup
-`info` and `status` behavior.
+`identity` and `status` behavior.
 
 If `reboot` returns a typed error, print it and keep the existing session state
 unless the underlying transport error already closed the client.
@@ -386,9 +391,10 @@ Automated tests should cover:
 - Discovery with no devices, one device, multiple devices, missing serial
   numbers, exact `--serial`, and explicit `--port`.
 - Interactive numbered selection without hardware.
-- Startup `info` and `status` banner generation.
-- Command dispatch for `info`, `build-info`, `get`, `set`, `set-all`, `pulse`,
-  `off-all`, `status`, and `reboot`.
+- Startup `identity` and `status` banner generation.
+- Command dispatch for `identity`, `capabilities`, `build-info`, `get`, `set`,
+  `set-all`, `pulse`, `off-all`, `status`, `health`, `transport`, `safety`,
+  `watchdog`, and `reboot`.
 - One-connection session ownership across multiple commands.
 - Validation, timeout, transport, protocol, and device errors continuing the
   session where appropriate.

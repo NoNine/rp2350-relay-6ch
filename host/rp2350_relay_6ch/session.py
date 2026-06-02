@@ -33,7 +33,7 @@ from rp2350_relay_6ch.discovery import (
     select_device_by_serial,
 )
 
-from .constants import PROTOCOL_VERSION, RELAY_COUNT
+from .constants import COMMAND_MODEL_VERSION, PROTOCOL_VERSION, RELAY_COUNT
 from .smoke import run_smoke_sequence
 
 HEARTBEAT_INTERVAL_S = 2.5
@@ -44,7 +44,8 @@ ANSI_BLUE = "\033[34m"
 ANSI_RESET = "\033[0m"
 STARTUP_BOX_MIN_WIDTH = 60
 CONNECTED_COMMANDS = (
-    "info",
+    "identity",
+    "capabilities",
     "build-info",
     "get",
     "set",
@@ -52,6 +53,10 @@ CONNECTED_COMMANDS = (
     "pulse",
     "off-all",
     "status",
+    "health",
+    "transport",
+    "safety",
+    "watchdog",
     "smoke",
     "reboot",
     "disconnect",
@@ -75,7 +80,7 @@ class SessionOptions:
 @dataclass
 class _ConnectionProbe:
     client: RelayClient
-    info: dict[str, Any]
+    identity: dict[str, Any]
     status: dict[str, Any]
 
 
@@ -391,9 +396,9 @@ class RelaySession:
                 retries=self.options.retries,
             )
             with self._lock:
-                info = client.get_info()
-                _validate_readiness_info(info)
-                status = client.get_status()
+                identity = client.identity()
+                _validate_readiness_identity(identity)
+                status = client.status()
         except RelayError as exc:
             if not quiet:
                 print(f"{_error_label(exc)}: {exc}", file=self.output)
@@ -403,7 +408,7 @@ class RelaySession:
                 pass
             return None
 
-        return _ConnectionProbe(client=client, info=info, status=status)
+        return _ConnectionProbe(client=client, identity=identity, status=status)
 
     def _adopt_connection(
         self,
@@ -419,7 +424,7 @@ class RelaySession:
         self.usb_serial = usb_serial
         self.product = product
         self._start_heartbeat()
-        self._print_banner(probe.info, probe.status)
+        self._print_banner(probe.identity, probe.status)
 
     def _close_probe(self, probe: _ConnectionProbe) -> None:
         try:
@@ -495,7 +500,7 @@ class RelaySession:
             self.heartbeat.stop()
             self.heartbeat = None
 
-    def _print_banner(self, info: dict[str, Any], status: dict[str, Any]) -> None:
+    def _print_banner(self, identity: dict[str, Any], status: dict[str, Any]) -> None:
         state = int(status.get("state", 0))
         pulsing = int(status.get("pulsing", 0))
         serial = self.usb_serial or "unknown"
@@ -505,9 +510,9 @@ class RelaySession:
                     ("Connection", "connected"),
                     ("Port", self.port),
                     ("Serial", serial),
-                    ("Hardware", info.get("hardware", "unknown")),
-                    ("Protocol", info.get("protocol_version", "unknown")),
-                    ("Relay count", info.get("relay_count", "unknown")),
+                    ("Hardware", identity.get("hardware", "unknown")),
+                    ("Protocol", identity.get("protocol_version", "unknown")),
+                    ("Relay count", identity.get("relay_count", "unknown")),
                     ("State", f"0x{state:02x}"),
                     ("On", _format_channels(state)),
                     ("Pulsing", _format_channels(pulsing)),
@@ -556,7 +561,7 @@ class RelaySession:
             raise RelayValidationError("reboot takes no arguments")
         client = self._require_client()
         with self._lock:
-            pre_reboot_status = client.get_status()
+            pre_reboot_status = client.status()
             payload = client.reboot()
         print("reboot requested", file=self.output)
         reboot_serial = self.usb_serial
@@ -592,12 +597,15 @@ class RelaySession:
     def _handle_relay_command(self, command: str, args: list[str]) -> None:
         client = self._require_client()
         with self._lock:
-            if command == "info":
+            if command == "identity":
                 _expect_arg_count(command, args, 0)
-                payload = client.get_info()
+                payload = client.identity()
+            elif command == "capabilities":
+                _expect_arg_count(command, args, 0)
+                payload = client.capabilities()
             elif command == "build-info":
                 _expect_arg_count(command, args, 0)
-                payload = client.get_build_info()
+                payload = client.build_info()
             elif command == "get":
                 if len(args) > 1:
                     raise RelayValidationError("get takes zero or one channel")
@@ -619,7 +627,19 @@ class RelaySession:
                 payload = client.off_all()
             elif command == "status":
                 _expect_arg_count(command, args, 0)
-                payload = client.get_status()
+                payload = client.status()
+            elif command == "health":
+                _expect_arg_count(command, args, 0)
+                payload = client.health()
+            elif command == "transport":
+                _expect_arg_count(command, args, 0)
+                payload = client.transport_status()
+            elif command == "safety":
+                _expect_arg_count(command, args, 0)
+                payload = client.safety()
+            elif command == "watchdog":
+                _expect_arg_count(command, args, 0)
+                payload = client.watchdog()
             elif command == "smoke":
                 parser = _PromptArgParser(prog=command, add_help=False)
                 parser.add_argument("--pulse-ms", type=int, default=1000)
@@ -634,7 +654,7 @@ class RelaySession:
             return True
         try:
             with self._lock:
-                status = self._require_client().get_status()
+                status = self._require_client().status()
             state = int(status["state"])
             pulsing = int(status.get("pulsing", 0))
         except Exception as exc:
@@ -694,8 +714,13 @@ class RelaySession:
             "  status                       show relay state, transport counters, and last error\n"
             "  get                          show all relay states\n"
             "  get <channel>                show one relay state\n"
-            "  info                         show controller hardware and protocol information\n"
+            "  identity                     show controller hardware and protocol information\n"
+            "  capabilities                 show controller capabilities\n"
             "  build-info                   show firmware build details\n"
+            "  health                       show health details\n"
+            "  transport                    show transport details\n"
+            "  safety                       show safety policy details\n"
+            "  watchdog                     show watchdog details\n"
             "\n"
             "Control:\n"
             "  set <channel> <on|off>       set one relay\n"
@@ -857,10 +882,14 @@ def _status_uptime_ms(status: dict[str, Any]) -> int | None:
     return None
 
 
-def _validate_readiness_info(info: dict[str, Any]) -> None:
-    if info.get("protocol_version") != PROTOCOL_VERSION:
+def _validate_readiness_identity(identity: dict[str, Any]) -> None:
+    if identity.get("protocol_version") != PROTOCOL_VERSION:
         raise RelayProtocolError(
-            f"unexpected relay protocol version {info.get('protocol_version')}"
+            f"unexpected relay protocol version {identity.get('protocol_version')}"
+        )
+    if identity.get("command_model_version") != COMMAND_MODEL_VERSION:
+        raise RelayProtocolError(
+            f"unexpected relay command model version {identity.get('command_model_version')}"
         )
 
 

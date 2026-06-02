@@ -73,16 +73,21 @@ class SessionFakeClient:
     def close(self) -> None:
         self.closed = True
 
-    def get_info(self) -> dict[str, Any]:
-        self.calls.append(("get_info", ()))
+    def identity(self) -> dict[str, Any]:
+        self.calls.append(("identity", ()))
         return {
+            "command_model_version": 2,
             "hardware": "Waveshare RP2350-Relay-6CH",
-            "protocol_version": 6,
+            "protocol_version": 7,
             "relay_count": 6,
         }
 
-    def get_status(self) -> dict[str, Any]:
-        self.calls.append(("get_status", ()))
+    def capabilities(self) -> dict[str, Any]:
+        self.calls.append(("capabilities", ()))
+        return {"capabilities": 31}
+
+    def status(self) -> dict[str, Any]:
+        self.calls.append(("status", ()))
         if self.fail_status:
             raise RelayTransportError("lost")
         status = {"state": self.relay_state, "pulsing": self.relay_pulsing}
@@ -100,9 +105,25 @@ class SessionFakeClient:
                 status["uptime_ms"] = uptime
         return status
 
-    def get_build_info(self) -> dict[str, Any]:
-        self.calls.append(("get_build_info", ()))
+    def build_info(self) -> dict[str, Any]:
+        self.calls.append(("build_info", ()))
         return {"app_version": "0.8.0"}
+
+    def health(self) -> dict[str, Any]:
+        self.calls.append(("health", ()))
+        return {"health": "normal"}
+
+    def transport_status(self) -> dict[str, Any]:
+        self.calls.append(("transport_status", ()))
+        return {"transport": "usb_cdc_acm_smp"}
+
+    def safety(self) -> dict[str, Any]:
+        self.calls.append(("safety", ()))
+        return {"comm_loss_policy": "energized_only"}
+
+    def watchdog(self) -> dict[str, Any]:
+        self.calls.append(("watchdog", ()))
+        return {"watchdog_enabled": False}
 
     def get_relays(self, channel: int | None = None) -> dict[str, Any]:
         self.calls.append(("get_relays", (channel,)))
@@ -227,20 +248,20 @@ def test_discovery_exact_serial_selects_unverified_candidate() -> None:
     assert device == RelayUsbDevice("COM7", "B905D541EF8C32DB", None, False)
 
 
-def test_startup_opens_one_client_runs_info_status_and_starts_heartbeat() -> None:
+def test_startup_opens_one_client_runs_identity_status_and_starts_heartbeat() -> None:
     session, output = make_session(port="COM7")
 
     assert session._connect_from_options(session.options) is _ConnectResult.CONNECTED
 
     assert len(SessionFakeClient.instances) == 1
-    assert SessionFakeClient.instances[0].calls == [("get_info", ()), ("get_status", ())]
+    assert SessionFakeClient.instances[0].calls == [("identity", ()), ("status", ())]
     assert FakeHeartbeat.instances[0].started is True
     text = output.getvalue()
     assert "╭" in text
     assert "RP2350 Relay Session" in text
     assert "Connection:   connected" in text
     assert "Port:         COM7" in text
-    assert "Protocol:     6" in text
+    assert "Protocol:     7" in text
     assert "State:        0x00" in text
     assert "Pulsing:      none" in text
 
@@ -453,7 +474,7 @@ def test_ctrl_c_cancels_input_line_without_closing_session(
 
     client = SessionFakeClient.instances[0]
     assert client.closed is True
-    assert client.calls == [("get_info", ()), ("get_status", ()), ("get_status", ())]
+    assert client.calls == [("identity", ()), ("status", ()), ("status", ())]
     assert "^C" in output.getvalue()
 
 
@@ -518,7 +539,8 @@ def test_connected_completion_suggests_all_session_commands() -> None:
     completer = RelaySessionCompleter(lambda: True)
 
     assert completer.complete("") == [
-        "info",
+        "identity",
+        "capabilities",
         "build-info",
         "get",
         "set",
@@ -526,6 +548,10 @@ def test_connected_completion_suggests_all_session_commands() -> None:
         "pulse",
         "off-all",
         "status",
+        "health",
+        "transport",
+        "safety",
+        "watchdog",
         "smoke",
         "reboot",
         "disconnect",
@@ -641,7 +667,10 @@ def test_status_prints_compact_health_line() -> None:
 
     session.handle_line("status")
 
-    assert "Health: degraded (comm_owner_timeout)" in output.getvalue()
+    text = output.getvalue()
+    assert "[health]" in text
+    assert "state:           degraded" in text
+    assert "primary_reason:  comm_owner_timeout" in text
 
 
 def test_connect_port_attaches_matching_usb_metadata() -> None:

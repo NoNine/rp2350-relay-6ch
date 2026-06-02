@@ -18,7 +18,7 @@
 #include <rp2350_relay_6ch/relay_mgmt.h>
 #include <rp2350_relay_6ch/watchdog_supervisor.h>
 
-#define TEST_BUF_SIZE 512U
+#define TEST_BUF_SIZE 256U
 
 static uint8_t request_buf[TEST_BUF_SIZE];
 static uint8_t response_buf[TEST_BUF_SIZE];
@@ -182,6 +182,30 @@ static bool decode_tstr(size_t response_len, const char *key, struct zcbor_strin
 	return false;
 }
 
+static bool field_exists(size_t response_len, const char *key)
+{
+	zcbor_state_t zsd[4];
+	struct zcbor_string actual_key;
+
+	zcbor_new_decode_state(zsd, ARRAY_SIZE(zsd), response_buf, response_len, 1, NULL, 0);
+	if (!zcbor_map_start_decode(zsd)) {
+		return false;
+	}
+
+	while (zcbor_tstr_decode(zsd, &actual_key)) {
+		if (actual_key.len == strlen(key) &&
+		    memcmp(actual_key.value, key, actual_key.len) == 0) {
+			return true;
+		}
+
+		if (!zcbor_any_skip(zsd, NULL)) {
+			return false;
+		}
+	}
+
+	return false;
+}
+
 static bool decode_err(size_t response_len, uint32_t *group, uint32_t *rc)
 {
 	zcbor_state_t zsd[5];
@@ -283,9 +307,13 @@ ZTEST(relay_mgmt, test_group_registered)
 
 	zassert_not_null(group);
 	zassert_equal(group->mg_handlers_count, RP2350_RELAY_6CH_MGMT_CMD_COUNT);
-	zassert_not_null(mgmt_get_handler(group, RP2350_RELAY_6CH_MGMT_CMD_INFO));
+	zassert_not_null(mgmt_get_handler(group, RP2350_RELAY_6CH_MGMT_CMD_IDENTITY));
+	zassert_not_null(mgmt_get_handler(group, RP2350_RELAY_6CH_MGMT_CMD_CAPABILITIES));
 	zassert_not_null(mgmt_get_handler(group, RP2350_RELAY_6CH_MGMT_CMD_BUILD_INFO));
 	zassert_not_null(mgmt_get_handler(group, RP2350_RELAY_6CH_MGMT_CMD_HEARTBEAT));
+	zassert_not_null(mgmt_get_handler(group, RP2350_RELAY_6CH_MGMT_CMD_GET));
+	zassert_not_null(mgmt_get_handler(group, RP2350_RELAY_6CH_MGMT_CMD_SET));
+	zassert_is_null(mgmt_get_handler(group, 3U));
 }
 
 ZTEST(relay_mgmt, test_registered_management_service_publishes_rpc_ready)
@@ -301,37 +329,65 @@ ZTEST(relay_mgmt, test_registered_management_service_publishes_rpc_ready)
 	zassert_equal(snap.reasons, HEALTH_REASON_NONE);
 }
 
-ZTEST(relay_mgmt, test_info_reports_capabilities)
+ZTEST(relay_mgmt, test_identity_reports_protocol_metadata)
 {
-	size_t response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_INFO, false,
+	size_t response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_IDENTITY, false,
 					   encode_empty_request());
 	uint32_t protocol_version = 0U;
+	uint32_t command_model_version = 0U;
 	uint32_t relay_count = 0U;
-	uint32_t pulse_min = 0U;
-	uint32_t pulse_max = 0U;
-	uint32_t comm_loss_timeout_ms = 0U;
-	uint32_t comm_loss_reboot_delay_ms = UINT32_MAX;
-	bool comm_loss_reboot_on_timeout = true;
 
 	zassert_true(decode_u32(response_len, "protocol_version", &protocol_version));
+	zassert_true(decode_u32(response_len, "command_model_version",
+				&command_model_version));
 	zassert_true(decode_u32(response_len, "relay_count", &relay_count));
+	zassert_equal(protocol_version, 7U);
+	zassert_equal(protocol_version, RP2350_RELAY_6CH_MGMT_PROTOCOL_VERSION);
+	zassert_equal(command_model_version, 2U);
+	zassert_equal(relay_count, RP2350_RELAY_6CH_CHANNEL_COUNT);
+	assert_tstr_equal(response_len, "hardware", RP2350_RELAY_6CH_HARDWARE_NAME);
+}
+
+ZTEST(relay_mgmt, test_role_command_ids_match_protocol_7_model_2)
+{
+	zassert_equal(RP2350_RELAY_6CH_MGMT_PROTOCOL_VERSION, 7U);
+	zassert_equal(RP2350_RELAY_6CH_MGMT_COMMAND_MODEL_VERSION, 2U);
+	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_IDENTITY, 0x00U);
+	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_CAPABILITIES, 0x01U);
+	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_BUILD_INFO, 0x02U);
+	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_GET, 0x10U);
+	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_STATUS, 0x11U);
+	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_HEALTH, 0x12U);
+	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_TRANSPORT, 0x13U);
+	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_SAFETY, 0x14U);
+	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_WATCHDOG, 0x15U);
+	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_SET, 0x20U);
+	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_SET_ALL, 0x21U);
+	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_PULSE, 0x22U);
+	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_OFF_ALL, 0x23U);
+	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_HEARTBEAT, 0x30U);
+	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_REBOOT, 0x40U);
+	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_EVENT, 0x7fU);
+}
+
+ZTEST(relay_mgmt, test_capabilities_reports_operations_only)
+{
+	size_t response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_CAPABILITIES, false,
+					   encode_empty_request());
+	uint32_t pulse_min = 0U;
+	uint32_t pulse_max = 0U;
+	uint32_t capabilities = 0U;
+
 	zassert_true(decode_u32(response_len, "pulse_min_ms", &pulse_min));
 	zassert_true(decode_u32(response_len, "pulse_max_ms", &pulse_max));
-	zassert_true(decode_u32(response_len, "comm_loss_timeout_ms",
-				&comm_loss_timeout_ms));
-	zassert_true(decode_bool(response_len, "comm_loss_reboot_on_timeout",
-				 &comm_loss_reboot_on_timeout));
-	zassert_true(decode_u32(response_len, "comm_loss_reboot_delay_ms",
-				&comm_loss_reboot_delay_ms));
-	zassert_equal(protocol_version, 6U);
-	zassert_equal(protocol_version, RP2350_RELAY_6CH_MGMT_PROTOCOL_VERSION);
-	zassert_equal(relay_count, RP2350_RELAY_6CH_CHANNEL_COUNT);
+	zassert_true(decode_u32(response_len, "capabilities", &capabilities));
 	zassert_equal(pulse_min, RP2350_RELAY_6CH_PULSE_MIN_MS);
 	zassert_equal(pulse_max, RP2350_RELAY_6CH_PULSE_MAX_MS);
-	zassert_equal(comm_loss_timeout_ms, relay_comm_loss_timeout_ms());
-	zassert_equal(comm_loss_reboot_on_timeout, relay_comm_loss_reboot_on_timeout());
-	zassert_equal(comm_loss_reboot_delay_ms, relay_comm_loss_reboot_delay_ms());
-	assert_tstr_equal(response_len, "comm_loss_policy", relay_comm_loss_policy());
+	zassert_equal(capabilities, BIT(0) | BIT(1) | BIT(2) | BIT(3) | BIT(4));
+	zassert_false(field_exists(response_len, "comm_loss_policy"));
+	zassert_false(field_exists(response_len, "comm_loss_timeout_ms"));
+	zassert_false(field_exists(response_len, "comm_loss_reboot_on_timeout"));
+	zassert_false(field_exists(response_len, "comm_loss_reboot_delay_ms"));
 }
 
 ZTEST(relay_mgmt, test_build_info_reports_build_metadata)
@@ -365,11 +421,6 @@ ZTEST(relay_mgmt, test_heartbeat_returns_ok_and_does_not_change_state)
 {
 	size_t response_len;
 	bool ok = false;
-	uint32_t received = 0U;
-	uint32_t succeeded = 0U;
-	uint32_t comm_loss_timeout_ms = 0U;
-	uint32_t comm_loss_reboot_delay_ms = UINT32_MAX;
-	bool comm_loss_reboot_on_timeout = true;
 
 	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_SET, true,
 				    encode_set_request(0U, true));
@@ -379,16 +430,10 @@ ZTEST(relay_mgmt, test_heartbeat_returns_ok_and_does_not_change_state)
 				    encode_empty_request());
 	zassert_true(decode_bool(response_len, "ok", &ok));
 	zassert_true(ok);
-	zassert_true(decode_u32(response_len, "comm_loss_timeout_ms",
-				&comm_loss_timeout_ms));
-	zassert_true(decode_bool(response_len, "comm_loss_reboot_on_timeout",
-				 &comm_loss_reboot_on_timeout));
-	zassert_true(decode_u32(response_len, "comm_loss_reboot_delay_ms",
-				&comm_loss_reboot_delay_ms));
-	zassert_equal(comm_loss_timeout_ms, relay_comm_loss_timeout_ms());
-	zassert_equal(comm_loss_reboot_on_timeout, relay_comm_loss_reboot_on_timeout());
-	zassert_equal(comm_loss_reboot_delay_ms, relay_comm_loss_reboot_delay_ms());
-	assert_tstr_equal(response_len, "comm_loss_policy", relay_comm_loss_policy());
+	zassert_false(field_exists(response_len, "comm_loss_policy"));
+	zassert_false(field_exists(response_len, "comm_loss_timeout_ms"));
+	zassert_false(field_exists(response_len, "comm_loss_reboot_on_timeout"));
+	zassert_false(field_exists(response_len, "comm_loss_reboot_delay_ms"));
 
 	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET, false,
 				    encode_empty_request());
@@ -396,10 +441,7 @@ ZTEST(relay_mgmt, test_heartbeat_returns_ok_and_does_not_change_state)
 
 	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_STATUS, false,
 				    encode_empty_request());
-	zassert_true(decode_u32(response_len, "received", &received));
-	zassert_true(decode_u32(response_len, "succeeded", &succeeded));
-	zassert_equal(received, 4U);
-	zassert_equal(succeeded, 3U);
+	assert_state(response_len, BIT(0), 0U);
 }
 
 ZTEST(relay_mgmt, test_get_all_default_off)
@@ -504,7 +546,7 @@ ZTEST(relay_mgmt, test_malformed_empty_request_command_returns_decode_error)
 	size_t response_len;
 
 	request_buf[0] = 0xffU;
-	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_INFO, false, 1U);
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_IDENTITY, false, 1U);
 	assert_error(response_len, RP2350_RELAY_6CH_MGMT_ERR_DECODE);
 
 	request_buf[0] = 0xffU;
@@ -519,14 +561,6 @@ ZTEST(relay_mgmt, test_malformed_empty_request_command_returns_decode_error)
 ZTEST(relay_mgmt, test_status_reports_counters)
 {
 	size_t response_len;
-	uint32_t received = 0U;
-	uint32_t succeeded = 0U;
-	uint32_t invalid_args = 0U;
-	bool usb_cdc_acm = true;
-	bool smp_uart = true;
-	uint32_t comm_loss_timeout_ms = 0U;
-	uint32_t comm_loss_reboot_delay_ms = UINT32_MAX;
-	bool comm_loss_reboot_on_timeout = true;
 
 	(void)call_handler(RP2350_RELAY_6CH_MGMT_CMD_GET, false, encode_empty_request());
 	(void)call_handler(RP2350_RELAY_6CH_MGMT_CMD_SET, true,
@@ -535,26 +569,15 @@ ZTEST(relay_mgmt, test_status_reports_counters)
 	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_STATUS, false,
 				    encode_empty_request());
 
-	zassert_true(decode_u32(response_len, "received", &received));
-	zassert_true(decode_u32(response_len, "succeeded", &succeeded));
-	zassert_true(decode_u32(response_len, "invalid_args", &invalid_args));
-	zassert_true(decode_bool(response_len, "usb_cdc_acm", &usb_cdc_acm));
-	zassert_true(decode_bool(response_len, "smp_uart", &smp_uart));
-	zassert_true(decode_u32(response_len, "comm_loss_timeout_ms",
-				&comm_loss_timeout_ms));
-	zassert_true(decode_bool(response_len, "comm_loss_reboot_on_timeout",
-				 &comm_loss_reboot_on_timeout));
-	zassert_true(decode_u32(response_len, "comm_loss_reboot_delay_ms",
-				&comm_loss_reboot_delay_ms));
-	zassert_equal(comm_loss_timeout_ms, relay_comm_loss_timeout_ms());
-	zassert_equal(comm_loss_reboot_on_timeout, relay_comm_loss_reboot_on_timeout());
-	zassert_equal(comm_loss_reboot_delay_ms, relay_comm_loss_reboot_delay_ms());
-	assert_tstr_equal(response_len, "comm_loss_policy", relay_comm_loss_policy());
-	zassert_equal(received, 3U);
-	zassert_equal(succeeded, 1U);
-	zassert_equal(invalid_args, 1U);
-	zassert_false(usb_cdc_acm);
-	zassert_false(smp_uart);
+	zassert_false(field_exists(response_len, "received"));
+	zassert_false(field_exists(response_len, "succeeded"));
+	zassert_false(field_exists(response_len, "invalid_args"));
+	zassert_false(field_exists(response_len, "usb_cdc_acm"));
+	zassert_false(field_exists(response_len, "smp_uart"));
+	zassert_false(field_exists(response_len, "comm_loss_timeout_ms"));
+	zassert_false(field_exists(response_len, "comm_loss_reboot_on_timeout"));
+	zassert_false(field_exists(response_len, "comm_loss_reboot_delay_ms"));
+	zassert_false(field_exists(response_len, "comm_loss_policy"));
 	assert_health(response_len, "normal", HEALTH_REASON_NONE, "none");
 }
 
@@ -576,7 +599,68 @@ ZTEST(relay_mgmt, test_status_reports_health_fields_from_one_snapshot)
 	zassert_true(transitions > 0U);
 }
 
-ZTEST(relay_mgmt, test_status_reports_watchdog_fields)
+ZTEST(relay_mgmt, test_health_reports_health_fields_only)
+{
+	size_t response_len;
+	uint32_t transitions = 0U;
+
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_SET, true,
+				    encode_set_request(2U, true));
+	assert_state(response_len, BIT(2), 0U);
+
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_HEALTH, false,
+				    encode_empty_request());
+
+	assert_health(response_len, "relay_active", HEALTH_REASON_NONE, "none");
+	zassert_true(decode_u32(response_len, "health_transitions", &transitions));
+	zassert_false(field_exists(response_len, "state"));
+	zassert_false(field_exists(response_len, "pulsing"));
+	zassert_false(field_exists(response_len, "transport"));
+	zassert_false(field_exists(response_len, "watchdog_enabled"));
+	zassert_true(transitions > 0U);
+}
+
+ZTEST(relay_mgmt, test_transport_reports_transport_fields_only)
+{
+	size_t response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_TRANSPORT, false,
+					   encode_empty_request());
+	bool usb_cdc_acm = true;
+	bool smp_uart = true;
+
+	assert_tstr_equal(response_len, "transport", "usb_cdc_acm_smp");
+	zassert_true(decode_bool(response_len, "usb_cdc_acm", &usb_cdc_acm));
+	zassert_true(decode_bool(response_len, "smp_uart", &smp_uart));
+	zassert_false(usb_cdc_acm);
+	zassert_false(smp_uart);
+	zassert_false(field_exists(response_len, "state"));
+	zassert_false(field_exists(response_len, "health"));
+	zassert_false(field_exists(response_len, "comm_loss_policy"));
+}
+
+ZTEST(relay_mgmt, test_safety_reports_policy_fields_only)
+{
+	size_t response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_SAFETY, false,
+					   encode_empty_request());
+	uint32_t comm_loss_timeout_ms = 0U;
+	uint32_t comm_loss_reboot_delay_ms = UINT32_MAX;
+	bool comm_loss_reboot_on_timeout = true;
+
+	zassert_true(decode_u32(response_len, "comm_loss_timeout_ms",
+				&comm_loss_timeout_ms));
+	zassert_true(decode_bool(response_len, "comm_loss_reboot_on_timeout",
+				 &comm_loss_reboot_on_timeout));
+	zassert_true(decode_u32(response_len, "comm_loss_reboot_delay_ms",
+				&comm_loss_reboot_delay_ms));
+	zassert_equal(comm_loss_timeout_ms, relay_comm_loss_timeout_ms());
+	zassert_equal(comm_loss_reboot_on_timeout, relay_comm_loss_reboot_on_timeout());
+	zassert_equal(comm_loss_reboot_delay_ms, relay_comm_loss_reboot_delay_ms());
+	assert_tstr_equal(response_len, "comm_loss_policy", relay_comm_loss_policy());
+	zassert_false(field_exists(response_len, "state"));
+	zassert_false(field_exists(response_len, "health"));
+	zassert_false(field_exists(response_len, "transport"));
+}
+
+ZTEST(relay_mgmt, test_watchdog_reports_watchdog_fields_only)
 {
 	size_t response_len;
 	bool watchdog_enabled = false;
@@ -592,7 +676,7 @@ ZTEST(relay_mgmt, test_status_reports_watchdog_fields)
 	watchdog_supervisor_start();
 	watchdog_supervisor_test_run_once();
 
-	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_STATUS, false,
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_WATCHDOG, false,
 				    encode_empty_request());
 
 	zassert_true(decode_bool(response_len, "watchdog_enabled", &watchdog_enabled));
@@ -614,6 +698,10 @@ ZTEST(relay_mgmt, test_status_reports_watchdog_fields)
 	zassert_equal(watchdog_feeds, 1U);
 	zassert_equal(watchdog_feed_errors, 0U);
 	zassert_true(last_reset_watchdog);
+	zassert_false(field_exists(response_len, "state"));
+	zassert_false(field_exists(response_len, "health"));
+	zassert_false(field_exists(response_len, "transport"));
+	zassert_false(field_exists(response_len, "comm_loss_policy"));
 }
 
 #if IS_ENABLED(CONFIG_REBOOT)
@@ -875,7 +963,7 @@ ZTEST(relay_mgmt, test_comm_loss_always_on_owner_control_clears_owner_lost)
 	CONFIG_RP2350_RELAY_6CH_COMM_LOSS_TIMEOUT_MS <= 100
 ZTEST(relay_mgmt, test_comm_loss_always_on_owner_reboot_on_timeout_reports_and_schedules)
 {
-	size_t response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_INFO, false,
+	size_t response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_SAFETY, false,
 					   encode_empty_request());
 	bool comm_loss_reboot_on_timeout = false;
 	uint32_t comm_loss_reboot_delay_ms = 0U;

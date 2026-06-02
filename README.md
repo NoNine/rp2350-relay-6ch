@@ -208,8 +208,9 @@ Implemented:
 - Safe six-channel relay control for `CH1` through `CH6`.
 - Default-off relay behavior on boot, reset, firmware restart, and test
   setup/teardown.
-- Relay get, set, set-all, pulse, off-all, status, info, and reboot command
-  handling through a custom MCUmgr/SMP management group.
+- Role-oriented identity, capability, build, status, health, transport,
+  safety, watchdog, relay control, heartbeat, and reboot command handling
+  through a custom MCUmgr/SMP management group.
 - USB CDC SMP transport for host control.
 - Python RPC library with typed transport, timeout, protocol, validation, and
   device errors.
@@ -323,7 +324,7 @@ checkout or Zephyr workspace is required.
 4. Verify the board from the machine connected to the USB device port:
 
    ```sh
-   rp2350-relay --port <serial-port> info
+   rp2350-relay --port <serial-port> identity
    rp2350-relay --port <serial-port> smoke
    ```
 
@@ -424,27 +425,39 @@ Select device number, or q to cancel: 1
 │   Port:         /dev/ttyACM0                                 │
 │   Serial:       E6614C311F4B8B2F                             │
 │   Hardware:     Waveshare RP2350-Relay-6CH                   │
-│   Protocol:     5                                            │
+│   Protocol:     7                                            │
 │   Relay count:  6                                            │
 │   State:        0x00                                         │
 │   On:           <span style="color: #ff4dff;">none</span>                                         │
 │   Pulsing:      <span style="color: #ff4dff;">none</span>                                         │
 ╰──────────────────────────────────────────────────────────────╯
-<span style="color: #00d084;">rp2350-relay</span>[<span style="color: #00bfff;">/dev/ttyACM0</span>]$ <span style="color: #d7eaff;">info</span>
-                             <span style="background: #8f8f8f; color: #000000;"> info       </span>
-                             <span style="background: #c0c0c0; color: #000000;"> build-info </span>
-                             <span style="background: #c0c0c0; color: #000000;"> get        </span>
-                             <span style="background: #c0c0c0; color: #000000;"> set        </span>
-                             <span style="background: #c0c0c0; color: #000000;"> set-all    </span>
-                             <span style="background: #c0c0c0; color: #000000;"> pulse      </span>
-                             <span style="background: #c0c0c0; color: #000000;"> off-all    </span>
-                             <span style="background: #c0c0c0; color: #000000;"> status     </span>
-                             <span style="background: #c0c0c0; color: #000000;"> reboot     </span>
-                             <span style="background: #c0c0c0; color: #000000;"> disconnect </span>
-                             <span style="background: #c0c0c0; color: #000000;"> connect    </span>
-                             <span style="background: #c0c0c0; color: #000000;"> help       </span>
-                             <span style="background: #c0c0c0; color: #000000;"> exit       </span>
-                             <span style="background: #c0c0c0; color: #000000;"> quit       </span></code></pre>
+<span style="color: #00d084;">rp2350-relay</span>[<span style="color: #00bfff;">/dev/ttyACM0</span>]$ <span style="color: #d7eaff;">help</span>
+Inspect:
+  identity                     show controller hardware and protocol information
+  capabilities                 show controller capabilities
+  build-info                   show firmware build details
+  get                          show all relay states
+  get &lt;channel&gt;                show one relay state
+  status                       show relay state, health, and uptime
+  health                       show health details
+  transport                    show transport details
+  safety                       show safety policy details
+  watchdog                     show watchdog details
+
+Control:
+  set &lt;channel&gt; &lt;on|off&gt;       set one relay
+  set-all &lt;mask&gt;               set all relays from a six-bit mask
+  pulse &lt;channel&gt; &lt;duration&gt;   pulse one relay for duration in ms
+  off-all                      turn every relay off and cancel pulses
+  smoke [--pulse-ms &lt;ms&gt;]      pulse each relay and turn all off
+  reboot                       request a controlled firmware reboot
+
+Connection:
+  disconnect                   close the current serial connection
+  connect                      connect using saved selector or discovery
+  help                         show session commands
+  exit                         leave the session
+  quit                         leave the session</code></pre>
 
 #### Python RelayClient
 
@@ -460,7 +473,8 @@ from rp2350_relay_6ch.discovery import select_device_by_serial
 device = select_device_by_serial("E6614C311F4B8B2F")
 
 with RelayClient.connect(device.port, timeout_s=2.0, retries=1) as relay:
-    relay.get_info()
+    relay.identity()
+    relay.capabilities()
     relay.pulse_relay(0, 100)
     relay.off_all()
 ```

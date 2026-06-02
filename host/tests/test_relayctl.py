@@ -30,12 +30,16 @@ class FakeDaemonClient:
     def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
         pass
 
-    def get_info(self) -> dict[str, Any]:
-        self.calls.append(("get_info", ()))
+    def identity(self) -> dict[str, Any]:
+        self.calls.append(("identity", ()))
         return {"relay_count": 6}
 
-    def get_build_info(self) -> dict[str, Any]:
-        self.calls.append(("get_build_info", ()))
+    def capabilities(self) -> dict[str, Any]:
+        self.calls.append(("capabilities", ()))
+        return {"capabilities": 31}
+
+    def build_info(self) -> dict[str, Any]:
+        self.calls.append(("build_info", ()))
         return {"app_version": "0.8.0"}
 
     def get_relays(self, channel: int | None = None) -> dict[str, Any]:
@@ -58,9 +62,29 @@ class FakeDaemonClient:
         self.calls.append(("off_all", ()))
         return {"state": 0, "pulsing": 0}
 
+    def status(self) -> dict[str, Any]:
+        self.calls.append(("status", ()))
+        return {"state": 0, "pulsing": 0, "request_count": 2}
+
+    def health(self) -> dict[str, Any]:
+        self.calls.append(("health", ()))
+        return {"health": "normal"}
+
+    def transport_status(self) -> dict[str, Any]:
+        self.calls.append(("transport_status", ()))
+        return {"transport": "usb_cdc_acm_smp"}
+
+    def safety(self) -> dict[str, Any]:
+        self.calls.append(("safety", ()))
+        return {"comm_loss_policy": "energized_only"}
+
+    def watchdog(self) -> dict[str, Any]:
+        self.calls.append(("watchdog", ()))
+        return {"watchdog_enabled": False}
+
     def get_status(self) -> dict[str, Any]:
         self.calls.append(("get_status", ()))
-        return {"state": 0, "pulsing": 0, "request_count": 2}
+        return self.status()
 
     def reboot(self) -> dict[str, Any]:
         self.calls.append(("reboot", ()))
@@ -129,7 +153,7 @@ socket = "/tmp/bench-a.sock"
 
     assert rc == relayctl.EXIT_OK
     assert FakeDaemonClient.instances[0].socket_path == "/tmp/bench-a.sock"
-    assert FakeDaemonClient.instances[0].calls == [("get_status", ())]
+    assert FakeDaemonClient.instances[0].calls == [("status", ())]
 
 
 def test_relayctl_outputs_json(capsys: pytest.CaptureFixture[str]) -> None:
@@ -200,7 +224,7 @@ socket = "/tmp/bench-a.sock"
     assert rc == relayctl.EXIT_OK
     assert "smoke test passed" in captured.out
     assert FakeDaemonClient.instances[0].socket_path == "/tmp/bench-a.sock"
-    assert calls[:2] == [("get_info", ()), ("get_status", ())]
+    assert calls[:3] == [("identity", ()), ("capabilities", ()), ("status", ())]
     assert [call for call in calls if call[0] == "pulse_relay"] == [
         ("pulse_relay", (0, 25)),
         ("pulse_relay", (1, 25)),
@@ -215,20 +239,20 @@ socket = "/tmp/bench-a.sock"
 
 def test_relayctl_rejects_direct_serial_options() -> None:
     with pytest.raises(SystemExit) as exc:
-        relayctl.main(["--socket", "/tmp/relay.sock", "--port", "COM7", "info"])
+        relayctl.main(["--socket", "/tmp/relay.sock", "--port", "COM7", "identity"])
 
     assert exc.value.code == relayctl.EXIT_ARGUMENT
 
 
 def test_relayctl_requires_socket() -> None:
-    rc = relayctl.main(["info"])
+    rc = relayctl.main(["identity"])
 
     assert rc == relayctl.EXIT_ARGUMENT
 
 
 def test_relayctl_rejects_socket_and_instance() -> None:
     with pytest.raises(SystemExit) as exc:
-        relayctl.main(["--socket", "/tmp/relay.sock", "--instance", "bench-a", "info"])
+        relayctl.main(["--socket", "/tmp/relay.sock", "--instance", "bench-a", "identity"])
 
     assert exc.value.code == relayctl.EXIT_ARGUMENT
 
@@ -236,7 +260,7 @@ def test_relayctl_rejects_socket_and_instance() -> None:
 def test_relayctl_maps_transport_exit(capsys: pytest.CaptureFixture[str]) -> None:
     FakeDaemonClient.failure = RelayTransportError("unavailable")
 
-    rc = relayctl.main(["--socket", "/tmp/relay.sock", "info"])
+    rc = relayctl.main(["--socket", "/tmp/relay.sock", "identity"])
 
     captured = capsys.readouterr()
 

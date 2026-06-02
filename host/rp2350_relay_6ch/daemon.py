@@ -22,6 +22,7 @@ from . import __version__
 from .client import RelayClient
 from .config import resolve_instance_config
 from .constants import (
+    COMMAND_MODEL_VERSION,
     HARDWARE_NAME,
     PROTOCOL_VERSION,
     PULSE_MAX_MS,
@@ -48,7 +49,8 @@ EXIT_TRANSPORT = 3
 EXIT_PROTOCOL = 5
 EXIT_DAEMON = 7
 DEVICE_COMMANDS = {
-    "info",
+    "identity",
+    "capabilities",
     "build-info",
     "get",
     "set",
@@ -56,6 +58,10 @@ DEVICE_COMMANDS = {
     "pulse",
     "off-all",
     "status",
+    "health",
+    "transport",
+    "safety",
+    "watchdog",
     "reboot",
 }
 COMMANDS = DEVICE_COMMANDS | {"daemon-status"}
@@ -151,7 +157,19 @@ def parse_request_line(line: bytes, accepted_order: int) -> _Request:
 
 
 def _validate_args(command: str, args: dict[str, Any]) -> None:
-    if command in {"info", "build-info", "off-all", "status", "reboot", "daemon-status"}:
+    if command in {
+        "identity",
+        "capabilities",
+        "build-info",
+        "off-all",
+        "status",
+        "health",
+        "transport",
+        "safety",
+        "watchdog",
+        "reboot",
+        "daemon-status",
+    }:
         if args:
             raise RelayValidationError(f"{command} does not accept args")
         return
@@ -369,9 +387,9 @@ class RelayDaemon:
             retries=self.config.retries,
         )
         try:
-            info = client.get_info()
-            _validate_readiness_info(info)
-            client.get_status()
+            identity = client.identity()
+            _validate_readiness_identity(identity)
+            client.status()
         except Exception:
             client.close()
             raise
@@ -591,10 +609,12 @@ def _dispatch_device_command(
     command: str,
     args: dict[str, Any],
 ) -> dict[str, Any]:
-    if command == "info":
-        return client.get_info()
+    if command == "identity":
+        return client.identity()
+    if command == "capabilities":
+        return client.capabilities()
     if command == "build-info":
-        return client.get_build_info()
+        return client.build_info()
     if command == "get":
         return client.get_relays(args.get("channel"))
     if command == "set":
@@ -606,7 +626,15 @@ def _dispatch_device_command(
     if command == "off-all":
         return client.off_all()
     if command == "status":
-        return client.get_status()
+        return client.status()
+    if command == "health":
+        return client.health()
+    if command == "transport":
+        return client.transport_status()
+    if command == "safety":
+        return client.safety()
+    if command == "watchdog":
+        return client.watchdog()
     if command == "reboot":
         return client.reboot()
     raise RelayValidationError(f"unknown command {command}")
@@ -629,15 +657,19 @@ def _is_missing_selected_device(exc: RelayValidationError) -> bool:
     return str(exc).startswith("no relay device found with USB serial ")
 
 
-def _validate_readiness_info(info: dict[str, Any]) -> None:
-    if info.get("protocol_version") != PROTOCOL_VERSION:
+def _validate_readiness_identity(identity: dict[str, Any]) -> None:
+    if identity.get("protocol_version") != PROTOCOL_VERSION:
         raise RelayProtocolError(
-            f"unexpected relay protocol version {info.get('protocol_version')}"
+            f"unexpected relay protocol version {identity.get('protocol_version')}"
         )
-    relay_count = info.get("relay_count")
+    if identity.get("command_model_version") != COMMAND_MODEL_VERSION:
+        raise RelayProtocolError(
+            f"unexpected relay command model version {identity.get('command_model_version')}"
+        )
+    relay_count = identity.get("relay_count")
     if relay_count is not None and relay_count != RELAY_COUNT:
         raise RelayProtocolError(f"unexpected relay count {relay_count}")
-    hardware = info.get("hardware")
+    hardware = identity.get("hardware")
     if isinstance(hardware, str) and hardware != HARDWARE_NAME:
         raise RelayProtocolError(f"unexpected relay hardware {hardware}")
 

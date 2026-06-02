@@ -46,14 +46,19 @@ def _client(args: argparse.Namespace) -> RelayDaemonClient:
     return RelayDaemonClient.connect(socket_path, timeout_s=args.timeout)
 
 
-def cmd_info(args: argparse.Namespace) -> dict[str, Any]:
+def cmd_identity(args: argparse.Namespace) -> dict[str, Any]:
     with _client(args) as client:
-        return client.get_info()
+        return client.identity()
+
+
+def cmd_capabilities(args: argparse.Namespace) -> dict[str, Any]:
+    with _client(args) as client:
+        return client.capabilities()
 
 
 def cmd_build_info(args: argparse.Namespace) -> dict[str, Any]:
     with _client(args) as client:
-        return client.get_build_info()
+        return client.build_info()
 
 
 def cmd_get(args: argparse.Namespace) -> dict[str, Any]:
@@ -83,7 +88,27 @@ def cmd_off_all(args: argparse.Namespace) -> dict[str, Any]:
 
 def cmd_status(args: argparse.Namespace) -> dict[str, Any]:
     with _client(args) as client:
-        return client.get_status()
+        return client.status()
+
+
+def cmd_health(args: argparse.Namespace) -> dict[str, Any]:
+    with _client(args) as client:
+        return client.health()
+
+
+def cmd_transport(args: argparse.Namespace) -> dict[str, Any]:
+    with _client(args) as client:
+        return client.transport_status()
+
+
+def cmd_safety(args: argparse.Namespace) -> dict[str, Any]:
+    with _client(args) as client:
+        return client.safety()
+
+
+def cmd_watchdog(args: argparse.Namespace) -> dict[str, Any]:
+    with _client(args) as client:
+        return client.watchdog()
 
 
 def cmd_reboot(args: argparse.Namespace) -> dict[str, Any]:
@@ -116,7 +141,8 @@ def cmd_systemd_doctor(args: argparse.Namespace) -> dict[str, Any]:
 
 
 COMMANDS = {
-    "info": cmd_info,
+    "identity": cmd_identity,
+    "capabilities": cmd_capabilities,
     "build-info": cmd_build_info,
     "get": cmd_get,
     "set": cmd_set,
@@ -124,6 +150,10 @@ COMMANDS = {
     "pulse": cmd_pulse,
     "off-all": cmd_off_all,
     "status": cmd_status,
+    "health": cmd_health,
+    "transport": cmd_transport,
+    "safety": cmd_safety,
+    "watchdog": cmd_watchdog,
     "reboot": cmd_reboot,
     "daemon-status": cmd_daemon_status,
     "smoke": cmd_smoke,
@@ -148,7 +178,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", choices=("human", "json"), default="human")
 
     subparsers = parser.add_subparsers(dest="command", required=True)
-    subparsers.add_parser("info", help="print relay controller information")
+    subparsers.add_parser("identity", help="print relay controller identity")
+    subparsers.add_parser("capabilities", help="print relay controller capabilities")
     subparsers.add_parser("build-info", help="print firmware build information")
 
     get_parser = subparsers.add_parser("get", help="get relay state")
@@ -167,6 +198,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("off-all", help="turn every relay off")
     subparsers.add_parser("status", help="print relay controller status")
+    subparsers.add_parser("health", help="print relay health details")
+    subparsers.add_parser("transport", help="print transport details")
+    subparsers.add_parser("safety", help="print safety policy details")
+    subparsers.add_parser("watchdog", help="print watchdog details")
     subparsers.add_parser("reboot", help="request a firmware reboot")
     subparsers.add_parser("daemon-status", help="print daemon process status")
 

@@ -10,7 +10,7 @@ the implementation lands.
 - Phase 8b daemon mode is Linux-only.
 - Direct manual operation on Windows and Linux is covered by Phase 8a session
   mode. Diagnostics and simple checks remain supported through direct serial
-  tooling, for example `rp2350-relay --port COM7 info`.
+  tooling, for example `rp2350-relay --port COM7 identity`.
 - The daemon is the Linux heartbeat owner for communication-loss
   safety while connected.
 - Do not add reboot-on-silence behavior, daemon authentication, audit logs, or
@@ -84,7 +84,7 @@ rp2350-relayd (--port /dev/ttyACM0 | --serial <usb-serial>) \
   inside the daemon.
 - Serialize all relay operations through one worker or command queue in the
   order complete request frames are accepted across all client sockets.
-- Query `info` and then `status` on startup and after reconnect. These
+- Query `identity` and then `status` on startup and after reconnect. These
   readiness queries must not change relay outputs.
 - Poll the relay-management `heartbeat` command every 2.5 seconds while
   connected. The cadence is fixed by host design and is not computed from
@@ -121,9 +121,9 @@ rp2350-relayd (--port /dev/ttyACM0 | --serial <usb-serial>) \
   streak since the last successful connection. Reset it to `0` after readiness
   succeeds.
 - Clear `last_error` after readiness succeeds.
-- After reconnect, run `info` and then `status` before accepting device
+- After reconnect, run `identity` and then `status` before accepting device
   commands again.
-- If a selected port or serial candidate opens but `info` or `status` proves it
+- If a selected port or serial candidate opens but `identity` or `status` proves it
   is not a valid relay controller, exit nonzero as a configuration error, even
   with `--wait-device`.
 - The daemon `reboot` command returns success once firmware accepts the reboot.
@@ -138,9 +138,10 @@ Use newline-delimited JSON over an explicit Unix domain socket. Limit
 first-phase socket access to the same operator user through parent directory
 ownership and socket permissions.
 
-Mirror existing relay commands: `info`, `build-info`, `get`, `set`, `set-all`,
-`pulse`, `off-all`, `status`, and `reboot`. Add `daemon-status` for daemon
-process and connection state.
+Mirror existing relay commands: `identity`, `capabilities`, `build-info`,
+`get`, `set`, `set-all`, `pulse`, `off-all`, `status`, `health`, `transport`,
+`safety`, `watchdog`, and `reboot`. Add `daemon-status` for daemon process and
+connection state.
 
 Request frames are one JSON object per line:
 
@@ -220,7 +221,7 @@ pulsing masks, or last-known relay-output cache fields:
 - `current_port` is the open serial path while connected and `null` while
   disconnected.
 - `last_error` is `null` after successful readiness.
-- Device identity belongs to the `info` command, not `daemon-status`.
+- Device identity belongs to the `identity` command, not `daemon-status`.
 
 ## Python API
 
@@ -236,10 +237,11 @@ with RelayDaemonClient.connect(timeout_s=2.0) as relay:
 
 - `RelayDaemonClient.connect(socket_path, timeout_s=2.0)` requires an explicit
   daemon socket path.
-- Expose methods matching direct `RelayClient`: `get_info()`,
-  `get_build_info()`, `get_relays(channel=None)`, `set_relay(channel, on)`,
-  `set_all_relays(state)`, `pulse_relay(channel, duration_ms)`, `off_all()`,
-  `get_status()`, and `reboot()`.
+- Expose methods matching direct `RelayClient`: `identity()`,
+  `capabilities()`, `build_info()`, `get_relays(channel=None)`,
+  `set_relay(channel, on)`, `set_all_relays(state)`,
+  `pulse_relay(channel, duration_ms)`, `off_all()`, `status()`, `health()`,
+  `transport_status()`, `safety()`, `watchdog()`, and `reboot()`.
 - Expose `get_daemon_status()` for `daemon-status`.
 - Keep channel numbers zero-based in the Python API.
 - Use the same host-side validation rules and typed exceptions as the direct
@@ -259,8 +261,9 @@ rp2350-relayctl --socket <path> [--timeout 2.0] \
   [--output human|json] <command>
 ```
 
-- Commands mirror the direct CLI: `info`, `build-info`, `get`, `set`,
-  `set-all`, `pulse`, `off-all`, `status`, and `reboot`.
+- Commands mirror the direct CLI: `identity`, `capabilities`, `build-info`,
+  `get`, `set`, `set-all`, `pulse`, `off-all`, `status`, `health`,
+  `transport`, `safety`, `watchdog`, and `reboot`.
 - Add `daemon-status` for daemon process and connection state. While the daemon
   is running, `daemon-status` exits `0` even when the relay controller is
   disconnected.
@@ -340,7 +343,7 @@ Automated tests should cover:
 - Required explicit socket arguments for the daemon and daemon clients.
 - `--serial` selection, missing serial with and without `--wait-device`,
   duplicate serial rejection, and serial rediscovery after renumbering.
-- Startup `info` then `status` readiness without sending `off-all`.
+- Startup `identity` then `status` readiness without sending `off-all`.
 - `daemon-status` success while disconnected and mirrored device-command
   transport errors while disconnected.
 - Socket parent creation, permissions, already-running detection, path-in-use
@@ -357,7 +360,8 @@ Manual Linux smoke check, when hardware is available:
 SOCKET="$XDG_RUNTIME_DIR/rp2350-relay/bench-a.sock"
 rp2350-relayd --serial <usb-serial> --socket "$SOCKET" --wait-device
 rp2350-relayctl --socket "$SOCKET" daemon-status
-rp2350-relayctl --socket "$SOCKET" info
+rp2350-relayctl --socket "$SOCKET" identity
+rp2350-relayctl --socket "$SOCKET" capabilities
 rp2350-relayctl --socket "$SOCKET" status
 rp2350-relayctl --socket "$SOCKET" pulse 1 100
 rp2350-relayctl --socket "$SOCKET" off-all

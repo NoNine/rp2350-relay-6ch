@@ -50,7 +50,7 @@ wait_device = true
 3. Query firmware identity and relay status through the daemon:
 
    ```sh
-   rp2350-relayctl --instance bench-a info
+   rp2350-relayctl --instance bench-a identity
    rp2350-relayctl --instance bench-a status
    ```
 

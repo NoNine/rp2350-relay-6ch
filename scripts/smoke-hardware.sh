@@ -18,7 +18,7 @@ Required checks:
   - CH1 through CH6 each pulse briefly and return off.
   - Phase 4 firmware builds with USB CDC ACM and SMP UART enabled.
   - The USB CDC serial device appears on the operator PC.
-  - USB RPC info, status, get, set, set-all, pulse, and off-all requests work.
+  - USB RPC identity, status, get, set, set-all, pulse, and off-all requests work.
   - Invalid USB RPC requests return structured errors without crashing firmware.
   - 'relay off' is run during teardown so no relay remains energized.
 

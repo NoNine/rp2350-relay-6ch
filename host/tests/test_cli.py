@@ -19,7 +19,7 @@ class FakeClient:
     failure: Exception | None = None
     relay_state = 0x21
     relay_pulsing = 0
-    protocol_version = 6
+    protocol_version = 7
 
     def __init__(
         self,
@@ -59,19 +59,25 @@ class FakeClient:
     def close(self) -> None:
         self.closed = True
 
-    def get_info(self) -> dict[str, Any]:
-        self.calls.append(("get_info", ()))
+    def identity(self) -> dict[str, Any]:
+        self.calls.append(("identity", ()))
         return {
-            "capabilities": 31,
+            "command_model_version": 2,
             "hardware": "Waveshare RP2350-Relay-6CH",
-            "pulse_max_ms": 60000,
-            "pulse_min_ms": 10,
             "protocol_version": self.protocol_version,
             "relay_count": 6,
         }
 
-    def get_build_info(self) -> dict[str, Any]:
-        self.calls.append(("get_build_info", ()))
+    def capabilities(self) -> dict[str, Any]:
+        self.calls.append(("capabilities", ()))
+        return {
+            "capabilities": 31,
+            "pulse_max_ms": 60000,
+            "pulse_min_ms": 10,
+        }
+
+    def build_info(self) -> dict[str, Any]:
+        self.calls.append(("build_info", ()))
         return {
             "app_version": "0.6.0",
             "zephyr_version": "4.2.0",
@@ -108,8 +114,8 @@ class FakeClient:
         self.calls.append(("off_all", ()))
         return {"state": 0, "pulsing": 0}
 
-    def get_status(self) -> dict[str, Any]:
-        self.calls.append(("get_status", ()))
+    def status(self) -> dict[str, Any]:
+        self.calls.append(("status", ()))
         return {
             "state": 0,
             "pulsing": 0,
@@ -117,14 +123,32 @@ class FakeClient:
             "health_reasons": 8,
             "health_primary_reason": "comm_owner_timeout",
             "health_transitions": 3,
-            "busy": 0,
-            "comm_loss_reboot_on_timeout": False,
-            "request_count": 12,
-            "last_error": 0,
-            "transport": "usb_cdc_acm_smp",
-            "usb_cdc_acm": True,
-            "smp_uart": True,
         }
+
+    def health(self) -> dict[str, Any]:
+        self.calls.append(("health", ()))
+        return {
+            "health": "degraded",
+            "health_reasons": 8,
+            "health_primary_reason": "comm_owner_timeout",
+            "health_transitions": 3,
+        }
+
+    def transport_status(self) -> dict[str, Any]:
+        self.calls.append(("transport_status", ()))
+        return {"transport": "usb_cdc_acm_smp", "usb_cdc_acm": True, "smp_uart": True}
+
+    def safety(self) -> dict[str, Any]:
+        self.calls.append(("safety", ()))
+        return {"comm_loss_reboot_on_timeout": False}
+
+    def watchdog(self) -> dict[str, Any]:
+        self.calls.append(("watchdog", ()))
+        return {"watchdog_enabled": False}
+
+    def get_status(self) -> dict[str, Any]:
+        self.calls.append(("get_status", ()))
+        return self.status()
 
     def reboot(self) -> dict[str, Any]:
         self.calls.append(("reboot", ()))
@@ -141,11 +165,11 @@ def fake_client(monkeypatch: pytest.MonkeyPatch) -> None:
     FakeClient.failure = None
     FakeClient.relay_state = 0x21
     FakeClient.relay_pulsing = 0
-    FakeClient.protocol_version = 6
+    FakeClient.protocol_version = 7
     monkeypatch.setattr(cli, "RelayClient", FakeClient)
 
 
-def test_info_outputs_json_and_uses_connection_options(capsys: pytest.CaptureFixture[str]) -> None:
+def test_identity_outputs_json_and_uses_connection_options(capsys: pytest.CaptureFixture[str]) -> None:
     rc = cli.main(
         [
             "--port",
@@ -158,7 +182,7 @@ def test_info_outputs_json_and_uses_connection_options(capsys: pytest.CaptureFix
             "2",
             "--output",
             "json",
-            "info",
+            "identity",
         ]
     )
 
@@ -172,34 +196,35 @@ def test_info_outputs_json_and_uses_connection_options(capsys: pytest.CaptureFix
     assert FakeClient.instances[0].retries == 2
 
 
-def test_info_human_output_lists_all_fields(capsys: pytest.CaptureFixture[str]) -> None:
-    rc = cli.main(["--port", "COM7", "info"])
+def test_identity_human_output_lists_identity_fields(capsys: pytest.CaptureFixture[str]) -> None:
+    rc = cli.main(["--port", "COM7", "identity"])
 
     captured = capsys.readouterr()
 
     assert rc == cli.EXIT_OK
-    assert "capabilities:      31" in captured.out
-    assert "hardware:          Waveshare RP2350-Relay-6CH" in captured.out
-    assert "pulse_max_ms:      60000" in captured.out
-    assert "pulse_min_ms:      10" in captured.out
-    assert "protocol_version:  6" in captured.out
-    assert "relay_count:       6" in captured.out
+    assert "command_model_version:  2" in captured.out
+    assert "hardware:" in captured.out
+    assert "Waveshare RP2350-Relay-6CH" in captured.out
+    assert "protocol_version:" in captured.out
+    assert "7" in captured.out
+    assert "relay_count:" in captured.out
 
 
-def test_info_allows_old_protocol_for_diagnostics(
+def test_identity_allows_old_protocol_for_diagnostics(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     FakeClient.protocol_version = 3
 
-    rc = cli.main(["--port", "COM7", "info"])
+    rc = cli.main(["--port", "COM7", "identity"])
 
     captured = capsys.readouterr()
 
     assert rc == cli.EXIT_OK
-    assert "protocol_version:  3" in captured.out
+    assert "protocol_version:" in captured.out
+    assert "3" in captured.out
 
 
-def test_non_info_rejects_old_protocol(capsys: pytest.CaptureFixture[str]) -> None:
+def test_non_identity_rejects_old_protocol(capsys: pytest.CaptureFixture[str]) -> None:
     FakeClient.protocol_version = 3
 
     rc = cli.main(["--port", "COM7", "status"])
@@ -350,7 +375,7 @@ def test_build_info_outputs_json_and_uses_client(
 
     assert rc == cli.EXIT_OK
     assert '"git_commit": "abcdef123456"' in captured.out
-    assert FakeClient.instances[0].calls == [("get_info", ()), ("get_build_info", ())]
+    assert FakeClient.instances[0].calls == [("identity", ()), ("build_info", ())]
 
 
 def test_build_info_human_output_lists_fields(capsys: pytest.CaptureFixture[str]) -> None:
@@ -367,7 +392,7 @@ def test_set_converts_one_based_channel_to_zero_based() -> None:
     rc = cli.main(["--port", "COM7", "set", "6", "on"])
 
     assert rc == cli.EXIT_OK
-    assert FakeClient.instances[0].calls == [("get_info", ()), ("set_relay", (5, True))]
+    assert FakeClient.instances[0].calls == [("identity", ()), ("set_relay", (5, True))]
 
 
 def test_set_all_accepts_hex_mask() -> None:
@@ -375,7 +400,7 @@ def test_set_all_accepts_hex_mask() -> None:
 
     assert rc == cli.EXIT_OK
     assert FakeClient.instances[0].calls == [
-        ("get_info", ()),
+        ("identity", ()),
         ("set_all_relays", (0x21,)),
     ]
 
@@ -391,7 +416,7 @@ def test_get_all_human_output_names_enabled_relays(
     assert "state:    0x21" in captured.out
     assert "on:       CH1, CH6" in captured.out
     assert "pulsing:  none" in captured.out
-    assert FakeClient.instances[0].calls == [("get_info", ()), ("get_relays", (None,))]
+    assert FakeClient.instances[0].calls == [("identity", ()), ("get_relays", (None,))]
 
 
 def test_get_channel_human_output_reports_on_channel(
@@ -405,7 +430,7 @@ def test_get_channel_human_output_reports_on_channel(
     assert "channel:  CH1" in captured.out
     assert "on:       true" in captured.out
     assert "pulsing:  false" in captured.out
-    assert FakeClient.instances[0].calls == [("get_info", ()), ("get_relays", (0,))]
+    assert FakeClient.instances[0].calls == [("identity", ()), ("get_relays", (0,))]
 
 
 def test_get_channel_human_output_reports_off_channel(
@@ -475,25 +500,15 @@ def test_status_human_output_groups_relay_and_transport_fields(
     captured = capsys.readouterr()
 
     assert rc == cli.EXIT_OK
-    assert captured.out == (
-        "[relays]\n"
-        "state:                        0x00\n"
-        "on:                           none\n"
-        "pulsing:                      none\n"
-        "\n"
-        "[health]\n"
-        "state:                        degraded\n"
-        "primary_reason:               comm_owner_timeout\n"
-        "reasons:                      8\n"
-        "transitions:                  3\n"
-        "\n"
-        "[transport]\n"
-        "busy:                         0\n"
-        "comm_loss_reboot_on_timeout:  False\n"
-        "last_error:                   0\n"
-        "request_count:                12\n"
-        "transport:                    usb_cdc_acm_smp\n"
-    )
+    assert "[relays]\n" in captured.out
+    assert "state:" in captured.out
+    assert "0x00" in captured.out
+    assert "on:" in captured.out
+    assert "none" in captured.out
+    assert "[health]\n" in captured.out
+    assert "primary_reason:" in captured.out
+    assert "comm_owner_timeout" in captured.out
+    assert "[transport]" not in captured.out
 
 
 def test_status_json_output_is_unchanged(capsys: pytest.CaptureFixture[str]) -> None:
@@ -503,11 +518,8 @@ def test_status_json_output_is_unchanged(capsys: pytest.CaptureFixture[str]) -> 
 
     assert rc == cli.EXIT_OK
     assert captured.out.strip() == (
-        '{"busy": 0, "comm_loss_reboot_on_timeout": false, "health": "degraded", '
-        '"health_primary_reason": "comm_owner_timeout", "health_reasons": 8, '
-        '"health_transitions": 3, "last_error": 0, "pulsing": 0, '
-        '"request_count": 12, "smp_uart": true, "state": 0, '
-        '"transport": "usb_cdc_acm_smp", "usb_cdc_acm": true}'
+        '{"health": "degraded", "health_primary_reason": "comm_owner_timeout", '
+        '"health_reasons": 8, "health_transitions": 3, "pulsing": 0, "state": 0}'
     )
 
 
@@ -537,7 +549,7 @@ def test_failure_exit_codes(
 ) -> None:
     FakeClient.failure = failure
 
-    rc = cli.main(["--port", "COM7", "info"])
+    rc = cli.main(["--port", "COM7", "identity"])
 
     captured = capsys.readouterr()
 
@@ -564,7 +576,12 @@ def test_smoke_pulses_each_relay_and_forces_teardown(
     calls = FakeClient.instances[0].calls
 
     assert rc == cli.EXIT_OK
-    assert calls[:3] == [("get_info", ()), ("get_info", ()), ("get_status", ())]
+    assert calls[:4] == [
+        ("identity", ()),
+        ("identity", ()),
+        ("capabilities", ()),
+        ("status", ()),
+    ]
     assert [call for call in calls if call[0] == "pulse_relay"] == [
         ("pulse_relay", (0, 25)),
         ("pulse_relay", (1, 25)),

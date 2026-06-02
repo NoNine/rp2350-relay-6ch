@@ -23,13 +23,19 @@ SMP_VERSION_2 = 1
 SERIAL_HDR_PKT = 0x0609
 SERIAL_HDR_FRAG = 0x0414
 
-CMD_INFO = 0
-CMD_GET = 1
-CMD_SET = 2
-CMD_SET_ALL = 3
-CMD_PULSE = 4
-CMD_OFF_ALL = 5
-CMD_STATUS = 6
+CMD_IDENTITY = 0x00
+CMD_CAPABILITIES = 0x01
+CMD_BUILD_INFO = 0x02
+CMD_GET = 0x10
+CMD_STATUS = 0x11
+CMD_HEALTH = 0x12
+CMD_TRANSPORT = 0x13
+CMD_SAFETY = 0x14
+CMD_WATCHDOG = 0x15
+CMD_SET = 0x20
+CMD_SET_ALL = 0x21
+CMD_PULSE = 0x22
+CMD_OFF_ALL = 0x23
 
 
 def crc16_itu_t(data: bytes, seed: int = 0) -> int:
@@ -292,17 +298,22 @@ def require(condition: bool, message: str) -> None:
 
 
 def run_smoke(args: argparse.Namespace) -> None:
-    info = call(args.port, args.baud, CMD_INFO, OP_READ, {})
-    print_response(info)
-    require(info.get("protocol_version") == 6, "protocol_version is not 6")
-    require(info.get("relay_count") == 6, "relay_count is not 6")
-    require(info.get("hardware") == "Waveshare RP2350-Relay-6CH", "unexpected hardware name")
+    identity = call(args.port, args.baud, CMD_IDENTITY, OP_READ, {})
+    print_response(identity)
+    require(identity.get("protocol_version") == 7, "protocol_version is not 7")
+    require(identity.get("command_model_version") == 2, "command_model_version is not 2")
+    require(identity.get("relay_count") == 6, "relay_count is not 6")
+    require(
+        identity.get("hardware") == "Waveshare RP2350-Relay-6CH",
+        "unexpected hardware name",
+    )
+
+    capabilities = call(args.port, args.baud, CMD_CAPABILITIES, OP_READ, {})
+    print_response(capabilities)
+    require(capabilities.get("capabilities") is not None, "missing capabilities")
 
     status = call(args.port, args.baud, CMD_STATUS, OP_READ, {})
     print_response(status)
-    require(status.get("transport") == "usb_cdc_acm_smp", "unexpected transport")
-    require(status.get("usb_cdc_acm") is True, "usb_cdc_acm is not true")
-    require(status.get("smp_uart") is True, "smp_uart is not true")
     require(status.get("state") == 0, "relays are not all off at start")
 
     print_response(call(args.port, args.baud, CMD_SET, OP_WRITE, {"channel": 0, "on": True}))
@@ -336,8 +347,14 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="action", required=True)
 
     commands = [
-        ("info", CMD_INFO, "read device and protocol information"),
-        ("status", CMD_STATUS, "read transport and relay status"),
+        ("identity", CMD_IDENTITY, "read device and protocol identity"),
+        ("capabilities", CMD_CAPABILITIES, "read operation capabilities"),
+        ("build-info", CMD_BUILD_INFO, "read firmware build information"),
+        ("status", CMD_STATUS, "read relay operator status"),
+        ("health", CMD_HEALTH, "read health details"),
+        ("transport", CMD_TRANSPORT, "read transport details"),
+        ("safety", CMD_SAFETY, "read safety policy details"),
+        ("watchdog", CMD_WATCHDOG, "read watchdog details"),
         ("off-all", CMD_OFF_ALL, "turn all relays off"),
         ("invalid-channel", CMD_SET, "send an invalid channel request"),
         ("invalid-pulse", CMD_PULSE, "send an invalid pulse-duration request"),

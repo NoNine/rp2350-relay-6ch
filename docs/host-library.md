@@ -63,7 +63,7 @@ for device in list_relay_devices():
 
 Discovery inspects USB metadata only. It does not open ports or send relay
 protocol commands, so treat returned devices as candidates until the script
-opens the port and verifies `get_info()` and `get_status()`.
+opens the port and verifies `identity()` and `status()`.
 
 To target a known controller by USB serial number:
 
@@ -74,8 +74,8 @@ from rp2350_relay_6ch.discovery import select_device_by_serial
 device = select_device_by_serial("E6614C311F4B8B2F")
 
 with RelayClient.connect(device.port, timeout_s=2.0, retries=1) as relay:
-    info = relay.get_info()
-    status = relay.get_status()
+    identity = relay.identity()
+    status = relay.status()
     relay.pulse_relay(0, 100)
     relay.off_all()
 ```
@@ -146,7 +146,7 @@ with RelayClient.connect(device.port, timeout_s=2.0, retries=1) as relay:
     thread.start()
     try:
         with lock:
-            relay.get_info()
+            relay.identity()
             relay.pulse_relay(0, 100)
     finally:
         stop.set()
@@ -173,8 +173,8 @@ clients = []
 try:
     for device in list_relay_devices():
         client = RelayClient.connect(device.port, timeout_s=2.0, retries=1)
-        client.get_info()
-        client.get_status()
+        client.identity()
+        client.status()
         clients.append((device, client))
 
     clients[0][1].set_relay(0, True)
@@ -207,8 +207,14 @@ with RelayDaemonClient.connect(socket_path, timeout_s=2.0) as relay:
 The client methods return decoded response dictionaries from the firmware:
 
 ```python
-info = client.get_info()
-status = client.get_status()
+identity = client.identity()
+capabilities = client.capabilities()
+build = client.build_info()
+status = client.status()
+health = client.health()
+transport = client.transport_status()
+safety = client.safety()
+watchdog = client.watchdog()
 relays = client.get_relays()
 channel_0 = client.get_relays(channel=0)
 
@@ -218,6 +224,10 @@ client.set_all_relays(0x21)
 client.pulse_relay(0, 100)
 client.off_all()
 ```
+
+`get_info()` is not part of the protocol `7`, command model `2` host API.
+Call role-specific read methods directly; each method sends exactly one
+firmware command.
 
 `reboot()` sends the firmware reboot command:
 

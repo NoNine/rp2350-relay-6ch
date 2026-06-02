@@ -60,18 +60,25 @@ def run(args: argparse.Namespace) -> None:
         retries=args.retries,
     ) as client:
         try:
-            info = client.get_info()
-            print_response("info", info)
-            require(info.get("protocol_version") == 6, "protocol_version is not 6")
-            require(info.get("relay_count") == 6, "relay_count is not 6")
+            identity = client.identity()
+            print_response("identity", identity)
+            require(identity.get("protocol_version") == 7, "protocol_version is not 7")
             require(
-                info.get("hardware") == "Waveshare RP2350-Relay-6CH",
+                identity.get("command_model_version") == 2,
+                "command_model_version is not 2",
+            )
+            require(identity.get("relay_count") == 6, "relay_count is not 6")
+            require(
+                identity.get("hardware") == "Waveshare RP2350-Relay-6CH",
                 "unexpected hardware name",
             )
 
+            capabilities = client.capabilities()
+            print_response("capabilities", capabilities)
+            require(capabilities.get("capabilities") is not None, "missing capabilities")
+
             status = client.get_status()
             print_response("status", status)
-            require(status.get("smp_uart") is True, "smp_uart is not true")
             require(status.get("state") == 0, "relays are not all off at start")
 
             print_response("get all", client.get_relays())

@@ -6,15 +6,20 @@ from typing import Any
 
 from .constants import (
     CMD_BUILD_INFO,
+    CMD_CAPABILITIES,
     CMD_GET,
     CMD_HEARTBEAT,
-    CMD_INFO,
+    CMD_HEALTH,
+    CMD_IDENTITY,
     CMD_OFF_ALL,
     CMD_PULSE,
     CMD_REBOOT,
+    CMD_SAFETY,
     CMD_SET,
     CMD_SET_ALL,
     CMD_STATUS,
+    CMD_TRANSPORT,
+    CMD_WATCHDOG,
     DEVICE_ERROR_NAMES,
     GROUP_RELAY,
     OP_READ,
@@ -86,10 +91,13 @@ class RelayClient:
     def close(self) -> None:
         self.transport.close()
 
-    def get_info(self) -> dict[str, Any]:
-        return self._request(CMD_INFO, OP_READ, {})
+    def identity(self) -> dict[str, Any]:
+        return self._request(CMD_IDENTITY, OP_READ, {})
 
-    def get_build_info(self) -> dict[str, Any]:
+    def capabilities(self) -> dict[str, Any]:
+        return self._request(CMD_CAPABILITIES, OP_READ, {})
+
+    def build_info(self) -> dict[str, Any]:
         return self._request(CMD_BUILD_INFO, OP_READ, {})
 
     def get_relays(self, channel: int | None = None) -> dict[str, Any]:
@@ -128,8 +136,26 @@ class RelayClient:
     def off_all(self) -> dict[str, Any]:
         return self._request(CMD_OFF_ALL, OP_WRITE, {})
 
-    def get_status(self) -> dict[str, Any]:
+    def status(self) -> dict[str, Any]:
         return self._request(CMD_STATUS, OP_READ, {})
+
+    def health(self) -> dict[str, Any]:
+        return self._request(CMD_HEALTH, OP_READ, {})
+
+    def transport_status(self) -> dict[str, Any]:
+        return self._request(CMD_TRANSPORT, OP_READ, {})
+
+    def safety(self) -> dict[str, Any]:
+        return self._request(CMD_SAFETY, OP_READ, {})
+
+    def watchdog(self) -> dict[str, Any]:
+        return self._request(CMD_WATCHDOG, OP_READ, {})
+
+    def get_build_info(self) -> dict[str, Any]:
+        return self.build_info()
+
+    def get_status(self) -> dict[str, Any]:
+        return self.status()
 
     def reboot(self) -> dict[str, Any]:
         return self._request(CMD_REBOOT, OP_WRITE, {})

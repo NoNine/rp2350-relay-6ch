@@ -53,6 +53,14 @@ def test_daemon_client_methods_send_expected_commands(tmp_path: Any) -> None:
     socket_path, thread = run_socket_server(tmp_path, handler)
 
     with RelayDaemonClient.connect(socket_path) as client:
+        assert client.identity() == {"state": 1}
+        assert client.capabilities() == {"state": 1}
+        assert client.build_info() == {"state": 1}
+        assert client.status() == {"state": 1}
+        assert client.health() == {"state": 1}
+        assert client.transport_status() == {"state": 1}
+        assert client.safety() == {"state": 1}
+        assert client.watchdog() == {"state": 1}
         assert client.set_relay(0, True) == {"state": 1}
         assert client.get_relays(0) == {"state": 1}
         assert client.off_all() == {"state": 1}
@@ -60,9 +68,17 @@ def test_daemon_client_methods_send_expected_commands(tmp_path: Any) -> None:
     thread.join(timeout=1.0)
 
     assert seen == [
-        {"id": 1, "command": "set", "args": {"channel": 0, "on": True}},
-        {"id": 2, "command": "get", "args": {"channel": 0}},
-        {"id": 3, "command": "off-all"},
+        {"id": 1, "command": "identity"},
+        {"id": 2, "command": "capabilities"},
+        {"id": 3, "command": "build-info"},
+        {"id": 4, "command": "status"},
+        {"id": 5, "command": "health"},
+        {"id": 6, "command": "transport"},
+        {"id": 7, "command": "safety"},
+        {"id": 8, "command": "watchdog"},
+        {"id": 9, "command": "set", "args": {"channel": 0, "on": True}},
+        {"id": 10, "command": "get", "args": {"channel": 0}},
+        {"id": 11, "command": "off-all"},
     ]
 
 
@@ -88,7 +104,7 @@ def test_daemon_client_maps_error_kinds(
 
     with RelayDaemonClient.connect(socket_path) as client:
         with pytest.raises(error_type, match="failed"):
-            client.get_info()
+            client.identity()
 
     thread.join(timeout=1.0)
 

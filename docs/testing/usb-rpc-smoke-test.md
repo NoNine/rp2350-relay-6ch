@@ -115,21 +115,31 @@ custom relay management group and MCUmgr enumeration support.
 ## Checks
 
 1. Confirm all relays are off immediately after boot.
-2. Send an SMP `info` request to group `64`, command `0`:
+2. Send an SMP `identity` request to group `64`, command `0`:
 
    ```sh
-   python tools/usb_rpc_smoke.py --port "$PORT" info
+   python tools/usb_rpc_smoke.py --port "$PORT" identity
    ```
 
    PowerShell:
 
    ```powershell
-   python tools/usb_rpc_smoke.py --port $env:PORT info
+   python tools/usb_rpc_smoke.py --port $env:PORT identity
    ```
 
-   Confirm the response reports protocol version `5`, relay count `6`, and
-   hardware `Waveshare RP2350-Relay-6CH`.
-3. Send a `status` request to group `64`, command `6`:
+   Confirm the response reports protocol version `7`, command model version
+   `2`, relay count `6`, and hardware `Waveshare RP2350-Relay-6CH`.
+3. Send `capabilities` and `transport` requests to group `64`, commands `1`
+   and `0x13`:
+
+   ```sh
+   python tools/usb_rpc_smoke.py --port "$PORT" capabilities
+   python tools/usb_rpc_smoke.py --port "$PORT" transport
+   ```
+
+   Confirm `capabilities` reports pulse bounds and `transport` reports
+   `usb_cdc_acm_smp`.
+4. Send a `status` request to group `64`, command `0x11`:
 
    ```sh
    python tools/usb_rpc_smoke.py --port "$PORT" status
@@ -142,11 +152,8 @@ custom relay management group and MCUmgr enumeration support.
    ```
 
    Confirm:
-   - `transport` is `usb_cdc_acm_smp`
-   - `usb_cdc_acm` is true
-   - `smp_uart` is true
    - relay `state` is `0`
-4. Send `get`, `set`, `set_all`, `pulse`, and `off_all` requests over USB CDC
+5. Send `get`, `set`, `set_all`, `pulse`, and `off_all` requests over USB CDC
    and confirm responses match `docs/protocol/relay-management.md`. Relay
    channels are zero-based in USB RPC commands, so channel `0` is `CH1` and
    channel `5` is `CH6`.
@@ -164,7 +171,7 @@ custom relay management group and MCUmgr enumeration support.
 
    PowerShell uses the same subcommands with `--port $env:PORT`.
 
-5. Send invalid channel and invalid pulse-duration requests. Confirm responses
+6. Send invalid channel and invalid pulse-duration requests. Confirm responses
    use the documented group error payload and the firmware remains responsive.
 
    ```sh
@@ -175,7 +182,7 @@ custom relay management group and MCUmgr enumeration support.
 
    PowerShell uses the same subcommands with `--port $env:PORT`.
 
-6. Optionally run the combined smoke sequence:
+7. Optionally run the combined smoke sequence:
 
    ```sh
    python tools/usb_rpc_smoke.py --port "$PORT" smoke

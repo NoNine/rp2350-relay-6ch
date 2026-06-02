@@ -52,18 +52,22 @@ class FakeRelayClient:
     def close(self) -> None:
         self.closed = True
 
-    def get_info(self) -> dict[str, Any]:
-        self.calls.append(("get_info", ()))
+    def identity(self) -> dict[str, Any]:
+        self.calls.append(("identity", ()))
         if self.fail_info is not None:
             raise self.fail_info
-        return {"protocol_version": 6, "relay_count": 6}
+        return {"protocol_version": 7, "command_model_version": 2, "relay_count": 6}
 
-    def get_build_info(self) -> dict[str, Any]:
-        self.calls.append(("get_build_info", ()))
+    def capabilities(self) -> dict[str, Any]:
+        self.calls.append(("capabilities", ()))
+        return {"capabilities": 31}
+
+    def build_info(self) -> dict[str, Any]:
+        self.calls.append(("build_info", ()))
         return {"app_version": "0.8.0"}
 
-    def get_status(self) -> dict[str, Any]:
-        self.calls.append(("get_status", ()))
+    def status(self) -> dict[str, Any]:
+        self.calls.append(("status", ()))
         return {
             "state": self.relay_state,
             "pulsing": 0,
@@ -72,6 +76,22 @@ class FakeRelayClient:
             "health_primary_reason": "comm_owner_timeout",
             "health_transitions": 3,
         }
+
+    def health(self) -> dict[str, Any]:
+        self.calls.append(("health", ()))
+        return {"health": "normal"}
+
+    def transport_status(self) -> dict[str, Any]:
+        self.calls.append(("transport_status", ()))
+        return {"transport": "usb_cdc_acm_smp"}
+
+    def safety(self) -> dict[str, Any]:
+        self.calls.append(("safety", ()))
+        return {"comm_loss_policy": "energized_only"}
+
+    def watchdog(self) -> dict[str, Any]:
+        self.calls.append(("watchdog", ()))
+        return {"watchdog_enabled": False}
 
     def get_relays(self, channel: int | None = None) -> dict[str, Any]:
         self.calls.append(("get_relays", (channel,)))
@@ -150,9 +170,9 @@ def test_parse_request_validation_errors() -> None:
     with pytest.raises(RelayProtocolError):
         parse_request_line(b"{", 1)
     with pytest.raises(RelayValidationError, match="id"):
-        parse_request_line(b'{"command":"info"}', 1)
+        parse_request_line(b'{"command":"identity"}', 1)
     with pytest.raises(RelayValidationError, match="id"):
-        parse_request_line(b'{"id":null,"command":"info"}', 1)
+        parse_request_line(b'{"id":null,"command":"identity"}', 1)
     with pytest.raises(RelayValidationError, match="unknown command"):
         parse_request_line(b'{"id":"1","command":"bogus"}', 1)
     with pytest.raises(RelayValidationError, match="channel"):
@@ -160,7 +180,7 @@ def test_parse_request_validation_errors() -> None:
 
 
 def test_parse_request_accepts_string_and_integer_ids() -> None:
-    assert parse_request_line(b'{"id":"abc","command":"info"}', 1).request_id == "abc"
+    assert parse_request_line(b'{"id":"abc","command":"identity"}', 1).request_id == "abc"
     assert parse_request_line(b'{"id":7,"command":"status"}', 2).request_id == 7
 
 
@@ -197,13 +217,13 @@ def test_config_from_args_keeps_raw_selector_flow() -> None:
     assert config.socket_path == "/tmp/relay.sock"
 
 
-def test_initial_connect_runs_info_then_status_without_off_all(tmp_path: Any) -> None:
+def test_initial_connect_runs_identity_then_status_without_off_all(tmp_path: Any) -> None:
     daemon = make_daemon(tmp_path)
 
     daemon._initial_connect()
 
     assert daemon.connected is True
-    assert FakeRelayClient.instances[0].calls == [("get_info", ()), ("get_status", ())]
+    assert FakeRelayClient.instances[0].calls == [("identity", ()), ("status", ())]
 
 
 def test_default_heartbeat_interval_is_fixed_2_5_seconds(tmp_path: Any) -> None:
@@ -221,8 +241,8 @@ def test_heartbeat_succeeds_silently_while_connected(tmp_path: Any) -> None:
     assert daemon.connected is True
     assert daemon.last_error is None
     assert FakeRelayClient.instances[0].calls == [
-        ("get_info", ()),
-        ("get_status", ()),
+        ("identity", ()),
+        ("status", ()),
         ("heartbeat", ()),
     ]
 
@@ -321,9 +341,9 @@ def test_readiness_protocol_mismatch_is_configuration_error(tmp_path: Any) -> No
     FakeRelayClient.fail_info = None
 
     class ProtocolMismatchClient(FakeRelayClient):
-        def get_info(self) -> dict[str, Any]:
-            self.calls.append(("get_info", ()))
-            return {"protocol_version": 99, "relay_count": 6}
+        def identity(self) -> dict[str, Any]:
+            self.calls.append(("identity", ()))
+            return {"protocol_version": 99, "command_model_version": 2, "relay_count": 6}
 
     daemon.client_factory = ProtocolMismatchClient.connect
 

@@ -16,7 +16,12 @@ from rp2350_relay_6ch import (
     RelayTransportError,
     RelayValidationError,
 )
-from rp2350_relay_6ch.constants import PROTOCOL_VERSION, RELAY_COUNT, RELAY_MASK
+from rp2350_relay_6ch.constants import (
+    COMMAND_MODEL_VERSION,
+    PROTOCOL_VERSION,
+    RELAY_COUNT,
+    RELAY_MASK,
+)
 from rp2350_relay_6ch.session import run_session
 from rp2350_relay_6ch.smoke import run_smoke_sequence
 
@@ -38,10 +43,14 @@ def _client(args: argparse.Namespace) -> RelayClient:
 
 
 def _validate_protocol(client: RelayClient) -> None:
-    info = client.get_info()
-    if info.get("protocol_version") != PROTOCOL_VERSION:
+    identity = client.identity()
+    if identity.get("protocol_version") != PROTOCOL_VERSION:
         raise RelayProtocolError(
-            f"unexpected relay protocol version {info.get('protocol_version')}"
+            f"unexpected relay protocol version {identity.get('protocol_version')}"
+        )
+    if identity.get("command_model_version") != COMMAND_MODEL_VERSION:
+        raise RelayProtocolError(
+            f"unexpected relay command model version {identity.get('command_model_version')}"
         )
 
 
@@ -164,7 +173,7 @@ def _format_human_value(value: object) -> object:
 
 
 def _format_human(command: str, payload: dict[str, Any]) -> str:
-    if command == "info":
+    if command in {"identity", "capabilities", "health", "transport", "safety", "watchdog"}:
         return _format_key_values(payload)
 
     if command == "get" and "channel" in payload:
@@ -238,15 +247,20 @@ def _require_port(args: argparse.Namespace) -> None:
         raise RelayValidationError("--port is required")
 
 
-def cmd_info(args: argparse.Namespace) -> dict[str, Any]:
+def cmd_identity(args: argparse.Namespace) -> dict[str, Any]:
     _require_port(args)
-    return _client(args).get_info()
+    return _client(args).identity()
+
+
+def cmd_capabilities(args: argparse.Namespace) -> dict[str, Any]:
+    _require_port(args)
+    return _client(args).capabilities()
 
 
 def cmd_build_info(args: argparse.Namespace) -> dict[str, Any]:
     _require_port(args)
     with _ready_client(args) as client:
-        return client.get_build_info()
+        return client.build_info()
 
 
 def cmd_get(args: argparse.Namespace) -> dict[str, Any]:
@@ -282,7 +296,31 @@ def cmd_off_all(args: argparse.Namespace) -> dict[str, Any]:
 def cmd_status(args: argparse.Namespace) -> dict[str, Any]:
     _require_port(args)
     with _ready_client(args) as client:
-        return client.get_status()
+        return client.status()
+
+
+def cmd_health(args: argparse.Namespace) -> dict[str, Any]:
+    _require_port(args)
+    with _ready_client(args) as client:
+        return client.health()
+
+
+def cmd_transport(args: argparse.Namespace) -> dict[str, Any]:
+    _require_port(args)
+    with _ready_client(args) as client:
+        return client.transport_status()
+
+
+def cmd_safety(args: argparse.Namespace) -> dict[str, Any]:
+    _require_port(args)
+    with _ready_client(args) as client:
+        return client.safety()
+
+
+def cmd_watchdog(args: argparse.Namespace) -> dict[str, Any]:
+    _require_port(args)
+    with _ready_client(args) as client:
+        return client.watchdog()
 
 
 def cmd_reboot(args: argparse.Namespace) -> dict[str, Any]:
@@ -298,7 +336,8 @@ def cmd_smoke(args: argparse.Namespace) -> dict[str, Any]:
 
 
 COMMANDS = {
-    "info": cmd_info,
+    "identity": cmd_identity,
+    "capabilities": cmd_capabilities,
     "build-info": cmd_build_info,
     "get": cmd_get,
     "set": cmd_set,
@@ -306,6 +345,10 @@ COMMANDS = {
     "pulse": cmd_pulse,
     "off-all": cmd_off_all,
     "status": cmd_status,
+    "health": cmd_health,
+    "transport": cmd_transport,
+    "safety": cmd_safety,
+    "watchdog": cmd_watchdog,
     "reboot": cmd_reboot,
     "smoke": cmd_smoke,
 }
@@ -329,7 +372,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    subparsers.add_parser("info", help="print relay controller information")
+    subparsers.add_parser("identity", help="print relay controller identity")
+    subparsers.add_parser("capabilities", help="print relay controller capabilities")
     subparsers.add_parser("build-info", help="print firmware build information")
 
     get_parser = subparsers.add_parser("get", help="get relay state")
@@ -348,6 +392,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("off-all", help="turn every relay off")
     subparsers.add_parser("status", help="print relay controller status")
+    subparsers.add_parser("health", help="print relay health details")
+    subparsers.add_parser("transport", help="print transport details")
+    subparsers.add_parser("safety", help="print safety policy details")
+    subparsers.add_parser("watchdog", help="print watchdog details")
     subparsers.add_parser("reboot", help="request a firmware reboot")
 
     smoke_parser = subparsers.add_parser("smoke", help="pulse each relay and turn all off")

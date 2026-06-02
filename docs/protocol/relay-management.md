@@ -14,7 +14,8 @@ Firmware tests continue to exercise the management group handlers on
 ## SMP Group
 
 - Group ID: `64`
-- Protocol version: `5`
+- Protocol version: `7`
+- Command model version: `2`
 - Hardware name: `Waveshare RP2350-Relay-6CH`
 - Relay channel indexes: zero-based, `0` through `5`
 - Relay state masks: bit `0` is `CH1`, bit `5` is `CH6`
@@ -23,21 +24,39 @@ Firmware tests continue to exercise the management group handlers on
 
 | ID | Name | SMP op | Purpose |
 | ---: | --- | --- | --- |
-| 0 | `info` | Read | Return protocol, firmware, hardware, and capability metadata. |
-| 1 | `get` | Read | Return all relay states, or one relay when `channel` is provided. |
-| 2 | `set` | Write | Set one relay on or off. |
-| 3 | `set_all` | Write | Set all relay states from one mask. |
-| 4 | `pulse` | Write | Pulse one relay for a bounded duration. |
-| 5 | `off_all` | Write | Cancel pulses and turn every relay off. |
-| 6 | `status` | Read | Return relay state, uptime, and protocol counters. |
-| 7 | `reboot` | Write | Request controlled reboot when Zephyr reboot support is enabled. |
-| 8 | `build_info` | Read | Return firmware build identity and traceability metadata. |
-| 9 | `heartbeat` | Write | Renew the communication-loss lease and return a liveness acknowledgement. |
-| 10 | `event` | Device-originated `Write Response` | Reserved best-effort asynchronous event frame. |
+| 0x00 | `identity` | Read | Return protocol, command model, hardware, and relay-count identity. |
+| 0x01 | `capabilities` | Read | Return operation capabilities and pulse bounds. |
+| 0x02 | `build_info` | Read | Return firmware build identity and traceability metadata. |
+| 0x10 | `get` | Read | Return all relay states, or one relay when `channel` is provided. |
+| 0x11 | `status` | Read | Return concise operator relay state, health, and uptime. |
+| 0x12 | `health` | Read | Return detailed health state and reasons. |
+| 0x13 | `transport` | Read | Return transport configuration and status. |
+| 0x14 | `safety` | Read | Return communication-loss safety policy. |
+| 0x15 | `watchdog` | Read | Return watchdog configuration and health. |
+| 0x20 | `set` | Write | Set one relay on or off. |
+| 0x21 | `set_all` | Write | Set all relay states from one mask. |
+| 0x22 | `pulse` | Write | Pulse one relay for a bounded duration. |
+| 0x23 | `off_all` | Write | Cancel pulses and turn every relay off. |
+| 0x30 | `heartbeat` | Write | Renew the communication-loss lease and return a liveness acknowledgement. |
+| 0x40 | `reboot` | Write | Request controlled reboot when Zephyr reboot support is enabled. |
+| 0x7f | `event` | Device-originated `Write Response` | Reserved best-effort asynchronous event frame. |
 
-Protocol version `5` is request/response only and adds communication-loss
-policy fields and lease behavior. Hosts must treat `event` as unavailable and
-use normal command responses and reconnect/status checks.
+### Role Command Model
+
+| Role | IDs | Commands | Host-callable | Purpose |
+| --- | --- | --- | --- | --- |
+| Identity | `0x00`-`0x02` | `identity`, `capabilities`, `build_info` | Yes | Describe the device, supported operations, and firmware build without reading or changing relay state. |
+| Observation | `0x10`-`0x15` | `get`, `status`, `health`, `transport`, `safety`, `watchdog` | Yes | Read relay state and role-specific operational details without claiming ownership or changing outputs. |
+| Control | `0x20`-`0x23` | `set`, `set_all`, `pulse`, `off_all` | Yes | Change relay outputs or cancel active pulse work. |
+| Ownership | `0x30` | `heartbeat` | Yes | Renew host ownership and the communication-loss lease without changing relay outputs. |
+| Maintenance | `0x40` | `reboot` | Yes | Request a controlled firmware reboot when reboot support is enabled. |
+| Reserved event | `0x7f` | `event` | No | Reserve a device-originated asynchronous event frame; hosts must not send requests to this command. |
+
+Protocol version `7` groups command IDs by command-model role: identity,
+observation, control, ownership, and maintenance. Control commands keep their
+original CBOR request and response definitions; only their wire command IDs
+move into the control range. Hosts must treat `event` as unavailable and use
+normal command responses and reconnect/status checks.
 
 ## Error Codes
 
@@ -64,7 +83,7 @@ Relay group errors are returned with Zephyr SMP v2 group error payloads:
 
 ## Request And Response Fields
 
-### `info`
+### `identity`
 
 Request: empty CBOR map.
 
@@ -73,18 +92,21 @@ Response:
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `protocol_version` | uint | Relay protocol version. |
+| `command_model_version` | uint | Protocol-independent command model version. |
 | `hardware` | text | Hardware name. |
 | `relay_count` | uint | Number of relays, currently `6`. |
+
+### `capabilities`
+
+Request: empty CBOR map.
+
+Response:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
 | `pulse_min_ms` | uint | Minimum pulse duration. |
 | `pulse_max_ms` | uint | Maximum pulse duration. |
-| `comm_loss_policy` | text | Communication-loss policy string. |
-| `comm_loss_timeout_ms` | uint | Firmware communication-loss all-off timeout. `0` means no firmware timeout. |
-| `comm_loss_reboot_on_timeout` | bool | Whether the active communication-loss policy schedules firmware reboot after timeout. |
-| `comm_loss_reboot_delay_ms` | uint | Delay from communication-loss all-off to autonomous reboot. `0` means no autonomous reboot is scheduled. |
 | `capabilities` | uint | Capability bit mask for get, set, set-all, pulse, and off-all. |
-
-Policy strings are `energized-only`, `no-comm-timeout`, and
-`always-on-owner`.
 
 ### `build_info`
 
@@ -173,19 +195,72 @@ Response:
 | --- | --- | --- |
 | `state` | uint | Current relay state mask. |
 | `pulsing` | uint | Current pulse-active relay mask. |
+| `health` | text | Health state name. |
+| `health_reasons` | uint | Health reason bit mask. |
+| `health_primary_reason` | text | Primary health reason name. |
+| `health_transitions` | uint | Health state transition count. |
+| `uptime_ms` | uint | Zephyr uptime in milliseconds. |
+
+`status` is an operator overview. It intentionally excludes transport,
+safety-policy, watchdog, and command-counter fields; use the role-specific
+read commands below for those details.
+
+### `health`
+
+Request: empty CBOR map.
+
+Response:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `health` | text | Health state name. |
+| `health_reasons` | uint | Health reason bit mask. |
+| `health_primary_reason` | text | Primary health reason name. |
+| `health_transitions` | uint | Health state transition count. |
+
+### `transport`
+
+Request: empty CBOR map.
+
+Response:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
 | `transport` | text | Transport name, currently `usb_cdc_acm_smp`. |
 | `usb_cdc_acm` | bool | Whether USB CDC ACM serial support is compiled in. |
 | `smp_uart` | bool | Whether Zephyr's SMP UART transport is compiled in. |
+
+### `safety`
+
+Request: empty CBOR map.
+
+Response:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
 | `comm_loss_policy` | text | Communication-loss policy string. |
 | `comm_loss_timeout_ms` | uint | Firmware communication-loss all-off timeout. `0` means no firmware timeout. |
 | `comm_loss_reboot_on_timeout` | bool | Whether the active communication-loss policy schedules firmware reboot after timeout. |
 | `comm_loss_reboot_delay_ms` | uint | Delay from communication-loss all-off to autonomous reboot. `0` means no autonomous reboot is scheduled. |
-| `uptime_ms` | uint | Zephyr uptime in milliseconds. |
-| `received` | uint | Commands received, including this status command. |
-| `succeeded` | uint | Commands completed before this status response is encoded. |
-| `decode_errors` | uint | Decode error count. |
-| `invalid_args` | uint | Invalid argument error count. |
-| `busy` | uint | Busy response count. |
+
+Policy strings are `energized-only`, `no-comm-timeout`, and
+`always-on-owner`.
+
+### `watchdog`
+
+Request: empty CBOR map.
+
+Response:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `watchdog_enabled` | bool | Whether watchdog supervision is active. |
+| `watchdog_healthy` | bool | Whether watchdog supervision is currently healthy. |
+| `watchdog_timeout_ms` | uint | Configured watchdog timeout. |
+| `watchdog_feed_interval_ms` | uint | Configured watchdog feed interval. |
+| `watchdog_feeds` | uint | Successful watchdog feed count. |
+| `watchdog_feed_errors` | uint | Watchdog feed error count. |
+| `last_reset_watchdog` | bool | Whether the previous reset was watchdog-caused. |
 
 ### `reboot`
 
@@ -214,18 +289,14 @@ Response:
 | Field | Type | Meaning |
 | --- | --- | --- |
 | `ok` | bool | Present and true when the heartbeat request was accepted. |
-| `comm_loss_policy` | text | Communication-loss policy string. |
-| `comm_loss_timeout_ms` | uint | Firmware communication-loss all-off timeout. `0` means no firmware timeout. |
-| `comm_loss_reboot_on_timeout` | bool | Whether the active communication-loss policy schedules firmware reboot after timeout. |
-| `comm_loss_reboot_delay_ms` | uint | Delay from communication-loss all-off to autonomous reboot. `0` means no autonomous reboot is scheduled. |
 
-In protocol `5`, `heartbeat` renews the firmware communication-loss lease when
+In protocol `7`, `heartbeat` renews the firmware communication-loss lease when
 the active policy uses a timeout. It does not change relay outputs directly,
 emit events, expose heartbeat health state, or persist relay state.
 
 ## Communication-Loss Safety
 
-Protocol `5` defines build-time communication-loss policies:
+Protocol `7` defines build-time communication-loss policies:
 
 - `energized-only`: the timeout is armed or renewed by successful relay-control
   commands that leave any relay on or pulsing, and by `heartbeat` while relays
@@ -257,14 +328,14 @@ is not delayed by `comm_loss_reboot_delay_ms`.
 
 `event` is reserved for future best-effort device-originated notifications. It
 is not a host request command, and hosts must not send `Read` or `Write`
-requests to command ID `10`.
+requests to command ID `0x7f`.
 
 Event frame convention:
 
 | SMP field | Value |
 | --- | --- |
 | Group | `64` |
-| Command ID | `10` |
+| Command ID | `0x7f` |
 | Operation | `Write Response` |
 | Sequence | `0xff` |
 | Payload | CBOR map |

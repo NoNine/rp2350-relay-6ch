@@ -10,9 +10,11 @@ from .constants import RELAY_COUNT
 
 
 class SmokeRelayClient(Protocol):
-    def get_info(self) -> dict[str, Any]: ...
+    def identity(self) -> dict[str, Any]: ...
 
-    def get_status(self) -> dict[str, Any]: ...
+    def capabilities(self) -> dict[str, Any]: ...
+
+    def status(self) -> dict[str, Any]: ...
 
     def pulse_relay(self, channel: int, duration_ms: int) -> dict[str, Any]: ...
 
@@ -30,8 +32,9 @@ def run_smoke_sequence(
     results: list[dict[str, Any]] = []
     final: dict[str, Any] | None = None
     try:
-        results.append({"command": "info", "response": client.get_info()})
-        results.append({"command": "status", "response": client.get_status()})
+        results.append({"command": "identity", "response": client.identity()})
+        results.append({"command": "capabilities", "response": client.capabilities()})
+        results.append({"command": "status", "response": client.status()})
         for channel in range(RELAY_COUNT):
             label = f"CH{channel + 1}"
             results.append(

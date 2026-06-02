@@ -8,10 +8,13 @@ import pytest
 from rp2350_relay_6ch import RelayClient, SerialSmpTransport, SimulatedPacketTransport
 from rp2350_relay_6ch.constants import (
     CMD_BUILD_INFO,
+    CMD_CAPABILITIES,
     CMD_GET,
     CMD_HEARTBEAT,
-    CMD_INFO,
+    CMD_HEALTH,
+    CMD_IDENTITY,
     CMD_PULSE,
+    CMD_SAFETY,
     CMD_SET,
     CMD_SET_ALL,
     ERR_BUSY,
@@ -19,7 +22,12 @@ from rp2350_relay_6ch.constants import (
     GROUP_RELAY,
     OP_READ_RSP,
     OP_WRITE_RSP,
+    COMMAND_MODEL_VERSION,
     DEVICE_ERROR_NAMES,
+    PROTOCOL_VERSION,
+    CMD_STATUS,
+    CMD_TRANSPORT,
+    CMD_WATCHDOG,
 )
 from rp2350_relay_6ch.exceptions import (
     RelayDeviceError,
@@ -159,13 +167,60 @@ def test_smp_package_encodes_serial_frames() -> None:
     assert frames[0].startswith(b"\x06\x09")
 
 
-def test_get_info_returns_decoded_success_response() -> None:
-    transport = SimulatedPacketTransport(
-        [response(CMD_INFO, 0, {"protocol_version": 6, "relay_count": 6})]
-    )
+def test_get_info_is_not_part_of_role_oriented_host_api() -> None:
+    assert not hasattr(RelayClient(SimulatedPacketTransport()), "get_info")
+
+
+@pytest.mark.parametrize(
+    ("method_name", "command", "payload"),
+    [
+        (
+            "identity",
+            CMD_IDENTITY,
+            {"protocol_version": 7, "command_model_version": 2, "relay_count": 6},
+        ),
+        ("capabilities", CMD_CAPABILITIES, {"capabilities": 31}),
+        ("build_info", CMD_BUILD_INFO, {"app_version": "0.8.0"}),
+        ("status", CMD_STATUS, {"state": 0, "pulsing": 0, "health": "normal"}),
+        ("health", CMD_HEALTH, {"health": "normal"}),
+        ("transport_status", CMD_TRANSPORT, {"transport": "usb_cdc_acm_smp"}),
+        ("safety", CMD_SAFETY, {"comm_loss_policy": "energized_only"}),
+        ("watchdog", CMD_WATCHDOG, {"watchdog_enabled": False}),
+    ],
+)
+def test_role_read_methods_each_send_one_read_request(
+    method_name: str,
+    command: int,
+    payload: dict[str, object],
+) -> None:
+    transport = SimulatedPacketTransport([response(command, 0, payload)])
     client = RelayClient(transport)
 
-    assert client.get_info() == {"protocol_version": 6, "relay_count": 6}
+    assert getattr(client, method_name)() == payload
+
+    assert len(transport.requests) == 1
+    packet = decode_packet(transport.requests[0])
+    assert packet.op == 0
+    assert packet.command == command
+    assert request_payload(transport) == {}
+
+
+def test_protocol_7_command_ids_are_grouped_by_role() -> None:
+    assert PROTOCOL_VERSION == 7
+    assert COMMAND_MODEL_VERSION == 2
+    assert CMD_IDENTITY == 0x00
+    assert CMD_CAPABILITIES == 0x01
+    assert CMD_BUILD_INFO == 0x02
+    assert CMD_GET == 0x10
+    assert CMD_STATUS == 0x11
+    assert CMD_HEALTH == 0x12
+    assert CMD_TRANSPORT == 0x13
+    assert CMD_SAFETY == 0x14
+    assert CMD_WATCHDOG == 0x15
+    assert CMD_SET == 0x20
+    assert CMD_SET_ALL == 0x21
+    assert CMD_PULSE == 0x22
+    assert CMD_HEARTBEAT == 0x30
 
 
 def test_heartbeat_sends_write_request_with_empty_payload() -> None:
@@ -179,27 +234,6 @@ def test_heartbeat_sends_write_request_with_empty_payload() -> None:
     packet = decode_packet(transport.requests[0])
     assert packet.op == 2
     assert packet.command == CMD_HEARTBEAT
-    assert request_payload(transport) == {}
-
-
-def test_get_build_info_sends_read_request() -> None:
-    payload = {
-        "app_version": "0.6.0",
-        "zephyr_version": "4.2.0",
-        "board": "native_sim",
-        "git_commit": "abcdef123456",
-        "git_dirty": False,
-        "build_timestamp": "2026-05-18T08:00:00+08:00",
-        "compiler": "GNU 13.3.0",
-    }
-    transport = SimulatedPacketTransport([response(CMD_BUILD_INFO, 0, payload)])
-    client = RelayClient(transport)
-
-    assert client.get_build_info() == payload
-
-    packet = decode_packet(transport.requests[0])
-    assert packet.op == 0
-    assert packet.command == CMD_BUILD_INFO
     assert request_payload(transport) == {}
 
 

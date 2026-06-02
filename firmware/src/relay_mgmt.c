@@ -146,7 +146,7 @@ static bool encode_state(zcbor_state_t *zse)
 	       zcbor_uint32_put(zse, pulse_mask);
 }
 
-static bool encode_health_status(zcbor_state_t *zse,
+static bool encode_health_fields(zcbor_state_t *zse,
 				 const struct health_snapshot *snapshot)
 {
 	const char *health = health_state_name(snapshot->state);
@@ -160,11 +160,7 @@ static bool encode_health_status(zcbor_state_t *zse,
 		.len = strlen(primary_reason),
 	};
 
-	return zcbor_tstr_put_lit(zse, "state") &&
-	       zcbor_uint32_put(zse, snapshot->relay_state_mask) &&
-	       zcbor_tstr_put_lit(zse, "pulsing") &&
-	       zcbor_uint32_put(zse, snapshot->pulse_mask) &&
-	       zcbor_tstr_put_lit(zse, "health") &&
+	return zcbor_tstr_put_lit(zse, "health") &&
 	       zcbor_tstr_encode(zse, &health_string) &&
 	       zcbor_tstr_put_lit(zse, "health_reasons") &&
 	       zcbor_uint32_put(zse, snapshot->reasons) &&
@@ -281,7 +277,7 @@ static bool validate_request_map(zcbor_state_t *zsd)
 	return decode_request(zsd, fields, ARRAY_SIZE(fields));
 }
 
-static int info_handler(struct smp_streamer *ctxt)
+static int identity_handler(struct smp_streamer *ctxt)
 {
 	zcbor_state_t *zsd = ctxt->reader->zs;
 	zcbor_state_t *zse = ctxt->writer->zs;
@@ -295,15 +291,38 @@ static int info_handler(struct smp_streamer *ctxt)
 
 	ok = zcbor_tstr_put_lit(zse, "protocol_version") &&
 	     zcbor_uint32_put(zse, RP2350_RELAY_6CH_MGMT_PROTOCOL_VERSION) &&
+	     zcbor_tstr_put_lit(zse, "command_model_version") &&
+	     zcbor_uint32_put(zse, RP2350_RELAY_6CH_MGMT_COMMAND_MODEL_VERSION) &&
 	     zcbor_tstr_put_lit(zse, "hardware") &&
 	     zcbor_tstr_put_lit(zse, RP2350_RELAY_6CH_HARDWARE_NAME) &&
 	     zcbor_tstr_put_lit(zse, "relay_count") &&
-	     zcbor_uint32_put(zse, RP2350_RELAY_6CH_CHANNEL_COUNT) &&
-	     zcbor_tstr_put_lit(zse, "pulse_min_ms") &&
+	     zcbor_uint32_put(zse, RP2350_RELAY_6CH_CHANNEL_COUNT);
+
+	if (!ok) {
+		return MGMT_ERR_EMSGSIZE;
+	}
+
+	counter_inc(RELAY_MGMT_COUNTER_SUCCEEDED);
+	indicator_record_command(INDICATOR_COMMAND_ACCEPTED);
+	return MGMT_ERR_EOK;
+}
+
+static int capabilities_handler(struct smp_streamer *ctxt)
+{
+	zcbor_state_t *zsd = ctxt->reader->zs;
+	zcbor_state_t *zse = ctxt->writer->zs;
+	bool ok;
+
+	counter_inc(RELAY_MGMT_COUNTER_RECEIVED);
+
+	if (!validate_request_map(zsd)) {
+		return error_response(zse, RP2350_RELAY_6CH_MGMT_ERR_DECODE);
+	}
+
+	ok = zcbor_tstr_put_lit(zse, "pulse_min_ms") &&
 	     zcbor_uint32_put(zse, RP2350_RELAY_6CH_PULSE_MIN_MS) &&
 	     zcbor_tstr_put_lit(zse, "pulse_max_ms") &&
 	     zcbor_uint32_put(zse, RP2350_RELAY_6CH_PULSE_MAX_MS) &&
-	     encode_comm_loss_policy(zse) &&
 	     zcbor_tstr_put_lit(zse, "capabilities") &&
 	     zcbor_uint32_put(zse, BIT(0) | BIT(1) | BIT(2) | BIT(3) | BIT(4));
 
@@ -499,26 +518,98 @@ static int status_handler(struct smp_streamer *ctxt)
 
 	health_snapshot(&snapshot);
 
-	ok = encode_health_status(zse, &snapshot) &&
-	     encode_watchdog_status(zse) &&
-	     encode_transport_status(zse) &&
-	     encode_comm_loss_policy(zse) &&
+	ok = zcbor_tstr_put_lit(zse, "state") &&
+	     zcbor_uint32_put(zse, snapshot.relay_state_mask) &&
+	     zcbor_tstr_put_lit(zse, "pulsing") &&
+	     zcbor_uint32_put(zse, snapshot.pulse_mask) &&
+	     encode_health_fields(zse, &snapshot) &&
 	     zcbor_tstr_put_lit(zse, "uptime_ms") &&
-	     zcbor_uint64_put(zse, k_uptime_get()) &&
-	     zcbor_tstr_put_lit(zse, "received") &&
-	     zcbor_uint32_put(zse, (uint32_t)atomic_get(&counters[RELAY_MGMT_COUNTER_RECEIVED])) &&
-	     zcbor_tstr_put_lit(zse, "succeeded") &&
-	     zcbor_uint32_put(zse, (uint32_t)atomic_get(&counters[RELAY_MGMT_COUNTER_SUCCEEDED])) &&
-	     zcbor_tstr_put_lit(zse, "decode_errors") &&
-	     zcbor_uint32_put(zse,
-			      (uint32_t)atomic_get(&counters[RELAY_MGMT_COUNTER_DECODE_ERRORS])) &&
-	     zcbor_tstr_put_lit(zse, "invalid_args") &&
-	     zcbor_uint32_put(zse,
-			      (uint32_t)atomic_get(&counters[RELAY_MGMT_COUNTER_INVALID_ARGS])) &&
-	     zcbor_tstr_put_lit(zse, "busy") &&
-	     zcbor_uint32_put(zse, (uint32_t)atomic_get(&counters[RELAY_MGMT_COUNTER_BUSY]));
+	     zcbor_uint64_put(zse, k_uptime_get());
 
 	if (!ok) {
+		return MGMT_ERR_EMSGSIZE;
+	}
+
+	counter_inc(RELAY_MGMT_COUNTER_SUCCEEDED);
+	indicator_record_command(INDICATOR_COMMAND_ACCEPTED);
+	return MGMT_ERR_EOK;
+}
+
+static int health_handler(struct smp_streamer *ctxt)
+{
+	zcbor_state_t *zsd = ctxt->reader->zs;
+	zcbor_state_t *zse = ctxt->writer->zs;
+	struct health_snapshot snapshot;
+
+	counter_inc(RELAY_MGMT_COUNTER_RECEIVED);
+
+	if (!validate_request_map(zsd)) {
+		return error_response(zse, RP2350_RELAY_6CH_MGMT_ERR_DECODE);
+	}
+
+	health_snapshot(&snapshot);
+
+	if (!encode_health_fields(zse, &snapshot)) {
+		return MGMT_ERR_EMSGSIZE;
+	}
+
+	counter_inc(RELAY_MGMT_COUNTER_SUCCEEDED);
+	indicator_record_command(INDICATOR_COMMAND_ACCEPTED);
+	return MGMT_ERR_EOK;
+}
+
+static int transport_handler(struct smp_streamer *ctxt)
+{
+	zcbor_state_t *zsd = ctxt->reader->zs;
+	zcbor_state_t *zse = ctxt->writer->zs;
+
+	counter_inc(RELAY_MGMT_COUNTER_RECEIVED);
+
+	if (!validate_request_map(zsd)) {
+		return error_response(zse, RP2350_RELAY_6CH_MGMT_ERR_DECODE);
+	}
+
+	if (!encode_transport_status(zse)) {
+		return MGMT_ERR_EMSGSIZE;
+	}
+
+	counter_inc(RELAY_MGMT_COUNTER_SUCCEEDED);
+	indicator_record_command(INDICATOR_COMMAND_ACCEPTED);
+	return MGMT_ERR_EOK;
+}
+
+static int safety_handler(struct smp_streamer *ctxt)
+{
+	zcbor_state_t *zsd = ctxt->reader->zs;
+	zcbor_state_t *zse = ctxt->writer->zs;
+
+	counter_inc(RELAY_MGMT_COUNTER_RECEIVED);
+
+	if (!validate_request_map(zsd)) {
+		return error_response(zse, RP2350_RELAY_6CH_MGMT_ERR_DECODE);
+	}
+
+	if (!encode_comm_loss_policy(zse)) {
+		return MGMT_ERR_EMSGSIZE;
+	}
+
+	counter_inc(RELAY_MGMT_COUNTER_SUCCEEDED);
+	indicator_record_command(INDICATOR_COMMAND_ACCEPTED);
+	return MGMT_ERR_EOK;
+}
+
+static int watchdog_handler(struct smp_streamer *ctxt)
+{
+	zcbor_state_t *zsd = ctxt->reader->zs;
+	zcbor_state_t *zse = ctxt->writer->zs;
+
+	counter_inc(RELAY_MGMT_COUNTER_RECEIVED);
+
+	if (!validate_request_map(zsd)) {
+		return error_response(zse, RP2350_RELAY_6CH_MGMT_ERR_DECODE);
+	}
+
+	if (!encode_watchdog_status(zse)) {
 		return MGMT_ERR_EMSGSIZE;
 	}
 
@@ -660,8 +751,7 @@ static int heartbeat_handler(struct smp_streamer *ctxt)
 	relay_comm_loss_renew();
 
 	ok = zcbor_tstr_put_lit(zse, "ok") &&
-	     zcbor_bool_put(zse, true) &&
-	     encode_comm_loss_policy(zse);
+	     zcbor_bool_put(zse, true);
 	if (!ok) {
 		return MGMT_ERR_EMSGSIZE;
 	}
@@ -672,8 +762,12 @@ static int heartbeat_handler(struct smp_streamer *ctxt)
 }
 
 static const struct mgmt_handler relay_mgmt_handlers[] = {
-	[RP2350_RELAY_6CH_MGMT_CMD_INFO] = {
-		.mh_read = info_handler,
+	[RP2350_RELAY_6CH_MGMT_CMD_IDENTITY] = {
+		.mh_read = identity_handler,
+		.mh_write = NULL,
+	},
+	[RP2350_RELAY_6CH_MGMT_CMD_CAPABILITIES] = {
+		.mh_read = capabilities_handler,
 		.mh_write = NULL,
 	},
 	[RP2350_RELAY_6CH_MGMT_CMD_GET] = {
@@ -698,6 +792,22 @@ static const struct mgmt_handler relay_mgmt_handlers[] = {
 	},
 	[RP2350_RELAY_6CH_MGMT_CMD_STATUS] = {
 		.mh_read = status_handler,
+		.mh_write = NULL,
+	},
+	[RP2350_RELAY_6CH_MGMT_CMD_HEALTH] = {
+		.mh_read = health_handler,
+		.mh_write = NULL,
+	},
+	[RP2350_RELAY_6CH_MGMT_CMD_TRANSPORT] = {
+		.mh_read = transport_handler,
+		.mh_write = NULL,
+	},
+	[RP2350_RELAY_6CH_MGMT_CMD_SAFETY] = {
+		.mh_read = safety_handler,
+		.mh_write = NULL,
+	},
+	[RP2350_RELAY_6CH_MGMT_CMD_WATCHDOG] = {
+		.mh_read = watchdog_handler,
 		.mh_write = NULL,
 	},
 	[RP2350_RELAY_6CH_MGMT_CMD_REBOOT] = {

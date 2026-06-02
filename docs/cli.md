@@ -53,7 +53,7 @@ Windows PowerShell with `pipx`:
 python -m pip install --user pipx
 python -m pipx ensurepath
 python -m pipx install .\rp2350_relay_6ch-<version>-py3-none-any.whl
-rp2350-relay --port <serial-port> info
+rp2350-relay --port <serial-port> identity
 ```
 
 Linux shell with `pipx`:
@@ -62,7 +62,7 @@ Linux shell with `pipx`:
 python3 -m pip install --user pipx
 python3 -m pipx ensurepath
 python3 -m pipx install ./rp2350_relay_6ch-<version>-py3-none-any.whl
-rp2350-relay --port <serial-port> info
+rp2350-relay --port <serial-port> identity
 ```
 
 Open a new terminal after `pipx ensurepath` if `rp2350-relay` is not found.
@@ -79,7 +79,7 @@ to provide an operator-local Python 3.12 environment:
 conda create -n rp2350-relay python=3.12
 conda activate rp2350-relay
 python -m pip install ./rp2350_relay_6ch-<version>-py3-none-any.whl
-rp2350-relay --port <serial-port> info
+rp2350-relay --port <serial-port> identity
 ```
 
 If a separate Python 3.12 or newer binary is already available, a local venv is
@@ -89,7 +89,7 @@ also supported:
 /path/to/python3.12 -m venv ~/.venvs/rp2350-relay
 . ~/.venvs/rp2350-relay/bin/activate
 python -m pip install ./rp2350_relay_6ch-<version>-py3-none-any.whl
-rp2350-relay --port <serial-port> info
+rp2350-relay --port <serial-port> identity
 ```
 
 Run a smoke test after installing the CLI and flashing the matching firmware:
@@ -111,7 +111,7 @@ CLI and its Python dependencies, but it is not the primary install path.
 Windows PowerShell:
 
 ```powershell
-.\rp2350_relay_6ch-<version>-windows-x64.exe --port <serial-port> info
+.\rp2350_relay_6ch-<version>-windows-x64.exe --port <serial-port> identity
 .\rp2350_relay_6ch-<version>-windows-x64.exe --port <serial-port> smoke
 ```
 
@@ -119,7 +119,7 @@ Linux shell:
 
 ```sh
 chmod +x ./rp2350_relay_6ch-<version>-linux-x64
-./rp2350_relay_6ch-<version>-linux-x64 --port <serial-port> info
+./rp2350_relay_6ch-<version>-linux-x64 --port <serial-port> identity
 ./rp2350_relay_6ch-<version>-linux-x64 --port <serial-port> smoke
 ```
 
@@ -149,7 +149,7 @@ Fully log out and log back in, then verify `dialout` appears:
 
 ```sh
 groups
-rp2350-relay --port <serial-port> info
+rp2350-relay --port <serial-port> identity
 ```
 
 For a temporary local workaround, grant access to the current device node:
@@ -261,7 +261,8 @@ Use `rp2350-relayctl` for daemon-client commands:
 
 ```sh
 rp2350-relayctl --socket "$SOCKET" daemon-status
-rp2350-relayctl --socket "$SOCKET" info
+rp2350-relayctl --socket "$SOCKET" identity
+rp2350-relayctl --socket "$SOCKET" capabilities
 rp2350-relayctl --socket "$SOCKET" status
 rp2350-relayctl --socket "$SOCKET" pulse 1 100
 rp2350-relayctl --socket "$SOCKET" off-all
@@ -316,7 +317,8 @@ log troubleshooting notes in
 
 ```sh
 rp2350-relay session
-rp2350-relay --port <serial-port> info
+rp2350-relay --port <serial-port> identity
+rp2350-relay --port <serial-port> capabilities
 rp2350-relay --port <serial-port> build-info
 rp2350-relay --port <serial-port> get
 rp2350-relay --port <serial-port> get 1
@@ -326,6 +328,10 @@ rp2350-relay --port <serial-port> set-all 0x21
 rp2350-relay --port <serial-port> pulse 1 100
 rp2350-relay --port <serial-port> off-all
 rp2350-relay --port <serial-port> status
+rp2350-relay --port <serial-port> health
+rp2350-relay --port <serial-port> transport
+rp2350-relay --port <serial-port> safety
+rp2350-relay --port <serial-port> watchdog
 rp2350-relay --port <serial-port> reboot
 rp2350-relay --port <serial-port> smoke --pulse-ms 1000
 ```
