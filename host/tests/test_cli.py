@@ -19,7 +19,7 @@ class FakeClient:
     failure: Exception | None = None
     relay_state = 0x21
     relay_pulsing = 0
-    protocol_version = 5
+    protocol_version = 6
 
     def __init__(
         self,
@@ -141,7 +141,7 @@ def fake_client(monkeypatch: pytest.MonkeyPatch) -> None:
     FakeClient.failure = None
     FakeClient.relay_state = 0x21
     FakeClient.relay_pulsing = 0
-    FakeClient.protocol_version = 5
+    FakeClient.protocol_version = 6
     monkeypatch.setattr(cli, "RelayClient", FakeClient)
 
 
@@ -182,7 +182,7 @@ def test_info_human_output_lists_all_fields(capsys: pytest.CaptureFixture[str]) 
     assert "hardware:          Waveshare RP2350-Relay-6CH" in captured.out
     assert "pulse_max_ms:      60000" in captured.out
     assert "pulse_min_ms:      10" in captured.out
-    assert "protocol_version:  5" in captured.out
+    assert "protocol_version:  6" in captured.out
     assert "relay_count:       6" in captured.out
 
 

@@ -16,6 +16,7 @@
 #include <rp2350_relay_6ch/indicator.h>
 #include <rp2350_relay_6ch/relay.h>
 #include <rp2350_relay_6ch/relay_mgmt.h>
+#include <rp2350_relay_6ch/watchdog_supervisor.h>
 
 #define TEST_BUF_SIZE 512U
 
@@ -256,6 +257,7 @@ static void relay_mgmt_before(void *fixture)
 
 	health_test_reset();
 	indicator_test_reset();
+	watchdog_supervisor_test_reset();
 	relay_mgmt_test_cancel_reboot();
 	zassert_equal(relay_off_all(), 0);
 	health_set_relay_gpio_ready(true);
@@ -321,6 +323,7 @@ ZTEST(relay_mgmt, test_info_reports_capabilities)
 				 &comm_loss_reboot_on_timeout));
 	zassert_true(decode_u32(response_len, "comm_loss_reboot_delay_ms",
 				&comm_loss_reboot_delay_ms));
+	zassert_equal(protocol_version, 6U);
 	zassert_equal(protocol_version, RP2350_RELAY_6CH_MGMT_PROTOCOL_VERSION);
 	zassert_equal(relay_count, RP2350_RELAY_6CH_CHANNEL_COUNT);
 	zassert_equal(pulse_min, RP2350_RELAY_6CH_PULSE_MIN_MS);
@@ -571,6 +574,46 @@ ZTEST(relay_mgmt, test_status_reports_health_fields_from_one_snapshot)
 	assert_health(response_len, "relay_active", HEALTH_REASON_NONE, "none");
 	zassert_true(decode_u32(response_len, "health_transitions", &transitions));
 	zassert_true(transitions > 0U);
+}
+
+ZTEST(relay_mgmt, test_status_reports_watchdog_fields)
+{
+	size_t response_len;
+	bool watchdog_enabled = false;
+	bool watchdog_healthy = false;
+	bool last_reset_watchdog = false;
+	uint32_t watchdog_timeout_ms = 0U;
+	uint32_t watchdog_feed_interval_ms = 0U;
+	uint32_t watchdog_feeds = UINT32_MAX;
+	uint32_t watchdog_feed_errors = UINT32_MAX;
+
+	watchdog_supervisor_test_set_device_ready(true);
+	watchdog_supervisor_test_set_last_reset_watchdog(true);
+	watchdog_supervisor_start();
+	watchdog_supervisor_test_run_once();
+
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_STATUS, false,
+				    encode_empty_request());
+
+	zassert_true(decode_bool(response_len, "watchdog_enabled", &watchdog_enabled));
+	zassert_true(decode_bool(response_len, "watchdog_healthy", &watchdog_healthy));
+	zassert_true(decode_u32(response_len, "watchdog_timeout_ms",
+				&watchdog_timeout_ms));
+	zassert_true(decode_u32(response_len, "watchdog_feed_interval_ms",
+				&watchdog_feed_interval_ms));
+	zassert_true(decode_u32(response_len, "watchdog_feeds", &watchdog_feeds));
+	zassert_true(decode_u32(response_len, "watchdog_feed_errors",
+				&watchdog_feed_errors));
+	zassert_true(decode_bool(response_len, "last_reset_watchdog",
+				 &last_reset_watchdog));
+	zassert_true(watchdog_enabled);
+	zassert_true(watchdog_healthy);
+	zassert_equal(watchdog_timeout_ms, CONFIG_RP2350_RELAY_6CH_WATCHDOG_TIMEOUT_MS);
+	zassert_equal(watchdog_feed_interval_ms,
+		      CONFIG_RP2350_RELAY_6CH_WATCHDOG_FEED_INTERVAL_MS);
+	zassert_equal(watchdog_feeds, 1U);
+	zassert_equal(watchdog_feed_errors, 0U);
+	zassert_true(last_reset_watchdog);
 }
 
 #if IS_ENABLED(CONFIG_REBOOT)

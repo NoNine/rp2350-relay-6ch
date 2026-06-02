@@ -33,6 +33,7 @@ enum health_reason {
 	HEALTH_REASON_INDICATOR_DEGRADED = BIT(5),
 	HEALTH_REASON_HOST_REBOOT_PENDING = BIT(6),
 	HEALTH_REASON_REBOOT_FAILED = BIT(7),
+	HEALTH_REASON_WATCHDOG_SUPERVISOR_FAILED = BIT(8),
 };
 
 struct health_snapshot {
@@ -55,6 +56,7 @@ void health_set_indicator_degraded(bool degraded);
 void health_record_relay_gpio_init_failed(void);
 void health_record_relay_io_error(void);
 void health_record_reboot_failed(void);
+void health_record_watchdog_supervisor_failed(void);
 void health_snapshot(struct health_snapshot *snapshot);
 const char *health_state_name(enum health_state state);
 const char *health_reason_name(enum health_reason reason);

@@ -77,7 +77,7 @@ class SessionFakeClient:
         self.calls.append(("get_info", ()))
         return {
             "hardware": "Waveshare RP2350-Relay-6CH",
-            "protocol_version": 5,
+            "protocol_version": 6,
             "relay_count": 6,
         }
 
@@ -240,7 +240,7 @@ def test_startup_opens_one_client_runs_info_status_and_starts_heartbeat() -> Non
     assert "RP2350 Relay Session" in text
     assert "Connection:   connected" in text
     assert "Port:         COM7" in text
-    assert "Protocol:     5" in text
+    assert "Protocol:     6" in text
     assert "State:        0x00" in text
     assert "Pulsing:      none" in text
 

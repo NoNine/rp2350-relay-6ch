@@ -77,4 +77,5 @@ target_include_directories(app PRIVATE
   ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
 target_sources(app PRIVATE src/main.c src/health.c src/relay.c src/relay_mgmt.c src/indicator.c)
+target_sources_ifdef(CONFIG_RP2350_RELAY_6CH_WATCHDOG app PRIVATE src/watchdog_supervisor.c)
 target_sources_ifdef(CONFIG_SHELL app PRIVATE src/relay_shell.c)

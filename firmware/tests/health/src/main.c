@@ -164,6 +164,31 @@ ZTEST(health, test_reboot_failed_is_fault_and_clears_pending_reasons)
 	zassert_equal(snap.primary_reason, HEALTH_REASON_REBOOT_FAILED);
 }
 
+ZTEST(health, test_watchdog_supervisor_failed_is_latched_fault)
+{
+	struct health_snapshot snap;
+
+	health_set_relay_gpio_ready(true);
+	health_set_rpc_ready(true);
+	health_set_comm_owner_timed_out(true);
+	health_record_watchdog_supervisor_failed();
+	snap = snapshot();
+
+	zassert_equal(snap.state, HEALTH_FAULT);
+	zassert_true((snap.reasons & HEALTH_REASON_WATCHDOG_SUPERVISOR_FAILED) != 0U);
+	zassert_equal(snap.primary_reason, HEALTH_REASON_WATCHDOG_SUPERVISOR_FAILED);
+	zassert_equal(strcmp(health_reason_name(snap.primary_reason),
+			     "watchdog_supervisor_failed"),
+		      0);
+
+	health_set_comm_owner_timed_out(false);
+	snap = snapshot();
+
+	zassert_equal(snap.state, HEALTH_FAULT);
+	zassert_true((snap.reasons & HEALTH_REASON_WATCHDOG_SUPERVISOR_FAILED) != 0U);
+	zassert_equal(snap.primary_reason, HEALTH_REASON_WATCHDOG_SUPERVISOR_FAILED);
+}
+
 ZTEST(health, test_indicator_degraded_is_advisory_degraded)
 {
 	struct health_snapshot snap;

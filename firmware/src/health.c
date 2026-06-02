@@ -31,6 +31,7 @@ static enum health_reason primary_reason(uint32_t reasons)
 		HEALTH_REASON_REBOOT_FAILED,
 		HEALTH_REASON_RELAY_GPIO_INIT_FAILED,
 		HEALTH_REASON_RELAY_IO_FAILED,
+		HEALTH_REASON_WATCHDOG_SUPERVISOR_FAILED,
 		HEALTH_REASON_COMM_OWNER_TIMEOUT,
 		HEALTH_REASON_RPC_NOT_READY,
 		HEALTH_REASON_INDICATOR_DEGRADED,
@@ -54,7 +55,8 @@ static enum health_state derive_state_locked(uint32_t reasons)
 
 	if ((reasons & (HEALTH_REASON_RELAY_GPIO_INIT_FAILED |
 			HEALTH_REASON_RELAY_IO_FAILED |
-			HEALTH_REASON_REBOOT_FAILED)) != 0U) {
+			HEALTH_REASON_REBOOT_FAILED |
+			HEALTH_REASON_WATCHDOG_SUPERVISOR_FAILED)) != 0U) {
 		return HEALTH_FAULT;
 	}
 
@@ -242,6 +244,15 @@ void health_record_reboot_failed(void)
 	k_mutex_unlock(&model.lock);
 }
 
+void health_record_watchdog_supervisor_failed(void)
+{
+	ensure_initialized();
+	k_mutex_lock(&model.lock, K_FOREVER);
+	model.reasons |= HEALTH_REASON_WATCHDOG_SUPERVISOR_FAILED;
+	recompute_locked();
+	k_mutex_unlock(&model.lock);
+}
+
 void health_snapshot(struct health_snapshot *snapshot)
 {
 	if (snapshot == NULL) {
@@ -295,6 +306,8 @@ const char *health_reason_name(enum health_reason reason)
 		return "host_reboot_pending";
 	case HEALTH_REASON_REBOOT_FAILED:
 		return "reboot_failed";
+	case HEALTH_REASON_WATCHDOG_SUPERVISOR_FAILED:
+		return "watchdog_supervisor_failed";
 	default:
 		return "unknown";
 	}

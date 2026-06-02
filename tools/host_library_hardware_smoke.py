@@ -62,7 +62,7 @@ def run(args: argparse.Namespace) -> None:
         try:
             info = client.get_info()
             print_response("info", info)
-            require(info.get("protocol_version") == 2, "protocol_version is not 2")
+            require(info.get("protocol_version") == 6, "protocol_version is not 6")
             require(info.get("relay_count") == 6, "relay_count is not 6")
             require(
                 info.get("hardware") == "Waveshare RP2350-Relay-6CH",

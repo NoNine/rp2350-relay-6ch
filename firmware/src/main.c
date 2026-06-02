@@ -9,6 +9,9 @@
 #include <rp2350_relay_6ch/indicator.h>
 #include <rp2350_relay_6ch/relay.h>
 #include <rp2350_relay_6ch/relay_mgmt.h>
+#ifdef CONFIG_RP2350_RELAY_6CH_WATCHDOG
+#include <rp2350_relay_6ch/watchdog_supervisor.h>
+#endif
 
 LOG_MODULE_REGISTER(rp2350_relay_6ch, LOG_LEVEL_INF);
 
@@ -32,6 +35,9 @@ int main(void)
 
 	health_set_relay_gpio_ready(true);
 	relay_mgmt_publish_health();
+#ifdef CONFIG_RP2350_RELAY_6CH_WATCHDOG
+	watchdog_supervisor_start();
+#endif
 	health_snapshot(&snapshot);
 	indicator_set_health_snapshot(&snapshot);
 	LOG_INF("RP2350 relay controller baseline started on %s", CONFIG_BOARD_TARGET);

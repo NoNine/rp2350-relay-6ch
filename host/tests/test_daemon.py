@@ -56,7 +56,7 @@ class FakeRelayClient:
         self.calls.append(("get_info", ()))
         if self.fail_info is not None:
             raise self.fail_info
-        return {"protocol_version": 5, "relay_count": 6}
+        return {"protocol_version": 6, "relay_count": 6}
 
     def get_build_info(self) -> dict[str, Any]:
         self.calls.append(("get_build_info", ()))

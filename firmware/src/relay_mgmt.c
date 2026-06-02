@@ -29,6 +29,9 @@
 #include <rp2350_relay_6ch/indicator.h>
 #include <rp2350_relay_6ch/relay.h>
 #include <rp2350_relay_6ch/relay_mgmt.h>
+#ifdef CONFIG_RP2350_RELAY_6CH_WATCHDOG
+#include <rp2350_relay_6ch/watchdog_supervisor.h>
+#endif
 
 LOG_MODULE_REGISTER(rp2350_relay_mgmt, LOG_LEVEL_INF);
 
@@ -197,6 +200,50 @@ static bool encode_comm_loss_policy(zcbor_state_t *zse)
 	       zcbor_bool_put(zse, relay_comm_loss_reboot_on_timeout()) &&
 	       zcbor_tstr_put_lit(zse, "comm_loss_reboot_delay_ms") &&
 	       zcbor_uint32_put(zse, relay_comm_loss_reboot_delay_ms());
+}
+
+static bool encode_watchdog_status(zcbor_state_t *zse)
+{
+	struct watchdog_status {
+		bool enabled;
+		bool healthy;
+		uint32_t timeout_ms;
+		uint32_t feed_interval_ms;
+		uint32_t feeds;
+		uint32_t feed_errors;
+		bool last_reset_watchdog;
+	} snapshot = {
+		.timeout_ms = CONFIG_RP2350_RELAY_6CH_WATCHDOG_TIMEOUT_MS,
+		.feed_interval_ms = CONFIG_RP2350_RELAY_6CH_WATCHDOG_FEED_INTERVAL_MS,
+	};
+
+#ifdef CONFIG_RP2350_RELAY_6CH_WATCHDOG
+	struct watchdog_supervisor_snapshot supervisor_snapshot;
+
+	watchdog_supervisor_snapshot(&supervisor_snapshot);
+	snapshot.enabled = supervisor_snapshot.enabled;
+	snapshot.healthy = supervisor_snapshot.healthy;
+	snapshot.timeout_ms = supervisor_snapshot.timeout_ms;
+	snapshot.feed_interval_ms = supervisor_snapshot.feed_interval_ms;
+	snapshot.feeds = supervisor_snapshot.feeds;
+	snapshot.feed_errors = supervisor_snapshot.feed_errors;
+	snapshot.last_reset_watchdog = supervisor_snapshot.last_reset_watchdog;
+#endif
+
+	return zcbor_tstr_put_lit(zse, "watchdog_enabled") &&
+	       zcbor_bool_put(zse, snapshot.enabled) &&
+	       zcbor_tstr_put_lit(zse, "watchdog_healthy") &&
+	       zcbor_bool_put(zse, snapshot.healthy) &&
+	       zcbor_tstr_put_lit(zse, "watchdog_timeout_ms") &&
+	       zcbor_uint32_put(zse, snapshot.timeout_ms) &&
+	       zcbor_tstr_put_lit(zse, "watchdog_feed_interval_ms") &&
+	       zcbor_uint32_put(zse, snapshot.feed_interval_ms) &&
+	       zcbor_tstr_put_lit(zse, "watchdog_feeds") &&
+	       zcbor_uint32_put(zse, snapshot.feeds) &&
+	       zcbor_tstr_put_lit(zse, "watchdog_feed_errors") &&
+	       zcbor_uint32_put(zse, snapshot.feed_errors) &&
+	       zcbor_tstr_put_lit(zse, "last_reset_watchdog") &&
+	       zcbor_bool_put(zse, snapshot.last_reset_watchdog);
 }
 
 static int encode_state_or_error(zcbor_state_t *zse)
@@ -453,6 +500,7 @@ static int status_handler(struct smp_streamer *ctxt)
 	health_snapshot(&snapshot);
 
 	ok = encode_health_status(zse, &snapshot) &&
+	     encode_watchdog_status(zse) &&
 	     encode_transport_status(zse) &&
 	     encode_comm_loss_policy(zse) &&
 	     zcbor_tstr_put_lit(zse, "uptime_ms") &&

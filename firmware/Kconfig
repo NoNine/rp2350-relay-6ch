@@ -47,6 +47,31 @@ config RP2350_RELAY_6CH_DISPLAY_ROTATED_180
 	  Rotate the optional OLED local status display 180 degrees for
 	  installations where the OLED panel is mounted upside down.
 
+config RP2350_RELAY_6CH_WATCHDOG
+	bool "Enable runtime hardware watchdog supervisor"
+	depends on WATCHDOG || ZTEST
+	default y if WATCHDOG
+	default y if ZTEST
+	help
+	  Enable a central runtime watchdog supervisor that starts after relay
+	  GPIO and management RPC readiness, then feeds the hardware watchdog
+	  only while fatal health gates remain clear.
+
+config RP2350_RELAY_6CH_WATCHDOG_TIMEOUT_MS
+	int "Runtime watchdog timeout in milliseconds"
+	default 10000
+	range 100 600000
+	help
+	  Hardware watchdog timeout used by the runtime supervisor.
+
+config RP2350_RELAY_6CH_WATCHDOG_FEED_INTERVAL_MS
+	int "Runtime watchdog feed interval in milliseconds"
+	default 2000
+	range 10 300000
+	help
+	  Period between supervisor feed checks. Keep this below the hardware
+	  watchdog timeout with enough margin for normal firmware latency.
+
 choice RP2350_RELAY_6CH_COMM_LOSS_POLICY
 	prompt "Communication-loss relay safety policy"
 	default RP2350_RELAY_6CH_COMM_LOSS_ENERGIZED_ONLY

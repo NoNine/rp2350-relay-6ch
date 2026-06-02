@@ -1,0 +1,8 @@
+common:
+  tags:
+    - watchdog
+    - firmware
+tests:
+  rp2350_relay_6ch.watchdog:
+    platform_allow:
+      - native_sim
