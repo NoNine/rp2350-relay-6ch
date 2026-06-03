@@ -485,23 +485,18 @@ class RelayDaemon:
             self._reconnect_once()
 
     def _reconnect_once(self) -> None:
-        try:
-            self._connect_ready()
-        except RelayValidationError as exc:
-            if _is_missing_selected_device(exc):
-                self._mark_disconnected(str(exc), count_attempt=True)
-                LOG.info("reconnect attempt failed: %s", exc)
-                return
-            LOG.error("configuration error during reconnect: %s", exc)
-            self._fatal_error = exc
-            self._stop.set()
-        except RelayProtocolError as exc:
-            LOG.error("configuration error during reconnect: %s", exc)
-            self._fatal_error = exc
-            self._stop.set()
-        except RelayError as exc:
-            self._mark_disconnected(str(exc), count_attempt=True)
-            LOG.info("reconnect attempt failed: %s", exc)
+        port = self._reconnect_candidate_port()
+        if port is None:
+            return
+        probe = self._reconnect_probe(
+            port,
+            record_failure=lambda message: self._mark_disconnected(message, count_attempt=True),
+            log_missing_selected_device=True,
+        )
+        if probe is None:
+            return
+        self._adopt_probe(probe)
+        LOG.info("relay controller ready on %s", port)
 
     def _reconnect_after_reboot_once(self) -> None:
         started_at = self._reboot_recovery_started_at
@@ -510,15 +505,10 @@ class RelayDaemon:
             return
         if time.monotonic() - started_at < REBOOT_RECOVERY_MIN_S:
             return
-        try:
-            port = self._reboot_recovery_candidate_port()
-        except RelayValidationError as exc:
-            if _is_missing_selected_device(exc):
-                self._record_reboot_reconnect_failure(str(exc))
-                return
-            LOG.error("configuration error during reconnect: %s", exc)
-            self._fatal_error = exc
-            self._stop.set()
+        port = self._reconnect_candidate_port(
+            record_failure=self._record_reboot_reconnect_failure,
+        )
+        if port is None:
             return
         old_instance_id = self._reboot_usb_instance_id
         candidate_instance_id = _linux_usb_instance_id_for_port(port)
@@ -533,24 +523,12 @@ class RelayDaemon:
             return
 
         LOG.info("USB instance changed; probing readiness")
-        try:
-            probe = self._probe_ready(port)
-        except RelayValidationError as exc:
-            if _is_missing_selected_device(exc):
-                self._record_reboot_reconnect_failure(str(exc))
-                return
-            LOG.error("configuration error during reconnect: %s", exc)
-            self._fatal_error = exc
-            self._stop.set()
-            return
-        except RelayProtocolError as exc:
-            LOG.error("configuration error during reconnect: %s", exc)
-            self._fatal_error = exc
-            self._stop.set()
-            return
-        except RelayError as exc:
-            self._record_reboot_reconnect_failure(str(exc))
-            LOG.info("reconnect attempt failed: %s", exc)
+        probe = self._reconnect_probe(
+            port,
+            record_failure=self._record_reboot_reconnect_failure,
+            log_missing_selected_device=False,
+        )
+        if probe is None:
             return
 
         if not _is_reboot_reconnect_fresh(self._reboot_pre_status or {}, probe.status):
@@ -562,11 +540,53 @@ class RelayDaemon:
         self._adopt_probe(probe)
         LOG.info("relay controller ready after firmware reboot")
 
-    def _reboot_recovery_candidate_port(self) -> str:
-        if self.config.selector_type == "port":
-            return self.config.selector_value
-        device = self.serial_selector(self.config.selector_value)
-        return device.port
+    def _reconnect_candidate_port(
+        self,
+        *,
+        record_failure: Callable[[str], None] | None = None,
+    ) -> str | None:
+        try:
+            return self._selected_port()
+        except RelayValidationError as exc:
+            if _is_missing_selected_device(exc):
+                if record_failure is None:
+                    self._mark_disconnected(str(exc), count_attempt=True)
+                    LOG.info("reconnect attempt failed: %s", exc)
+                else:
+                    record_failure(str(exc))
+                return None
+            self._fail_reconnect(exc)
+            return None
+
+    def _reconnect_probe(
+        self,
+        port: str,
+        *,
+        record_failure: Callable[[str], None],
+        log_missing_selected_device: bool,
+    ) -> _ConnectionProbe | None:
+        try:
+            return self._probe_ready(port)
+        except RelayValidationError as exc:
+            if _is_missing_selected_device(exc):
+                record_failure(str(exc))
+                if log_missing_selected_device:
+                    LOG.info("reconnect attempt failed: %s", exc)
+                return None
+            self._fail_reconnect(exc)
+            return None
+        except RelayProtocolError as exc:
+            self._fail_reconnect(exc)
+            return None
+        except RelayError as exc:
+            record_failure(str(exc))
+            LOG.info("reconnect attempt failed: %s", exc)
+            return None
+
+    def _fail_reconnect(self, exc: RelayError) -> None:
+        LOG.error("configuration error during reconnect: %s", exc)
+        self._fatal_error = exc
+        self._stop.set()
 
     def _record_reboot_reconnect_failure(self, message: str) -> None:
         with self._state_lock:
