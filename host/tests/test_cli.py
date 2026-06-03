@@ -71,7 +71,7 @@ class FakeClient:
     def capabilities(self) -> dict[str, Any]:
         self.calls.append(("capabilities", ()))
         return {
-            "capabilities": 31,
+            "capabilities": 63,
             "pulse_max_ms": 60000,
             "pulse_min_ms": 10,
         }
@@ -206,6 +206,36 @@ def test_identity_human_output_lists_identity_fields(capsys: pytest.CaptureFixtu
     assert "protocol_version:" in captured.out
     assert "8" in captured.out
     assert "relay_count:" in captured.out
+
+
+def test_capabilities_human_output_decodes_mask(capsys: pytest.CaptureFixture[str]) -> None:
+    rc = cli.main(["--port", "COM7", "capabilities"])
+
+    captured = capsys.readouterr()
+
+    assert rc == cli.EXIT_OK
+    assert captured.out == (
+        "capabilities:  0x3f\n"
+        "  get:     true\n"
+        "  get_all: true\n"
+        "  set:     true\n"
+        "  set_all: true\n"
+        "  pulse:   true\n"
+        "  off_all: true\n"
+        "pulse_max_ms:  60000\n"
+        "pulse_min_ms:  10\n"
+    )
+
+
+def test_capabilities_json_output_keeps_raw_payload(capsys: pytest.CaptureFixture[str]) -> None:
+    rc = cli.main(["--port", "COM7", "--output", "json", "capabilities"])
+
+    captured = capsys.readouterr()
+
+    assert rc == cli.EXIT_OK
+    assert captured.out == (
+        '{"capabilities": 63, "pulse_max_ms": 60000, "pulse_min_ms": 10}\n'
+    )
 
 
 def test_identity_allows_old_protocol_for_diagnostics(

@@ -84,7 +84,11 @@ class SessionFakeClient:
 
     def capabilities(self) -> dict[str, Any]:
         self.calls.append(("capabilities", ()))
-        return {"capabilities": 31}
+        return {
+            "capabilities": 63,
+            "pulse_max_ms": 60000,
+            "pulse_min_ms": 10,
+        }
 
     def status(self) -> dict[str, Any]:
         self.calls.append(("status", ()))
@@ -680,6 +684,25 @@ def test_status_prints_compact_health_line() -> None:
     assert "[health]" in text
     assert "state:           degraded" in text
     assert "primary_reason:  comm_owner_timeout" in text
+
+
+def test_capabilities_prints_decoded_mask() -> None:
+    session, output = make_session(port="COM7")
+    session._connect_from_options(session.options)
+
+    session.handle_line("capabilities")
+
+    assert (
+        "capabilities:  0x3f\n"
+        "  get:     true\n"
+        "  get_all: true\n"
+        "  set:     true\n"
+        "  set_all: true\n"
+        "  pulse:   true\n"
+        "  off_all: true\n"
+        "pulse_max_ms:  60000\n"
+        "pulse_min_ms:  10\n"
+    ) in output.getvalue()
 
 
 def test_connect_port_attaches_matching_usb_metadata() -> None:

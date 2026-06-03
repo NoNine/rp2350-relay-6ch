@@ -31,6 +31,14 @@ EXIT_TRANSPORT = 3
 EXIT_TIMEOUT = 4
 EXIT_PROTOCOL = 5
 EXIT_DEVICE = 6
+CAPABILITY_BITS = (
+    ("get", 0),
+    ("get_all", 1),
+    ("set", 2),
+    ("set_all", 3),
+    ("pulse", 4),
+    ("off_all", 5),
+)
 
 
 def _client(args: argparse.Namespace) -> RelayClient:
@@ -164,6 +172,24 @@ def _format_daemon_status(payload: dict[str, Any]) -> str:
     return _format_key_value_rows(fields)
 
 
+def _format_capabilities(payload: dict[str, Any]) -> str:
+    capabilities = int(payload.get("capabilities", 0))
+    fields: list[tuple[str, object]] = [("capabilities", f"0x{capabilities:x}")]
+    lines = _format_key_value_rows(fields).splitlines()
+    key_width = max(len(name) for name, _bit in CAPABILITY_BITS)
+    for name, bit in CAPABILITY_BITS:
+        value = str(bool(capabilities & (1 << bit))).lower()
+        lines.append(f"  {name + ':':<{key_width + 1}} {value}")
+    remaining = [
+        (key, payload[key])
+        for key in sorted(payload)
+        if key != "capabilities"
+    ]
+    if remaining:
+        lines.extend(_format_key_value_rows(remaining).splitlines())
+    return "\n".join(lines)
+
+
 def _format_human_value(value: object) -> object:
     if value is None:
         return "none"
@@ -173,7 +199,10 @@ def _format_human_value(value: object) -> object:
 
 
 def _format_human(command: str, payload: dict[str, Any]) -> str:
-    if command in {"identity", "capabilities", "health", "transport", "safety", "watchdog"}:
+    if command == "capabilities":
+        return _format_capabilities(payload)
+
+    if command in {"identity", "health", "transport", "safety", "watchdog"}:
         return _format_key_values(payload)
 
     if command == "get":

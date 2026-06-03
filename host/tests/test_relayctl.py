@@ -36,7 +36,11 @@ class FakeDaemonClient:
 
     def capabilities(self) -> dict[str, Any]:
         self.calls.append(("capabilities", ()))
-        return {"capabilities": 31}
+        return {
+            "capabilities": 63,
+            "pulse_max_ms": 60000,
+            "pulse_min_ms": 10,
+        }
 
     def build_info(self) -> dict[str, Any]:
         self.calls.append(("build_info", ()))
@@ -164,6 +168,28 @@ def test_relayctl_outputs_json(capsys: pytest.CaptureFixture[str]) -> None:
     assert rc == relayctl.EXIT_OK
     assert '"connected": false' in captured.out
     assert FakeDaemonClient.instances[0].calls == [("daemon_status", ())]
+
+
+def test_relayctl_capabilities_human_output_decodes_mask(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    rc = relayctl.main(["--socket", "/tmp/relay.sock", "capabilities"])
+
+    captured = capsys.readouterr()
+
+    assert rc == relayctl.EXIT_OK
+    assert captured.out == (
+        "capabilities:  0x3f\n"
+        "  get:     true\n"
+        "  get_all: true\n"
+        "  set:     true\n"
+        "  set_all: true\n"
+        "  pulse:   true\n"
+        "  off_all: true\n"
+        "pulse_max_ms:  60000\n"
+        "pulse_min_ms:  10\n"
+    )
+    assert FakeDaemonClient.instances[0].calls == [("capabilities", ())]
 
 
 def test_relayctl_daemon_status_defaults_to_human_output(

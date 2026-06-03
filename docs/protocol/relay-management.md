@@ -109,6 +109,23 @@ Response:
 | `pulse_max_ms` | uint | Maximum pulse duration. |
 | `capabilities` | uint | Capability bit mask for get, get-all, set, set-all, pulse, and off-all. |
 
+The core relay operation model is the host-callable subset of commands that
+directly reads or changes relay output state: `get`, `get_all`, `set`,
+`set_all`, `pulse`, and `off_all`. Capability bits advertise support for this
+subset only; identity, diagnostics, ownership, maintenance, and reserved event
+commands are outside this bit mask.
+
+Capability bit mapping:
+
+| Bit | Mask | Operation | Meaning |
+| ---: | ---: | --- | --- |
+| 0 | `0x01` | `get` | Read one relay channel state. |
+| 1 | `0x02` | `get_all` | Read all relay channel states. |
+| 2 | `0x04` | `set` | Command one relay channel on or off. |
+| 3 | `0x08` | `set_all` | Command all relay channels from a state mask. |
+| 4 | `0x10` | `pulse` | Command one relay channel on temporarily. |
+| 5 | `0x20` | `off_all` | Cancel pulses and command all relay channels off. |
+
 ### `build_info`
 
 Request: empty CBOR map.
