@@ -333,7 +333,10 @@ Protocol `8` defines build-time communication-loss policies:
 - `energized-only`: the timeout is armed or renewed by successful relay-control
   commands that leave any relay on or pulsing, and by `heartbeat` while relays
   are energized. When all relays are off, the timeout is disarmed. The standard
-  product profile uses this policy with `comm_loss_timeout_ms=5000`.
+  product profile uses this policy with `comm_loss_timeout_ms=5000`. If the
+  timeout expires while relays are energized, firmware latches owner-lost
+  health and local attention indication until a later successful heartbeat or
+  relay-control command proves the owner is back.
 - `no-comm-timeout`: firmware does not force relay state off because of
   communication loss. `comm_loss_timeout_ms` is reported as `0`.
 - `always-on-owner`: the timeout starts at boot, renews on heartbeat and
@@ -343,7 +346,8 @@ Protocol `8` defines build-time communication-loss policies:
   back.
 
 When `comm_loss_timeout_ms` expires, firmware cancels active pulses, turns all
-relays off, and updates local indicators. Builds with
+relays off, reports degraded health with `comm_owner_timeout`, and updates
+local indicators. Builds with
 `comm_loss_reboot_on_timeout=true` schedule a cold firmware reboot after
 `comm_loss_reboot_delay_ms`. During that delay firmware first shows owner-lost
 attention indication, then switches to reboot-pending indication for the final

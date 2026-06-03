@@ -16,16 +16,17 @@ This document is the concise implementer-facing contract.
 
 The compact health model centralizes controller health as application-owned
 firmware state. It records observable facts, derives a small overall state and
-reason flags, exposes that state through the existing `status` command, and
-lets local indicators derive their stable summary from the same source.
+reason flags, exposes that state through the existing `status` and `health`
+commands, and lets local indicators derive their stable summary from the same
+source.
 Indicator code may keep presentation-only state such as command flash windows,
 buzzer sequencing, display write status, and pulse display timing, but it must
 not maintain a second authoritative controller-health model.
 
-This first contract is status-only. It does not enable hardware watchdog
+This first contract is health-summary-only. It does not enable hardware watchdog
 feeding, Zephyr task watchdog, MCUboot image confirmation, new relay recovery
-actions, persistent fault history, zbus, Zephyr statistics, or measured load
-health.
+actions, persistent fault history, zbus, Zephyr statistics, asynchronous events,
+or measured load health.
 
 High-level architecture:
 
@@ -110,8 +111,8 @@ If watchdog support is later promoted, start with a central health-gated feed
 path using Zephyr's public hardware watchdog driver API (`wdt_*`). Defer Zephyr
 task watchdog (`task_wdt_*`) until firmware has multiple independent
 long-running workers or checkpoints that need separate liveness channels. This
-contract remains status-only and does not enable watchdog configuration, feed
-gating, or task watchdog supervision.
+contract remains health-summary-only and does not enable watchdog configuration,
+feed gating, or task watchdog supervision.
 
 Reason flags:
 
@@ -226,6 +227,7 @@ enum health_reason {
 	HEALTH_REASON_COMM_REBOOT_PENDING = BIT(4),
 	HEALTH_REASON_INDICATOR_DEGRADED = BIT(5),
 	HEALTH_REASON_HOST_REBOOT_PENDING = BIT(6),
+	HEALTH_REASON_REBOOT_FAILED = BIT(7),
 };
 
 struct health_snapshot {
@@ -251,6 +253,7 @@ void health_set_host_reboot_pending(bool pending);
 void health_set_indicator_degraded(bool degraded);
 void health_record_relay_gpio_init_failed(void);
 void health_record_relay_io_error(void);
+void health_record_reboot_failed(void);
 void health_snapshot(struct health_snapshot *snapshot);
 const char *health_state_name(enum health_state state);
 const char *health_reason_name(enum health_reason reason);
@@ -278,7 +281,7 @@ Relay pulse timing details used for OLED progress rendering may remain an
 indicator-specific input; the authoritative pulse-active mask still comes from
 the health snapshot.
 
-## Status Response Contract
+## Status And Health Response Contract
 
 Extend the existing `status` response with additive fields only:
 
@@ -294,6 +297,10 @@ Encode `state`, `pulsing`, and the health fields from one
 contract; the health snapshot is the status source of truth for commanded relay
 masks. Publication correctness belongs in firmware tests that cover each relay
 mutation path.
+
+The protocol `health` command returns the same health fields from the same
+`health_snapshot` source, without the relay masks and uptime fields that make
+`status` an operator overview.
 
 A successful relay-control, heartbeat-recovery, communication-loss
 recovery-cancel, or reboot-scheduling command must update relevant health facts
