@@ -7,6 +7,72 @@ release assets. The section shape is inspired by Adafruit CircuitPython release
 notes: highlights, install/assets, verification, known limitations, and safety
 notes.
 
+## 0.8.9 - 2026-06-03
+
+Communication-loss, health, product-build, and daemon reliability release for
+the current relay firmware and host tooling line.
+
+- Tag: `v0.8.9`
+- Commit: the `v0.8.9` tag target.
+
+### Highlights
+
+- Added communication-loss safety handling with owner timeout indication,
+  recovery behavior, and local operator feedback.
+- Added compact health reporting, reboot failure health status, and a runtime
+  watchdog supervisor path.
+- Refined the relay management protocol roles, split relay get handling, and
+  decoded relay capabilities in host output.
+- Promoted product composition as the top-level build workflow with YAML
+  product configs, scoped release configs, and scoped wheel staging.
+- Improved reboot recovery, startup recovery, retained display cleanup, and
+  daemon reconnect probing.
+- Added host smoke command coverage, documented host control surfaces, and
+  documented relay daemon autostart setup.
+
+### Install / Assets
+
+- Install the host CLI from the GitHub Release wheel:
+  `rp2350_relay_6ch-0.8.9-py3-none-any.whl`.
+- Flash one of the matching firmware artifacts from the same release:
+  `rp2350_relay_6ch-0.8.9-waveshare.uf2` or
+  `rp2350_relay_6ch-0.8.9-pico2.uf2`.
+- Optional platform executable artifacts may be attached when useful:
+  `rp2350_relay_6ch-0.8.9-linux-x64` or
+  `rp2350_relay_6ch-0.8.9-windows-x64.exe`.
+- The source distribution `rp2350_relay_6ch-0.8.9.tar.gz` may be available as
+  an additional artifact.
+
+### Verification
+
+- Host tests passed with
+  `${ZEPHYR_VENV:-${ZEPHYR_WORKSPACE:-$HOME/zephyrproject}/.venv}/bin/python -m pytest host/tests`.
+- Release metadata and formatting passed `git diff --check`.
+- Release artifact build passed with `scripts/build.sh release 0.8.9`.
+
+### Known Limitations
+
+- MCUboot-compatible firmware upload, test-image, confirm-image, and rollback
+  workflows remain planned but not implemented.
+- OLED status is firmware-local and is not exposed through host-visible status,
+  protocol, CLI, or daemon APIs.
+- Pico 2 and Pico 2 W DIY builds require explicit relay overlays and external
+  relay driver hardware.
+- RS485 and wireless host communication are not v1 control paths.
+- Application-layer authentication is not implemented; this release assumes
+  trusted local USB or local Unix socket access.
+
+### Safety Notes
+
+- Keep hazardous relay-side loads disconnected during bring-up.
+- Confirm all relays are off after flashing, reset, smoke tests, daemon
+  reconnect checks, service restart checks, and teardown.
+- Communication-loss safety is firmware policy for relay outputs; it does not
+  measure contact closure, load voltage, load current, or external equipment
+  health.
+- The OLED indicator is informational only; safe relay state remains defined by
+  relay GPIO state, firmware behavior, and host control checks.
+
 ## 0.8.8 - 2026-05-28
 
 OLED indicator and Linux service-management release for the current relay
