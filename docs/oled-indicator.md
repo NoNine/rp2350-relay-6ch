@@ -229,8 +229,12 @@ POST success requires all of the following:
 - Display feature is enabled.
 - A `zephyr,display` device exists.
 - `device_is_ready()` returns true for that device.
+- `display_blanking_on()` succeeds before orientation or clear writes, so
+  retained or incorrectly oriented reset artifacts are hidden.
 - Display capabilities match the expected 128x64 monochrome use.
 - The configured OLED orientation is accepted.
+- `display_write()` successfully writes a full-frame all-zero buffer while the
+  display is blanked, clearing retained OLED contents from an MCU reset.
 - `display_blanking_off()` succeeds.
 - `display_write()` successfully writes a page-aligned 8-pixel-high diagnostic
   buffer, such as an 8x8 or 16x8 fixed bit pattern at `(0, 0)`.

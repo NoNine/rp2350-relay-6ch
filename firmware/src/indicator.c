@@ -96,12 +96,14 @@ struct indicator_state {
 	uint8_t display_filled_mask;
 	uint8_t display_pulse_mask;
 	uint16_t display_post_write_count;
+	uint16_t display_clear_write_count;
 	uint16_t display_write_count;
 	enum indicator_rgb_pattern last_rgb;
 	enum indicator_buzzer_pattern last_buzzer;
 };
 
 static struct indicator_state state;
+static uint8_t display_frame[DISPLAY_FRAME_SIZE];
 
 static void set_buzzer_locked(enum indicator_buzzer_pattern pattern);
 
@@ -133,7 +135,9 @@ struct indicator_display_test_config {
 	uint16_t height;
 	uint32_t pixel_formats;
 	bool blanking_fails;
+	bool blanking_on_fails;
 	bool orientation_fails;
+	bool clear_write_fails;
 	bool post_write_fails;
 	bool render_write_fails;
 	enum display_orientation orientation;
@@ -392,6 +396,17 @@ static int display_blanking_off_local(void)
 #endif
 }
 
+static int display_blanking_on_local(void)
+{
+#ifdef CONFIG_ZTEST
+	return display_test_config.blanking_on_fails ? -EIO : 0;
+#elif IS_ENABLED(CONFIG_RP2350_RELAY_6CH_DISPLAY)
+	return display_blanking_on(display_dev);
+#else
+	return -ENODEV;
+#endif
+}
+
 static int display_set_orientation_local(enum display_orientation orientation)
 {
 #ifdef CONFIG_ZTEST
@@ -406,26 +421,34 @@ static int display_set_orientation_local(enum display_orientation orientation)
 #endif
 }
 
+enum display_write_kind {
+	DISPLAY_WRITE_CLEAR,
+	DISPLAY_WRITE_POST,
+	DISPLAY_WRITE_RENDER,
+};
+
 static int display_write_local(uint16_t x, uint16_t y,
 			       const struct display_buffer_descriptor *desc,
-			       const uint8_t *buf, bool post)
+			       const uint8_t *buf, enum display_write_kind kind)
 {
 #ifdef CONFIG_ZTEST
 	ARG_UNUSED(x);
 	ARG_UNUSED(y);
 
-	if ((post && display_test_config.post_write_fails) ||
-	    (!post && display_test_config.render_write_fails)) {
+	if ((kind == DISPLAY_WRITE_CLEAR && display_test_config.clear_write_fails) ||
+	    (kind == DISPLAY_WRITE_POST && display_test_config.post_write_fails) ||
+	    (kind == DISPLAY_WRITE_RENDER && display_test_config.render_write_fails)) {
 		return -EIO;
 	}
 
-	if (!post && desc->buf_size == sizeof(display_test_frame)) {
+	if ((kind == DISPLAY_WRITE_CLEAR || kind == DISPLAY_WRITE_RENDER) &&
+	    desc->buf_size == sizeof(display_test_frame)) {
 		memcpy(display_test_frame, buf, sizeof(display_test_frame));
 	}
 
 	return 0;
 #elif IS_ENABLED(CONFIG_RP2350_RELAY_6CH_DISPLAY)
-	ARG_UNUSED(post);
+	ARG_UNUSED(kind);
 
 	return display_write(display_dev, x, y, desc, buf);
 #else
@@ -433,7 +456,7 @@ static int display_write_local(uint16_t x, uint16_t y,
 	ARG_UNUSED(y);
 	ARG_UNUSED(desc);
 	ARG_UNUSED(buf);
-	ARG_UNUSED(post);
+	ARG_UNUSED(kind);
 
 	return -ENODEV;
 #endif
@@ -453,7 +476,13 @@ static enum indicator_display_state display_post(void)
 		0x81, 0x42, 0x24, 0x18, 0x18, 0x24, 0x42, 0x81,
 		0xff, 0x00, 0xaa, 0x55, 0x33, 0xcc, 0x0f, 0xf0,
 	};
-	const struct display_buffer_descriptor desc = {
+	const struct display_buffer_descriptor clear_desc = {
+		.buf_size = sizeof(display_frame),
+		.width = DISPLAY_WIDTH,
+		.height = DISPLAY_HEIGHT,
+		.pitch = DISPLAY_WIDTH,
+	};
+	const struct display_buffer_descriptor post_desc = {
 		.buf_size = sizeof(post_pattern),
 		.width = DISPLAY_POST_WIDTH,
 		.height = DISPLAY_POST_HEIGHT,
@@ -467,6 +496,12 @@ static enum indicator_display_state display_post(void)
 
 	if (!display_ready()) {
 		return INDICATOR_DISPLAY_NOT_DETECTED;
+	}
+
+	ret = display_blanking_on_local();
+	if (ret < 0) {
+		LOG_WRN("OLED display blanking on failed: %d", ret);
+		return INDICATOR_DISPLAY_FAILED;
 	}
 
 	display_get_capabilities_local(&caps);
@@ -484,13 +519,21 @@ static enum indicator_display_state display_post(void)
 		return INDICATOR_DISPLAY_FAILED;
 	}
 
+	memset(display_frame, 0, sizeof(display_frame));
+	ret = display_write_local(0U, 0U, &clear_desc, display_frame, DISPLAY_WRITE_CLEAR);
+	if (ret < 0) {
+		LOG_WRN("OLED display clear write failed: %d", ret);
+		return INDICATOR_DISPLAY_FAILED;
+	}
+	state.display_clear_write_count++;
+
 	ret = display_blanking_off_local();
 	if (ret < 0) {
 		LOG_WRN("OLED display blanking off failed: %d", ret);
 		return INDICATOR_DISPLAY_FAILED;
 	}
 
-	ret = display_write_local(0U, 0U, &desc, post_pattern, true);
+	ret = display_write_local(0U, 0U, &post_desc, post_pattern, DISPLAY_WRITE_POST);
 	if (ret < 0) {
 		LOG_WRN("OLED display POST write failed: %d", ret);
 		return INDICATOR_DISPLAY_FAILED;
@@ -955,9 +998,9 @@ static int display_render_frame(enum indicator_display_mode mode,
 				const int64_t pulse_end_ms[DISPLAY_PULSE_CHANNELS],
 				bool ready, bool error, int64_t now)
 {
-	static uint8_t frame[DISPLAY_FRAME_SIZE];
+	uint8_t *const frame = display_frame;
 	struct display_buffer_descriptor desc = {
-		.buf_size = sizeof(frame),
+		.buf_size = sizeof(display_frame),
 		.width = DISPLAY_WIDTH,
 		.height = DISPLAY_HEIGHT,
 		.pitch = DISPLAY_WIDTH,
@@ -969,7 +1012,7 @@ static int display_render_frame(enum indicator_display_mode mode,
 				 DISPLAY_UI_TEXT_X1 - detail_width + 1U :
 				 DISPLAY_UI_TEXT_X0;
 
-	memset(frame, 0, sizeof(frame));
+	memset(frame, 0, sizeof(display_frame));
 	display_draw_annunciators(frame, ready, (state_mask | pulse_mask) != 0U,
 				  pulse_mask != 0U, error);
 	display_draw_hline(frame, DISPLAY_UI_RULE_X0, DISPLAY_UI_TOP_RULE_Y,
@@ -1009,7 +1052,7 @@ static int display_render_frame(enum indicator_display_mode mode,
 		display_draw_text(frame, detail_x, DISPLAY_UI_STATUS_Y, detail_text);
 	}
 
-	return display_write_local(0U, 0U, &desc, frame, false);
+	return display_write_local(0U, 0U, &desc, frame, DISPLAY_WRITE_RENDER);
 }
 
 static bool display_can_render_locked(void)
@@ -1244,6 +1287,7 @@ void indicator_init(void)
 	k_mutex_lock(&state.lock, K_FOREVER);
 	state.initialized = true;
 	state.display_post_write_count = 0U;
+	state.display_clear_write_count = 0U;
 	state.display_state = display_post();
 	display_state = state.display_state;
 	state.hardware_enabled = rgb_available() || buzzer_available() ||
@@ -1393,7 +1437,6 @@ void indicator_test_reset(void)
 	}
 
 	indicator_test_now_ms = 0;
-	memset(display_test_frame, 0, sizeof(display_test_frame));
 	display_test_config.orientation = DISPLAY_ORIENTATION_NORMAL;
 	indicator_init();
 	render();
@@ -1422,6 +1465,7 @@ void indicator_test_get_snapshot(struct indicator_test_snapshot *snapshot)
 	snapshot->display_filled_mask = state.display_filled_mask;
 	snapshot->display_pulse_mask = state.display_pulse_mask;
 	snapshot->display_post_write_count = state.display_post_write_count;
+	snapshot->display_clear_write_count = state.display_clear_write_count;
 	snapshot->display_write_count = state.display_write_count;
 	snapshot->buzzer_on = state.beep_on;
 	snapshot->beeps_remaining = state.beeps_remaining;
@@ -1463,6 +1507,11 @@ bool indicator_test_display_glyph_supported(char c)
 	return false;
 }
 
+void indicator_test_seed_display_frame(uint8_t pattern)
+{
+	memset(display_test_frame, pattern, sizeof(display_test_frame));
+}
+
 void indicator_test_configure_display(bool supported, bool ready,
 				      uint16_t width, uint16_t height,
 				      uint32_t pixel_formats,
@@ -1476,15 +1525,28 @@ void indicator_test_configure_display(bool supported, bool ready,
 	display_test_config.height = height;
 	display_test_config.pixel_formats = pixel_formats;
 	display_test_config.blanking_fails = blanking_fails;
+	display_test_config.blanking_on_fails = false;
 	display_test_config.orientation_fails = false;
+	display_test_config.clear_write_fails = false;
 	display_test_config.post_write_fails = post_write_fails;
 	display_test_config.render_write_fails = render_write_fails;
 	display_test_config.orientation = DISPLAY_ORIENTATION_NORMAL;
+	memset(display_test_frame, 0, sizeof(display_test_frame));
 }
 
 void indicator_test_set_display_render_failure(bool render_write_fails)
 {
 	display_test_config.render_write_fails = render_write_fails;
+}
+
+void indicator_test_set_display_blanking_on_failure(bool blanking_on_fails)
+{
+	display_test_config.blanking_on_fails = blanking_on_fails;
+}
+
+void indicator_test_set_display_clear_failure(bool clear_write_fails)
+{
+	display_test_config.clear_write_fails = clear_write_fails;
 }
 
 void indicator_test_set_display_orientation_failure(bool orientation_fails)

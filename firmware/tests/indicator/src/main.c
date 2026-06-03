@@ -534,10 +534,28 @@ ZTEST(indicator, test_display_post_success_and_ready_render)
 	zassert_equal(snap.display_detail, INDICATOR_DISPLAY_DETAIL_OK);
 	zassert_equal(snap.display_filled_mask, 0U);
 	zassert_equal(snap.display_pulse_mask, 0U);
+	zassert_equal(snap.display_clear_write_count, 1U);
 	zassert_equal(snap.display_post_write_count, 1U);
 	zassert_true(snap.display_write_count > 0U);
 	zassert_true(indicator_test_display_pixel_is_set(115U, 54U));
 	zassert_false(indicator_test_display_pixel_is_set(125U, 54U));
+}
+
+ZTEST(indicator, test_display_post_clears_retained_reset_pixels_before_render)
+{
+	struct indicator_test_snapshot snap;
+
+	indicator_test_configure_display(true, true, 128U, 64U,
+					 PIXEL_FORMAT_MONO01, false, false, false);
+	indicator_test_seed_display_frame(0xff);
+	indicator_test_reset();
+	snap = snapshot();
+
+	zassert_equal(snap.display_state, INDICATOR_DISPLAY_READY);
+	zassert_equal(snap.display_clear_write_count, 1U);
+	zassert_equal(snap.display_post_write_count, 1U);
+	zassert_true(snap.display_write_count > 0U);
+	zassert_false(indicator_test_display_pixel_is_set(127U, 63U));
 }
 
 ZTEST(indicator, test_display_post_sets_configured_orientation)
@@ -656,6 +674,22 @@ ZTEST(indicator, test_display_rejects_bad_geometry)
 	zassert_false(snap.fault);
 }
 
+ZTEST(indicator, test_display_rejects_blanking_on_failure)
+{
+	struct indicator_test_snapshot snap;
+
+	indicator_test_configure_display(true, true, 128U, 64U,
+					 PIXEL_FORMAT_MONO01, false, false, false);
+	indicator_test_set_display_blanking_on_failure(true);
+	indicator_test_reset();
+	snap = snapshot();
+
+	zassert_equal(snap.display_state, INDICATOR_DISPLAY_FAILED);
+	zassert_equal(snap.display_clear_write_count, 0U);
+	zassert_equal(snap.display_post_write_count, 0U);
+	zassert_equal(snap.display_write_count, 0U);
+}
+
 ZTEST(indicator, test_display_rejects_blanking_failure)
 {
 	struct indicator_test_snapshot snap;
@@ -666,6 +700,7 @@ ZTEST(indicator, test_display_rejects_blanking_failure)
 	snap = snapshot();
 
 	zassert_equal(snap.display_state, INDICATOR_DISPLAY_FAILED);
+	zassert_equal(snap.display_clear_write_count, 1U);
 	zassert_equal(snap.display_post_write_count, 0U);
 	zassert_equal(snap.display_write_count, 0U);
 }
@@ -681,6 +716,23 @@ ZTEST(indicator, test_display_rejects_orientation_failure)
 	snap = snapshot();
 
 	zassert_equal(snap.display_state, INDICATOR_DISPLAY_FAILED);
+	zassert_equal(snap.display_clear_write_count, 0U);
+	zassert_equal(snap.display_post_write_count, 0U);
+	zassert_equal(snap.display_write_count, 0U);
+}
+
+ZTEST(indicator, test_display_rejects_clear_write_failure)
+{
+	struct indicator_test_snapshot snap;
+
+	indicator_test_configure_display(true, true, 128U, 64U,
+					 PIXEL_FORMAT_MONO01, false, false, false);
+	indicator_test_set_display_clear_failure(true);
+	indicator_test_reset();
+	snap = snapshot();
+
+	zassert_equal(snap.display_state, INDICATOR_DISPLAY_FAILED);
+	zassert_equal(snap.display_clear_write_count, 0U);
 	zassert_equal(snap.display_post_write_count, 0U);
 	zassert_equal(snap.display_write_count, 0U);
 }
@@ -695,6 +747,7 @@ ZTEST(indicator, test_display_rejects_post_write_failure)
 	snap = snapshot();
 
 	zassert_equal(snap.display_state, INDICATOR_DISPLAY_FAILED);
+	zassert_equal(snap.display_clear_write_count, 1U);
 	zassert_equal(snap.display_post_write_count, 0U);
 	zassert_equal(snap.display_write_count, 0U);
 }

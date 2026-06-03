@@ -32,6 +32,7 @@ struct indicator_test_snapshot {
 	uint8_t display_filled_mask;
 	uint8_t display_pulse_mask;
 	uint16_t display_post_write_count;
+	uint16_t display_clear_write_count;
 	uint16_t display_write_count;
 	bool buzzer_on;
 	uint8_t beeps_remaining;
@@ -43,12 +44,15 @@ void indicator_test_force_render(void);
 void indicator_test_advance(uint32_t ms);
 bool indicator_test_display_pixel_is_set(uint8_t x, uint8_t y);
 bool indicator_test_display_glyph_supported(char c);
+void indicator_test_seed_display_frame(uint8_t pattern);
 void indicator_test_configure_display(bool supported, bool ready,
 				      uint16_t width, uint16_t height,
 				      uint32_t pixel_formats,
 				      bool blanking_fails,
 				      bool post_write_fails,
 				      bool render_write_fails);
+void indicator_test_set_display_blanking_on_failure(bool blanking_on_fails);
+void indicator_test_set_display_clear_failure(bool clear_write_fails);
 void indicator_test_set_display_render_failure(bool render_write_fails);
 void indicator_test_set_display_orientation_failure(bool orientation_fails);
 enum display_orientation indicator_test_display_orientation(void);
