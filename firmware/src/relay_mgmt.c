@@ -3,6 +3,7 @@
  */
 
 #include <stdbool.h>
+#include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -29,8 +30,12 @@
 #include <rp2350_relay_6ch/indicator.h>
 #include <rp2350_relay_6ch/relay.h>
 #include <rp2350_relay_6ch/relay_mgmt.h>
+#include <rp2350_relay_6ch/reboot.h>
 #ifdef CONFIG_RP2350_RELAY_6CH_WATCHDOG
 #include <rp2350_relay_6ch/watchdog_supervisor.h>
+#endif
+#ifdef CONFIG_ZTEST
+#include <rp2350_relay_6ch_test/reboot.h>
 #endif
 
 LOG_MODULE_REGISTER(rp2350_relay_mgmt, LOG_LEVEL_INF);
@@ -651,10 +656,13 @@ static void reboot_work_handler(struct k_work *work)
 		indicator_publish_health_snapshot();
 		return;
 	}
+
+	reboot_usb_disconnect_and_settle();
 #ifdef CONFIG_ZTEST
 	if (!test_reboot_return) {
 		return;
 	}
+	reboot_test_record_reboot();
 #else
 	sys_reboot(SYS_REBOOT_COLD);
 #endif
@@ -970,6 +978,11 @@ void relay_mgmt_test_cancel_reboot(void)
 	(void)k_work_cancel_delayable(&reboot_work);
 	health_set_host_reboot_pending(false);
 	indicator_publish_health_snapshot();
+	test_reboot_schedule_result = 1;
+	test_reboot_return = false;
+	reboot_test_reset();
+#else
+	reboot_test_reset();
 #endif
 }
 

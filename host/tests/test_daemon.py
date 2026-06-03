@@ -9,10 +9,12 @@ from typing import Any
 
 import pytest
 
+import rp2350_relay_6ch.daemon as daemon_module
 from rp2350_relay_6ch.daemon import (
     MAX_FRAME_BYTES,
     DaemonConfig,
     RelayDaemon,
+    _linux_usb_instance_id_for_port,
     _prepare_socket_path,
     build_parser,
     config_from_args,
@@ -34,6 +36,7 @@ class FakeRelayClient:
     fail_info: Exception | None = None
     heartbeat_failure: Exception | None = None
     command_delay = 0.0
+    status_uptimes: list[int | None] = []
 
     def __init__(self, port: str, **kwargs: Any) -> None:
         if port in self.failing_ports:
@@ -68,7 +71,7 @@ class FakeRelayClient:
 
     def status(self) -> dict[str, Any]:
         self.calls.append(("status", ()))
-        return {
+        status = {
             "state": self.relay_state,
             "pulsing": 0,
             "health": "degraded",
@@ -76,6 +79,11 @@ class FakeRelayClient:
             "health_primary_reason": "comm_owner_timeout",
             "health_transitions": 3,
         }
+        if self.status_uptimes:
+            uptime = self.status_uptimes.pop(0)
+            if uptime is not None:
+                status["uptime_ms"] = uptime
+        return status
 
     def health(self) -> dict[str, Any]:
         self.calls.append(("health", ()))
@@ -147,6 +155,7 @@ def reset_fakes() -> None:
     FakeRelayClient.fail_info = None
     FakeRelayClient.heartbeat_failure = None
     FakeRelayClient.command_delay = 0.0
+    FakeRelayClient.status_uptimes = []
 
 
 def make_daemon(
@@ -171,6 +180,17 @@ def make_daemon(
         client_factory=FakeRelayClient.connect,
         serial_selector=serial_selector or (lambda serial: RelayUsbDevice("COM9", serial)),
         sleep=lambda seconds: None,
+    )
+
+
+def request_reboot(daemon: RelayDaemon) -> dict[str, Any]:
+    request = parse_request_line(b'{"id":"1","command":"reboot"}', 1)
+    return daemon._handle_request(request)
+
+
+def make_reboot_recovery_ready(daemon: RelayDaemon) -> None:
+    daemon._reboot_recovery_started_at = (
+        time.monotonic() - daemon_module.REBOOT_RECOVERY_MIN_S - 0.1
     )
 
 
@@ -223,6 +243,38 @@ def test_config_from_args_keeps_raw_selector_flow() -> None:
     assert config.selector_type == "port"
     assert config.selector_value == "/dev/ttyACM0"
     assert config.socket_path == "/tmp/relay.sock"
+
+
+def test_linux_usb_instance_id_for_port_reads_sysfs(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sys_class_tty = tmp_path / "sys" / "class" / "tty"
+    usb_device = tmp_path / "sys" / "devices" / "pci0000:00" / "usb1" / "1-2"
+    tty_device = usb_device / "1-2:1.0" / "tty" / "ttyACM0"
+    tty_device.mkdir(parents=True)
+    (usb_device / "devnum").write_text("9\n", encoding="ascii")
+    (sys_class_tty / "ttyACM0").mkdir(parents=True)
+    os.symlink(tty_device, sys_class_tty / "ttyACM0" / "device")
+    monkeypatch.setattr(daemon_module.sys, "platform", "linux")
+    monkeypatch.setattr(daemon_module, "SYS_CLASS_TTY", sys_class_tty)
+
+    assert _linux_usb_instance_id_for_port("/dev/ttyACM0") == "1-2:9"
+    (usb_device / "devnum").write_text("bad\n", encoding="ascii")
+    assert _linux_usb_instance_id_for_port("/dev/ttyACM0") is None
+
+
+def test_linux_usb_instance_id_for_port_returns_none_for_unusable_paths(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(daemon_module, "SYS_CLASS_TTY", tmp_path)
+    monkeypatch.setattr(daemon_module.sys, "platform", "linux")
+
+    assert _linux_usb_instance_id_for_port("ttyACM0") is None
+    assert _linux_usb_instance_id_for_port("/dev/ttyACM0") is None
+    monkeypatch.setattr(daemon_module.sys, "platform", "win32")
+    assert _linux_usb_instance_id_for_port("/dev/ttyACM0") is None
 
 
 def test_initial_connect_runs_identity_then_status_without_off_all(tmp_path: Any) -> None:
@@ -409,15 +461,183 @@ def test_disconnected_device_command_fails_but_daemon_status_succeeds(tmp_path: 
         daemon._handle_request(set_request)
 
 
-def test_reboot_returns_success_then_enters_disconnected(tmp_path: Any) -> None:
-    daemon = make_daemon(tmp_path)
-    daemon._initial_connect()
-    request = parse_request_line(b'{"id":"1","command":"reboot"}', 1)
+def test_reboot_returns_success_then_enters_reboot_recovery(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    FakeRelayClient.status_uptimes = [1_000, 12_000]
+    instance_ports: list[str] = []
 
-    assert daemon._handle_request(request) == {"reboot": True}
+    def instance_id(port: str) -> str | None:
+        instance_ports.append(port)
+        return "1-2:9"
+
+    monkeypatch.setattr(daemon_module, "_linux_usb_instance_id_for_port", instance_id)
+    daemon = make_daemon(tmp_path, selector_value="/dev/ttyACM0")
+    daemon._initial_connect()
+
+    assert request_reboot(daemon) == {"reboot": True}
 
     assert daemon.connected is False
-    assert daemon.last_error == "firmware reboot requested"
+    assert daemon.last_error == "firmware reboot accepted; waiting for USB re-enumeration"
+    assert daemon._reboot_recovery is True
+    assert daemon._reboot_pre_status == {
+        "state": 0,
+        "pulsing": 0,
+        "health": "degraded",
+        "health_reasons": 8,
+        "health_primary_reason": "comm_owner_timeout",
+        "health_transitions": 3,
+        "uptime_ms": 12_000,
+    }
+    assert daemon._reboot_usb_instance_id == "1-2:9"
+    assert instance_ports == ["/dev/ttyACM0"]
+    assert FakeRelayClient.instances[0].closed is True
+
+
+def test_reboot_recovery_serial_rediscovery_precedes_instance_guard(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    FakeRelayClient.status_uptimes = [5_000, 10_000, 100]
+    events: list[tuple[str, str]] = []
+
+    def selector(serial: str) -> RelayUsbDevice:
+        events.append(("select", serial))
+        return RelayUsbDevice("/dev/ttyACM1", serial)
+
+    def instance_id(port: str) -> str | None:
+        events.append(("instance", port))
+        if port == "/dev/ttyACM0":
+            return "1-2:9"
+        return "1-2:10"
+
+    monkeypatch.setattr(daemon_module, "_linux_usb_instance_id_for_port", instance_id)
+    daemon = make_daemon(
+        tmp_path,
+        selector_type="serial",
+        selector_value="abc",
+        serial_selector=selector,
+    )
+    daemon._connect_ready()
+    daemon.current_port = "/dev/ttyACM0"
+    request_reboot(daemon)
+    events.clear()
+    make_reboot_recovery_ready(daemon)
+
+    daemon._reconnect_after_reboot_once()
+
+    assert events[:2] == [("select", "abc"), ("instance", "/dev/ttyACM1")]
+    assert daemon.connected is True
+    assert FakeRelayClient.instances[-1].port == "/dev/ttyACM1"
+
+
+def test_reboot_recovery_skips_open_while_same_usb_instance(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    FakeRelayClient.status_uptimes = [5_000, 10_000]
+    monkeypatch.setattr(daemon_module, "_linux_usb_instance_id_for_port", lambda port: "1-2:9")
+    daemon = make_daemon(tmp_path, selector_value="/dev/ttyACM0")
+    daemon._initial_connect()
+    request_reboot(daemon)
+    make_reboot_recovery_ready(daemon)
+
+    daemon._reconnect_after_reboot_once()
+
+    assert len(FakeRelayClient.instances) == 1
+    assert daemon.connected is False
+    assert daemon.reconnect_attempts == 0
+
+
+def test_reboot_recovery_proceeds_when_usb_instance_changes(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    FakeRelayClient.status_uptimes = [5_000, 10_000, 250]
+    instance_ids = iter(["1-2:9", "1-2:10"])
+    monkeypatch.setattr(
+        daemon_module,
+        "_linux_usb_instance_id_for_port",
+        lambda port: next(instance_ids),
+    )
+    daemon = make_daemon(tmp_path, selector_value="/dev/ttyACM0")
+    daemon._initial_connect()
+    request_reboot(daemon)
+    make_reboot_recovery_ready(daemon)
+
+    daemon._reconnect_after_reboot_once()
+
+    assert [client.port for client in FakeRelayClient.instances] == [
+        "/dev/ttyACM0",
+        "/dev/ttyACM0",
+    ]
+    assert daemon.connected is True
+
+
+def test_reboot_recovery_rejects_stale_uptime(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    FakeRelayClient.status_uptimes = [5_000, 10_000, 11_000]
+    instance_ids = iter(["1-2:9", "1-2:10"])
+    monkeypatch.setattr(
+        daemon_module,
+        "_linux_usb_instance_id_for_port",
+        lambda port: next(instance_ids),
+    )
+    daemon = make_daemon(tmp_path, selector_value="/dev/ttyACM0")
+    daemon._initial_connect()
+    request_reboot(daemon)
+    make_reboot_recovery_ready(daemon)
+
+    daemon._reconnect_after_reboot_once()
+
+    assert daemon.connected is False
+    assert daemon.last_error == "firmware reboot reconnect returned stale uptime"
+    assert FakeRelayClient.instances[-1].closed is True
+
+
+def test_reboot_recovery_accepts_lower_uptime(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    FakeRelayClient.status_uptimes = [5_000, 10_000, 250]
+    instance_ids = iter(["1-2:9", "1-2:10"])
+    monkeypatch.setattr(
+        daemon_module,
+        "_linux_usb_instance_id_for_port",
+        lambda port: next(instance_ids),
+    )
+    daemon = make_daemon(tmp_path, selector_value="/dev/ttyACM0")
+    daemon._initial_connect()
+    request_reboot(daemon)
+    make_reboot_recovery_ready(daemon)
+
+    daemon._reconnect_after_reboot_once()
+
+    assert daemon.connected is True
+    assert daemon.last_error is None
+
+
+def test_reboot_recovery_none_instance_id_uses_settle_and_uptime_freshness(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    FakeRelayClient.status_uptimes = [5_000, 10_000, 250]
+    monkeypatch.setattr(daemon_module, "_linux_usb_instance_id_for_port", lambda port: None)
+    daemon = make_daemon(tmp_path, selector_value="/dev/ttyACM0")
+    daemon._initial_connect()
+    request_reboot(daemon)
+
+    daemon._reconnect_after_reboot_once()
+
+    assert len(FakeRelayClient.instances) == 1
+    make_reboot_recovery_ready(daemon)
+    daemon._reconnect_after_reboot_once()
+
+    assert daemon.connected is True
+    assert FakeRelayClient.instances[-1].port == "/dev/ttyACM0"
 
 
 def test_serial_rediscovery_after_renumbering(tmp_path: Any) -> None:

@@ -15,6 +15,10 @@
 #include <rp2350_relay_6ch/health.h>
 #include <rp2350_relay_6ch/indicator.h>
 #include <rp2350_relay_6ch/relay.h>
+#include <rp2350_relay_6ch/reboot.h>
+#ifdef CONFIG_ZTEST
+#include <rp2350_relay_6ch_test/reboot.h>
+#endif
 
 LOG_MODULE_REGISTER(rp2350_relay, LOG_LEVEL_INF);
 
@@ -381,10 +385,13 @@ static void comm_loss_reboot_expired(struct k_work *work)
 	ARG_UNUSED(work);
 
 #ifdef CONFIG_ZTEST
+	reboot_usb_disconnect_and_settle();
 	if (!comm_loss_test_reboot_return) {
 		return;
 	}
+	reboot_test_record_reboot();
 #elif defined(CONFIG_REBOOT)
+	reboot_usb_disconnect_and_settle();
 	sys_reboot(SYS_REBOOT_COLD);
 #else
 	return;

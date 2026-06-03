@@ -16,6 +16,7 @@ import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from . import __version__
@@ -43,6 +44,7 @@ from .exceptions import (
 
 MAX_FRAME_BYTES = 4096
 HEARTBEAT_INTERVAL_S = 2.5
+REBOOT_RECOVERY_MIN_S = 1.5
 EXIT_OK = 0
 EXIT_ARGUMENT = 2
 EXIT_TRANSPORT = 3
@@ -67,6 +69,7 @@ DEVICE_COMMANDS = {
 }
 COMMANDS = DEVICE_COMMANDS | {"daemon-status"}
 LOG = logging.getLogger(__name__)
+SYS_CLASS_TTY = Path("/sys/class/tty")
 
 
 @dataclass(frozen=True)
@@ -102,6 +105,7 @@ class _PendingLine:
 class _ConnectionProbe:
     client: RelayClient
     port: str
+    status: dict[str, Any]
 
 
 def response_ok(request_id: str | int | None, result: dict[str, Any]) -> dict[str, Any]:
@@ -261,6 +265,11 @@ class RelayDaemon:
         self.current_port: str | None = None
         self.reconnect_attempts = 0
         self.last_error: str | None = None
+        self._reboot_recovery = False
+        self._reboot_recovery_started_at: float | None = None
+        self._reboot_pre_status: dict[str, Any] | None = None
+        self._reboot_usb_instance_id: str | None = None
+        self._reboot_instance_missing_seen = False
         self._server: socket.socket | None = None
         self._selector = selectors.DefaultSelector()
         self._requests: queue.Queue[_Request | None] = queue.Queue()
@@ -380,6 +389,11 @@ class RelayDaemon:
 
     def _connect_ready(self) -> None:
         port = self._selected_port()
+        probe = self._probe_ready(port)
+        self._adopt_probe(probe)
+        LOG.info("relay controller ready on %s", port)
+
+    def _probe_ready(self, port: str) -> _ConnectionProbe:
         client = self.client_factory(
             port,
             baudrate=self.config.baud,
@@ -389,21 +403,27 @@ class RelayDaemon:
         try:
             identity = client.identity()
             _validate_readiness_identity(identity)
-            client.status()
+            status = client.status()
         except Exception:
             client.close()
             raise
+        return _ConnectionProbe(client=client, port=port, status=status)
 
+    def _adopt_probe(self, probe: _ConnectionProbe) -> None:
         with self._state_lock:
             old_client = self.client
-            self.client = client
+            self.client = probe.client
             self.connected = True
-            self.current_port = port
+            self.current_port = probe.port
             self.reconnect_attempts = 0
             self.last_error = None
+            self._reboot_recovery = False
+            self._reboot_recovery_started_at = None
+            self._reboot_pre_status = None
+            self._reboot_usb_instance_id = None
+            self._reboot_instance_missing_seen = False
         if old_client is not None:
             old_client.close()
-        LOG.info("relay controller ready on %s", port)
 
     def _selected_port(self) -> str:
         if self.config.selector_type == "port":
@@ -420,35 +440,138 @@ class RelayDaemon:
             if count_attempt:
                 self.reconnect_attempts += 1
             self.last_error = message
+            self._reboot_recovery = False
+            self._reboot_recovery_started_at = None
+            self._reboot_pre_status = None
+            self._reboot_usb_instance_id = None
+            self._reboot_instance_missing_seen = False
         if client is not None:
             try:
                 client.close()
             except Exception:
                 pass
 
+    def _enter_reboot_recovery(
+        self,
+        *,
+        pre_reboot_status: dict[str, Any],
+        port: str | None,
+        client: RelayClient,
+    ) -> None:
+        usb_instance_id = _linux_usb_instance_id_for_port(port or "")
+        with self._state_lock:
+            self.client = None
+            self.connected = False
+            self.current_port = None
+            self.last_error = "firmware reboot accepted; waiting for USB re-enumeration"
+            self._reboot_recovery = True
+            self._reboot_recovery_started_at = time.monotonic()
+            self._reboot_pre_status = pre_reboot_status
+            self._reboot_usb_instance_id = usb_instance_id
+            self._reboot_instance_missing_seen = False
+        try:
+            client.close()
+        except Exception:
+            pass
+        LOG.info("firmware reboot accepted; waiting for USB re-enumeration")
+
     def _reconnect_loop(self) -> None:
         while not self._stop.wait(self.config.reconnect_interval):
             if self.connected:
                 continue
-            try:
-                self._connect_ready()
-            except RelayValidationError as exc:
-                if _is_missing_selected_device(exc):
-                    self._mark_disconnected(str(exc), count_attempt=True)
-                    LOG.info("reconnect attempt failed: %s", exc)
-                    continue
-                LOG.error("configuration error during reconnect: %s", exc)
-                self._fatal_error = exc
-                self._stop.set()
-                break
-            except RelayProtocolError as exc:
-                LOG.error("configuration error during reconnect: %s", exc)
-                self._fatal_error = exc
-                self._stop.set()
-                break
-            except RelayError as exc:
+            if self._reboot_recovery:
+                self._reconnect_after_reboot_once()
+                continue
+            self._reconnect_once()
+
+    def _reconnect_once(self) -> None:
+        try:
+            self._connect_ready()
+        except RelayValidationError as exc:
+            if _is_missing_selected_device(exc):
                 self._mark_disconnected(str(exc), count_attempt=True)
                 LOG.info("reconnect attempt failed: %s", exc)
+                return
+            LOG.error("configuration error during reconnect: %s", exc)
+            self._fatal_error = exc
+            self._stop.set()
+        except RelayProtocolError as exc:
+            LOG.error("configuration error during reconnect: %s", exc)
+            self._fatal_error = exc
+            self._stop.set()
+        except RelayError as exc:
+            self._mark_disconnected(str(exc), count_attempt=True)
+            LOG.info("reconnect attempt failed: %s", exc)
+
+    def _reconnect_after_reboot_once(self) -> None:
+        started_at = self._reboot_recovery_started_at
+        if started_at is None:
+            self._mark_disconnected("firmware reboot recovery state is incomplete")
+            return
+        if time.monotonic() - started_at < REBOOT_RECOVERY_MIN_S:
+            return
+        try:
+            port = self._reboot_recovery_candidate_port()
+        except RelayValidationError as exc:
+            if _is_missing_selected_device(exc):
+                self._record_reboot_reconnect_failure(str(exc))
+                return
+            LOG.error("configuration error during reconnect: %s", exc)
+            self._fatal_error = exc
+            self._stop.set()
+            return
+        old_instance_id = self._reboot_usb_instance_id
+        candidate_instance_id = _linux_usb_instance_id_for_port(port)
+        if candidate_instance_id is None:
+            self._reboot_instance_missing_seen = True
+        if (
+            old_instance_id is not None
+            and candidate_instance_id == old_instance_id
+            and not self._reboot_instance_missing_seen
+        ):
+            LOG.info("old USB instance still present; waiting")
+            return
+
+        LOG.info("USB instance changed; probing readiness")
+        try:
+            probe = self._probe_ready(port)
+        except RelayValidationError as exc:
+            if _is_missing_selected_device(exc):
+                self._record_reboot_reconnect_failure(str(exc))
+                return
+            LOG.error("configuration error during reconnect: %s", exc)
+            self._fatal_error = exc
+            self._stop.set()
+            return
+        except RelayProtocolError as exc:
+            LOG.error("configuration error during reconnect: %s", exc)
+            self._fatal_error = exc
+            self._stop.set()
+            return
+        except RelayError as exc:
+            self._record_reboot_reconnect_failure(str(exc))
+            LOG.info("reconnect attempt failed: %s", exc)
+            return
+
+        if not _is_reboot_reconnect_fresh(self._reboot_pre_status or {}, probe.status):
+            probe.client.close()
+            self._record_reboot_reconnect_failure("firmware reboot reconnect returned stale uptime")
+            LOG.info("reconnect attempt failed: firmware reboot reconnect returned stale uptime")
+            return
+
+        self._adopt_probe(probe)
+        LOG.info("relay controller ready after firmware reboot")
+
+    def _reboot_recovery_candidate_port(self) -> str:
+        if self.config.selector_type == "port":
+            return self.config.selector_value
+        device = self.serial_selector(self.config.selector_value)
+        return device.port
+
+    def _record_reboot_reconnect_failure(self, message: str) -> None:
+        with self._state_lock:
+            self.reconnect_attempts += 1
+            self.last_error = message
 
     def _heartbeat_loop(self) -> None:
         while not self._stop.wait(self.config.heartbeat_interval):
@@ -594,13 +717,25 @@ class RelayDaemon:
             client = self.client
             if client is None or not self.connected:
                 raise RelayTransportError("relay controller is disconnected")
+            if request.command == "reboot":
+                port = self.current_port
+                try:
+                    pre_reboot_status = client.status()
+                    result = client.reboot()
+                except RelayTransportError as exc:
+                    self._mark_disconnected(str(exc))
+                    raise
+                self._enter_reboot_recovery(
+                    pre_reboot_status=pre_reboot_status,
+                    port=port,
+                    client=client,
+                )
+                return result
             try:
                 result = _dispatch_device_command(client, request.command or "", request.args)
             except RelayTransportError as exc:
                 self._mark_disconnected(str(exc))
                 raise
-            if request.command == "reboot":
-                self._mark_disconnected("firmware reboot requested")
             return result
 
 
@@ -657,6 +792,50 @@ def _request_id_from_line(line: bytes) -> str | int | None:
 
 def _is_missing_selected_device(exc: RelayValidationError) -> bool:
     return str(exc).startswith("no relay device found with USB serial ")
+
+
+def _status_uptime_ms(status: dict[str, Any]) -> int | None:
+    uptime = status.get("uptime_ms")
+    if isinstance(uptime, bool):
+        return None
+    if isinstance(uptime, int):
+        return uptime
+    return None
+
+
+def _is_reboot_reconnect_fresh(
+    pre_reboot_status: dict[str, Any],
+    post_reboot_status: dict[str, Any],
+) -> bool:
+    pre_uptime = _status_uptime_ms(pre_reboot_status)
+    post_uptime = _status_uptime_ms(post_reboot_status)
+    if pre_uptime is None or post_uptime is None:
+        return True
+    return post_uptime < pre_uptime
+
+
+def _linux_usb_instance_id_for_port(port: str) -> str | None:
+    if sys.platform != "linux" or not os.path.isabs(port):
+        return None
+    tty_name = os.path.basename(port)
+    if not tty_name:
+        return None
+    try:
+        device_path = (SYS_CLASS_TTY / tty_name / "device").resolve(strict=True)
+    except (OSError, RuntimeError):
+        return None
+    for candidate in (device_path, *device_path.parents):
+        devnum_path = candidate / "devnum"
+        try:
+            devnum = devnum_path.read_text(encoding="ascii").strip()
+        except OSError:
+            continue
+        try:
+            devnum_value = int(devnum)
+        except ValueError:
+            return None
+        return f"{candidate.name}:{devnum_value}"
+    return None
 
 
 def _validate_readiness_identity(identity: dict[str, Any]) -> None:

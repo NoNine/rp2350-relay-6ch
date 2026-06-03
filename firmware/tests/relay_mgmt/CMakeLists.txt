@@ -83,5 +83,6 @@ target_sources(app PRIVATE
   ../../src/relay.c
   ../../src/indicator.c
   ../../src/relay_mgmt.c
+  ../../src/reboot.c
   ../../src/watchdog_supervisor.c
 )

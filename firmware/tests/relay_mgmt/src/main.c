@@ -21,6 +21,7 @@
 #include <rp2350_relay_6ch_test/indicator.h>
 #include <rp2350_relay_6ch_test/relay.h>
 #include <rp2350_relay_6ch_test/relay_mgmt.h>
+#include <rp2350_relay_6ch_test/reboot.h>
 #include <rp2350_relay_6ch_test/watchdog_supervisor.h>
 
 #define TEST_BUF_SIZE 256U
@@ -764,9 +765,47 @@ ZTEST(relay_mgmt, test_host_reboot_return_records_reboot_failed)
 	relay_mgmt_test_force_reboot_return(true);
 	relay_mgmt_test_run_reboot_work();
 
+	zassert_equal(reboot_test_usb_disconnect_attempts(), 1U);
+	zassert_equal(reboot_test_usb_disconnect_settles(), 1U);
 	health_snapshot(&snap);
 	zassert_equal(snap.state, HEALTH_FAULT);
 	zassert_equal(snap.primary_reason, HEALTH_REASON_REBOOT_FAILED);
+}
+
+ZTEST(relay_mgmt, test_host_reboot_work_disconnects_usb_before_reboot)
+{
+	relay_mgmt_test_force_reboot_return(true);
+	relay_mgmt_test_run_reboot_work();
+
+	zassert_equal(reboot_test_usb_disconnect_attempts(), 1U);
+	zassert_equal(reboot_test_usb_disconnect_settles(), 1U);
+	zassert_true(reboot_test_usb_disconnect_order() > 0U);
+	zassert_true(reboot_test_reboot_order() >
+		     reboot_test_usb_disconnect_order());
+}
+
+ZTEST(relay_mgmt, test_host_reboot_usb_already_disabled_still_reboots)
+{
+	reboot_test_force_usb_disconnect_result(-EALREADY);
+	relay_mgmt_test_force_reboot_return(true);
+	relay_mgmt_test_run_reboot_work();
+
+	zassert_equal(reboot_test_usb_disconnect_attempts(), 1U);
+	zassert_equal(reboot_test_usb_disconnect_settles(), 1U);
+	zassert_true(reboot_test_reboot_order() >
+		     reboot_test_usb_disconnect_order());
+}
+
+ZTEST(relay_mgmt, test_host_reboot_usb_disconnect_failure_still_reboots)
+{
+	reboot_test_force_usb_disconnect_result(-EIO);
+	relay_mgmt_test_force_reboot_return(true);
+	relay_mgmt_test_run_reboot_work();
+
+	zassert_equal(reboot_test_usb_disconnect_attempts(), 1U);
+	zassert_equal(reboot_test_usb_disconnect_settles(), 1U);
+	zassert_true(reboot_test_reboot_order() >
+		     reboot_test_usb_disconnect_order());
 }
 
 ZTEST(relay_mgmt, test_host_reboot_off_all_failure_records_reboot_failed)
@@ -776,6 +815,9 @@ ZTEST(relay_mgmt, test_host_reboot_off_all_failure_records_reboot_failed)
 	relay_test_force_next_off_all_result(-EIO);
 	relay_mgmt_test_run_reboot_work();
 
+	zassert_equal(reboot_test_usb_disconnect_attempts(), 0U);
+	zassert_equal(reboot_test_usb_disconnect_settles(), 0U);
+	zassert_equal(reboot_test_reboot_order(), 0U);
 	health_snapshot(&snap);
 	zassert_equal(snap.state, HEALTH_FAULT);
 	zassert_true((snap.reasons & HEALTH_REASON_REBOOT_FAILED) != 0U);
@@ -1112,6 +1154,85 @@ ZTEST(relay_mgmt, test_comm_loss_reboot_pending_control_cancels_reboot)
 	zassert_false(snap.reboot_pending);
 }
 
+ZTEST(relay_mgmt, test_comm_loss_reboot_work_disconnects_usb_before_reboot)
+{
+	size_t response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_SET, true,
+					   encode_set_request(0U, true));
+
+	assert_state(response_len, BIT(0), 0U);
+	k_msleep(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_TIMEOUT_MS + 20U);
+	zassert_true(relay_comm_loss_test_reboot_scheduled());
+
+	relay_comm_loss_test_force_reboot_return(true);
+	relay_comm_loss_test_run_reboot_work();
+
+	zassert_equal(reboot_test_usb_disconnect_attempts(), 1U);
+	zassert_equal(reboot_test_usb_disconnect_settles(), 1U);
+	zassert_true(reboot_test_usb_disconnect_order() > 0U);
+	zassert_true(reboot_test_reboot_order() >
+		     reboot_test_usb_disconnect_order());
+}
+
+ZTEST(relay_mgmt, test_comm_loss_reboot_usb_already_disabled_still_reboots)
+{
+	size_t response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_SET, true,
+					   encode_set_request(0U, true));
+
+	assert_state(response_len, BIT(0), 0U);
+	k_msleep(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_TIMEOUT_MS + 20U);
+	zassert_true(relay_comm_loss_test_reboot_scheduled());
+
+	reboot_test_force_usb_disconnect_result(-EALREADY);
+	relay_comm_loss_test_force_reboot_return(true);
+	relay_comm_loss_test_run_reboot_work();
+
+	zassert_equal(reboot_test_usb_disconnect_attempts(), 1U);
+	zassert_equal(reboot_test_usb_disconnect_settles(), 1U);
+	zassert_true(reboot_test_reboot_order() >
+		     reboot_test_usb_disconnect_order());
+}
+
+ZTEST(relay_mgmt, test_comm_loss_reboot_usb_disconnect_failure_still_reboots)
+{
+	size_t response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_SET, true,
+					   encode_set_request(0U, true));
+
+	assert_state(response_len, BIT(0), 0U);
+	k_msleep(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_TIMEOUT_MS + 20U);
+	zassert_true(relay_comm_loss_test_reboot_scheduled());
+
+	reboot_test_force_usb_disconnect_result(-EIO);
+	relay_comm_loss_test_force_reboot_return(true);
+	relay_comm_loss_test_run_reboot_work();
+
+	zassert_equal(reboot_test_usb_disconnect_attempts(), 1U);
+	zassert_equal(reboot_test_usb_disconnect_settles(), 1U);
+	zassert_true(reboot_test_reboot_order() >
+		     reboot_test_usb_disconnect_order());
+}
+
+ZTEST(relay_mgmt, test_comm_loss_canceled_pending_reboot_does_not_disconnect_usb)
+{
+	size_t response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_SET, true,
+					   encode_set_request(0U, true));
+	bool ok = false;
+
+	assert_state(response_len, BIT(0), 0U);
+	k_msleep(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_TIMEOUT_MS + 20U);
+	zassert_true(relay_comm_loss_test_reboot_scheduled());
+
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_HEARTBEAT, true,
+				    encode_empty_request());
+	zassert_true(decode_bool(response_len, "ok", &ok));
+	zassert_true(ok);
+	zassert_false(relay_comm_loss_test_reboot_scheduled());
+	k_msleep(CONFIG_RP2350_RELAY_6CH_COMM_LOSS_REBOOT_DELAY_MS + 20U);
+
+	zassert_equal(reboot_test_usb_disconnect_attempts(), 0U);
+	zassert_equal(reboot_test_usb_disconnect_settles(), 0U);
+	zassert_equal(reboot_test_reboot_order(), 0U);
+}
+
 ZTEST(relay_mgmt, test_comm_loss_reboot_schedule_failure_records_reboot_failed)
 {
 	size_t response_len;
@@ -1143,6 +1264,8 @@ ZTEST(relay_mgmt, test_comm_loss_reboot_return_records_reboot_failed)
 	relay_comm_loss_test_force_reboot_return(true);
 	relay_comm_loss_test_run_reboot_work();
 
+	zassert_equal(reboot_test_usb_disconnect_attempts(), 1U);
+	zassert_equal(reboot_test_usb_disconnect_settles(), 1U);
 	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_STATUS, false,
 				    encode_empty_request());
 	assert_health(response_len, "fault",

@@ -50,6 +50,10 @@ functions/variables, uppercase macros, and headers under
 `firmware/include/rp2350_relay_6ch/`. Use Zephyr GPIO, USB, MCUmgr/SMP, CBOR,
 logging, flash map, and DFU APIs where available.
 
+Keep headers under `firmware/include/rp2350_relay_6ch/` production-only. Do not
+put `CONFIG_ZTEST`, test-only declarations, or test hooks there; place test
+support declarations under `firmware/tests/support/include/`.
+
 For Python, use `snake_case` modules/functions, `PascalCase` classes, and typed
 exceptions for protocol, timeout, transport, validation, and device errors.
 
