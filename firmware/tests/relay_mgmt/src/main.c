@@ -348,17 +348,17 @@ ZTEST(relay_mgmt, test_identity_reports_protocol_metadata)
 	zassert_true(decode_u32(response_len, "command_model_version",
 				&command_model_version));
 	zassert_true(decode_u32(response_len, "relay_count", &relay_count));
-	zassert_equal(protocol_version, 8U);
+	zassert_equal(protocol_version, 9U);
 	zassert_equal(protocol_version, RP2350_RELAY_6CH_MGMT_PROTOCOL_VERSION);
-	zassert_equal(command_model_version, 2U);
+	zassert_equal(command_model_version, 3U);
 	zassert_equal(relay_count, RP2350_RELAY_6CH_CHANNEL_COUNT);
 	assert_tstr_equal(response_len, "hardware", RP2350_RELAY_6CH_HARDWARE_NAME);
 }
 
-ZTEST(relay_mgmt, test_role_command_ids_match_protocol_8_model_2)
+ZTEST(relay_mgmt, test_role_command_ids_match_protocol_9_model_3)
 {
-	zassert_equal(RP2350_RELAY_6CH_MGMT_PROTOCOL_VERSION, 8U);
-	zassert_equal(RP2350_RELAY_6CH_MGMT_COMMAND_MODEL_VERSION, 2U);
+	zassert_equal(RP2350_RELAY_6CH_MGMT_PROTOCOL_VERSION, 9U);
+	zassert_equal(RP2350_RELAY_6CH_MGMT_COMMAND_MODEL_VERSION, 3U);
 	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_IDENTITY, 0x00U);
 	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_CAPABILITIES, 0x01U);
 	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_BUILD_INFO, 0x02U);
@@ -375,6 +375,7 @@ ZTEST(relay_mgmt, test_role_command_ids_match_protocol_8_model_2)
 	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_OFF_ALL, 0x23U);
 	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_HEARTBEAT, 0x30U);
 	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_REBOOT, 0x40U);
+	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_BOOTSEL, 0x41U);
 	zassert_equal(RP2350_RELAY_6CH_MGMT_CMD_EVENT, 0x7fU);
 }
 
@@ -818,6 +819,63 @@ ZTEST(relay_mgmt, test_host_reboot_off_all_failure_records_reboot_failed)
 	zassert_equal(reboot_test_usb_disconnect_attempts(), 0U);
 	zassert_equal(reboot_test_usb_disconnect_settles(), 0U);
 	zassert_equal(reboot_test_reboot_order(), 0U);
+	health_snapshot(&snap);
+	zassert_equal(snap.state, HEALTH_FAULT);
+	zassert_true((snap.reasons & HEALTH_REASON_REBOOT_FAILED) != 0U);
+	zassert_equal(snap.primary_reason, HEALTH_REASON_REBOOT_FAILED);
+}
+
+ZTEST(relay_mgmt, test_bootsel_success_sets_pending_health)
+{
+	size_t response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_BOOTSEL, true,
+					   encode_empty_request());
+	bool ok = false;
+	struct health_snapshot snap;
+
+	zassert_true(decode_bool(response_len, "ok", &ok));
+	zassert_true(ok);
+	health_snapshot(&snap);
+	zassert_equal(snap.state, HEALTH_RECOVERY_PENDING);
+	zassert_equal(snap.primary_reason, HEALTH_REASON_HOST_REBOOT_PENDING);
+}
+
+ZTEST(relay_mgmt, test_bootsel_schedule_failure_returns_reboot_failed)
+{
+	size_t response_len;
+	struct health_snapshot snap;
+
+	relay_mgmt_test_force_bootsel_schedule_result(-EINVAL);
+	response_len = call_handler(RP2350_RELAY_6CH_MGMT_CMD_BOOTSEL, true,
+				    encode_empty_request());
+
+	assert_error(response_len, RP2350_RELAY_6CH_MGMT_ERR_REBOOT_FAILED);
+	health_snapshot(&snap);
+	zassert_equal(snap.state, HEALTH_FAULT);
+	zassert_equal(snap.primary_reason, HEALTH_REASON_REBOOT_FAILED);
+}
+
+ZTEST(relay_mgmt, test_bootsel_work_disconnects_usb_before_bootsel)
+{
+	relay_mgmt_test_force_bootsel_return(true);
+	relay_mgmt_test_run_bootsel_work();
+
+	zassert_equal(reboot_test_usb_disconnect_attempts(), 1U);
+	zassert_equal(reboot_test_usb_disconnect_settles(), 1U);
+	zassert_true(reboot_test_usb_disconnect_order() > 0U);
+	zassert_true(reboot_test_bootsel_order() >
+		     reboot_test_usb_disconnect_order());
+}
+
+ZTEST(relay_mgmt, test_bootsel_off_all_failure_records_reboot_failed)
+{
+	struct health_snapshot snap;
+
+	relay_test_force_next_off_all_result(-EIO);
+	relay_mgmt_test_run_bootsel_work();
+
+	zassert_equal(reboot_test_usb_disconnect_attempts(), 0U);
+	zassert_equal(reboot_test_usb_disconnect_settles(), 0U);
+	zassert_equal(reboot_test_bootsel_order(), 0U);
 	health_snapshot(&snap);
 	zassert_equal(snap.state, HEALTH_FAULT);
 	zassert_true((snap.reasons & HEALTH_REASON_REBOOT_FAILED) != 0U);

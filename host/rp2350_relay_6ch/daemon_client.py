@@ -107,6 +107,9 @@ class RelayDaemonClient:
     def reboot(self) -> dict[str, Any]:
         return self._request("reboot")
 
+    def bootsel(self) -> dict[str, Any]:
+        return self._request("bootsel")
+
     def daemon_status(self) -> dict[str, Any]:
         return self._request("daemon-status")
 

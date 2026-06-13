@@ -121,6 +121,11 @@ def cmd_reboot(args: argparse.Namespace) -> dict[str, Any]:
         return client.reboot()
 
 
+def cmd_bootsel(args: argparse.Namespace) -> dict[str, Any]:
+    with _client(args) as client:
+        return client.bootsel()
+
+
 def cmd_daemon_status(args: argparse.Namespace) -> dict[str, Any]:
     with _client(args) as client:
         return client.daemon_status()
@@ -161,6 +166,7 @@ COMMANDS = {
     "safety": cmd_safety,
     "watchdog": cmd_watchdog,
     "reboot": cmd_reboot,
+    "bootsel": cmd_bootsel,
     "daemon-status": cmd_daemon_status,
     "smoke": cmd_smoke,
     "systemd-install": cmd_systemd_install,
@@ -210,6 +216,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("safety", help="print safety policy details")
     subparsers.add_parser("watchdog", help="print watchdog details")
     subparsers.add_parser("reboot", help="request a firmware reboot")
+    subparsers.add_parser("bootsel", help="enter RP2350 ROM BOOTSEL for picotool or UF2")
     subparsers.add_parser("daemon-status", help="print daemon process status")
 
     smoke_parser = subparsers.add_parser("smoke", help="pulse each relay and turn all off")

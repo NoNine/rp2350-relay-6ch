@@ -129,6 +129,9 @@ rp2350-relayd (--port /dev/ttyACM0 | --serial <usb-serial>) \
 - The daemon `reboot` command returns success once firmware accepts the reboot.
   The daemon then enters disconnected/reconnecting state and rejects queued or
   new device commands until readiness succeeds again.
+- The daemon `bootsel` command returns success once firmware accepts RP2350 ROM
+  BOOTSEL entry. The daemon closes the app connection and does not expect
+  automatic reconnect because the device leaves the USB serial/SMP transport.
 - Wildcard `/dev/ttyACM*` discovery and interactive selection are deferred
   beyond Phase 8b.
 
@@ -140,8 +143,8 @@ ownership and socket permissions.
 
 Mirror existing relay commands: `identity`, `capabilities`, `build-info`,
 `get`, `set`, `set-all`, `pulse`, `off-all`, `status`, `health`, `transport`,
-`safety`, `watchdog`, and `reboot`. Add `daemon-status` for daemon process and
-connection state.
+`safety`, `watchdog`, `reboot`, and `bootsel`. Add `daemon-status` for daemon
+process and connection state.
 
 Request frames are one JSON object per line:
 
@@ -241,7 +244,8 @@ with RelayDaemonClient.connect(timeout_s=2.0) as relay:
   `capabilities()`, `build_info()`, `get_relay(channel)`,
   `get_all_relays()`, `set_relay(channel, on)`, `set_all_relays(state)`,
   `pulse_relay(channel, duration_ms)`, `off_all_relays()`, `status()`,
-  `health()`, `transport_status()`, `safety()`, `watchdog()`, and `reboot()`.
+  `health()`, `transport_status()`, `safety()`, `watchdog()`, `reboot()`, and
+  `bootsel()`.
 - Expose `daemon_status()` for `daemon-status`.
 - Keep channel numbers zero-based in the Python API.
 - Use the same host-side validation rules and typed exceptions as the direct
@@ -263,7 +267,7 @@ rp2350-relayctl --socket <path> [--timeout 2.0] \
 
 - Commands mirror the direct CLI: `identity`, `capabilities`, `build-info`,
   `get`, `get-all`, `set`, `set-all`, `pulse`, `off-all`, `status`, `health`,
-  `transport`, `safety`, `watchdog`, and `reboot`.
+  `transport`, `safety`, `watchdog`, `reboot`, and `bootsel`.
 - Add `daemon-status` for daemon process and connection state. While the daemon
   is running, `daemon-status` exits `0` even when the relay controller is
   disconnected.

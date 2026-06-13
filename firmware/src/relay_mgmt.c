@@ -637,11 +637,15 @@ static int watchdog_handler(struct smp_streamer *ctxt)
 
 #ifdef CONFIG_REBOOT
 static void reboot_work_handler(struct k_work *work);
+static void bootsel_work_handler(struct k_work *work);
 
 static K_WORK_DELAYABLE_DEFINE(reboot_work, reboot_work_handler);
+static K_WORK_DELAYABLE_DEFINE(bootsel_work, bootsel_work_handler);
 #ifdef CONFIG_ZTEST
 static int test_reboot_schedule_result = 1;
+static int test_bootsel_schedule_result = 1;
 static bool test_reboot_return;
+static bool test_bootsel_return;
 #endif
 
 static void reboot_work_handler(struct k_work *work)
@@ -665,6 +669,32 @@ static void reboot_work_handler(struct k_work *work)
 	reboot_test_record_reboot();
 #else
 	sys_reboot(SYS_REBOOT_COLD);
+#endif
+	health_record_reboot_failed();
+	indicator_publish_health_snapshot();
+}
+
+static void bootsel_work_handler(struct k_work *work)
+{
+	int ret;
+
+	ARG_UNUSED(work);
+
+	ret = relay_off_all();
+	if (ret < 0) {
+		health_record_reboot_failed();
+		indicator_publish_health_snapshot();
+		return;
+	}
+
+	reboot_usb_disconnect_and_settle();
+#ifdef CONFIG_ZTEST
+	if (!test_bootsel_return) {
+		return;
+	}
+	reboot_enter_bootsel();
+#else
+	reboot_enter_bootsel();
 #endif
 	health_record_reboot_failed();
 	indicator_publish_health_snapshot();
@@ -695,6 +725,55 @@ static int reboot_handler(struct smp_streamer *ctxt)
 	}
 #else
 	schedule_ret = k_work_schedule(&reboot_work, K_MSEC(REBOOT_PENDING_INDICATION_MS));
+#endif
+	if (schedule_ret < 0) {
+		health_record_reboot_failed();
+		indicator_publish_health_snapshot();
+		return error_response(zse, RP2350_RELAY_6CH_MGMT_ERR_REBOOT_FAILED);
+	}
+	health_set_host_reboot_pending(true);
+	ok = zcbor_tstr_put_lit(zse, "ok") && zcbor_bool_put(zse, true);
+#else
+	ok = encode_relay_error(zse, RP2350_RELAY_6CH_MGMT_ERR_REBOOT_UNAVAILABLE);
+#endif
+
+	if (!ok) {
+		return MGMT_ERR_EMSGSIZE;
+	}
+
+#ifdef CONFIG_REBOOT
+	counter_inc(RELAY_MGMT_COUNTER_SUCCEEDED);
+	indicator_publish_health_snapshot();
+#else
+	record_error_indicator(RP2350_RELAY_6CH_MGMT_ERR_REBOOT_UNAVAILABLE);
+#endif
+	return MGMT_ERR_EOK;
+}
+
+static int bootsel_handler(struct smp_streamer *ctxt)
+{
+	zcbor_state_t *zsd = ctxt->reader->zs;
+	zcbor_state_t *zse = ctxt->writer->zs;
+	bool ok;
+
+	counter_inc(RELAY_MGMT_COUNTER_RECEIVED);
+
+	if (!validate_request_map(zsd)) {
+		return error_response(zse, RP2350_RELAY_6CH_MGMT_ERR_DECODE);
+	}
+
+#ifdef CONFIG_REBOOT
+	int schedule_ret;
+
+#ifdef CONFIG_ZTEST
+	schedule_ret = test_bootsel_schedule_result;
+	test_bootsel_schedule_result = 1;
+	if (schedule_ret >= 0) {
+		schedule_ret = k_work_schedule(
+			&bootsel_work, K_MSEC(REBOOT_PENDING_INDICATION_MS));
+	}
+#else
+	schedule_ret = k_work_schedule(&bootsel_work, K_MSEC(REBOOT_PENDING_INDICATION_MS));
 #endif
 	if (schedule_ret < 0) {
 		health_record_reboot_failed();
@@ -838,6 +917,10 @@ static const struct mgmt_handler relay_mgmt_handlers[] = {
 		.mh_read = NULL,
 		.mh_write = reboot_handler,
 	},
+	[RP2350_RELAY_6CH_MGMT_CMD_BOOTSEL] = {
+		.mh_read = NULL,
+		.mh_write = bootsel_handler,
+	},
 	[RP2350_RELAY_6CH_MGMT_CMD_BUILD_INFO] = {
 		.mh_read = build_info_handler,
 		.mh_write = NULL,
@@ -976,13 +1059,25 @@ void relay_mgmt_test_cancel_reboot(void)
 {
 #ifdef CONFIG_REBOOT
 	(void)k_work_cancel_delayable(&reboot_work);
+	(void)k_work_cancel_delayable(&bootsel_work);
 	health_set_host_reboot_pending(false);
 	indicator_publish_health_snapshot();
 	test_reboot_schedule_result = 1;
+	test_bootsel_schedule_result = 1;
 	test_reboot_return = false;
+	test_bootsel_return = false;
 	reboot_test_reset();
 #else
 	reboot_test_reset();
+#endif
+}
+
+void relay_mgmt_test_force_bootsel_schedule_result(int result)
+{
+#ifdef CONFIG_REBOOT
+	test_bootsel_schedule_result = result;
+#else
+	ARG_UNUSED(result);
 #endif
 }
 
@@ -992,6 +1087,14 @@ void relay_mgmt_test_force_reboot_schedule_result(int result)
 	test_reboot_schedule_result = result;
 #else
 	ARG_UNUSED(result);
+#endif
+}
+
+void relay_mgmt_test_run_bootsel_work(void)
+{
+#ifdef CONFIG_REBOOT
+	bootsel_work_handler(&bootsel_work.work);
+	test_bootsel_return = false;
 #endif
 }
 
@@ -1007,6 +1110,15 @@ void relay_mgmt_test_force_reboot_return(bool enabled)
 {
 #ifdef CONFIG_REBOOT
 	test_reboot_return = enabled;
+#else
+	ARG_UNUSED(enabled);
+#endif
+}
+
+void relay_mgmt_test_force_bootsel_return(bool enabled)
+{
+#ifdef CONFIG_REBOOT
+	test_bootsel_return = enabled;
 #else
 	ARG_UNUSED(enabled);
 #endif

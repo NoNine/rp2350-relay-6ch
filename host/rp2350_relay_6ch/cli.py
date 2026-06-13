@@ -223,6 +223,9 @@ def _format_human(command: str, payload: dict[str, Any]) -> str:
     if command == "reboot":
         return "reboot requested"
 
+    if command == "bootsel":
+        return "bootsel requested"
+
     if command == "smoke":
         return "smoke test passed"
 
@@ -364,6 +367,12 @@ def cmd_reboot(args: argparse.Namespace) -> dict[str, Any]:
         return client.reboot()
 
 
+def cmd_bootsel(args: argparse.Namespace) -> dict[str, Any]:
+    _require_port(args)
+    with _ready_client(args) as client:
+        return client.bootsel()
+
+
 def cmd_smoke(args: argparse.Namespace) -> dict[str, Any]:
     _require_port(args)
     with _ready_client(args) as client:
@@ -386,6 +395,7 @@ COMMANDS = {
     "safety": cmd_safety,
     "watchdog": cmd_watchdog,
     "reboot": cmd_reboot,
+    "bootsel": cmd_bootsel,
     "smoke": cmd_smoke,
 }
 
@@ -434,6 +444,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser("safety", help="print safety policy details")
     subparsers.add_parser("watchdog", help="print watchdog details")
     subparsers.add_parser("reboot", help="request a firmware reboot")
+    subparsers.add_parser("bootsel", help="enter RP2350 ROM BOOTSEL for picotool or UF2")
 
     smoke_parser = subparsers.add_parser("smoke", help="pulse each relay and turn all off")
     smoke_parser.add_argument("--pulse-ms", type=int, default=1000)

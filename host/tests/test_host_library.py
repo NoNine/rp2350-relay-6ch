@@ -8,6 +8,7 @@ import pytest
 from rp2350_relay_6ch import RelayClient, SerialSmpTransport, SimulatedPacketTransport
 from rp2350_relay_6ch.constants import (
     CMD_BUILD_INFO,
+    CMD_BOOTSEL,
     CMD_CAPABILITIES,
     CMD_GET,
     CMD_GET_ALL,
@@ -16,6 +17,7 @@ from rp2350_relay_6ch.constants import (
     CMD_IDENTITY,
     CMD_OFF_ALL,
     CMD_PULSE,
+    CMD_REBOOT,
     CMD_SAFETY,
     CMD_SET,
     CMD_SET_ALL,
@@ -179,7 +181,7 @@ def test_get_info_is_not_part_of_role_oriented_host_api() -> None:
         (
             "identity",
             CMD_IDENTITY,
-            {"protocol_version": 8, "command_model_version": 2, "relay_count": 6},
+            {"protocol_version": 9, "command_model_version": 3, "relay_count": 6},
         ),
         ("capabilities", CMD_CAPABILITIES, {"capabilities": 31}),
         ("build_info", CMD_BUILD_INFO, {"app_version": "0.8.0"}),
@@ -208,8 +210,8 @@ def test_role_read_methods_each_send_one_read_request(
 
 
 def test_protocol_8_command_ids_are_grouped_by_role() -> None:
-    assert PROTOCOL_VERSION == 8
-    assert COMMAND_MODEL_VERSION == 2
+    assert PROTOCOL_VERSION == 9
+    assert COMMAND_MODEL_VERSION == 3
     assert CMD_IDENTITY == 0x00
     assert CMD_CAPABILITIES == 0x01
     assert CMD_BUILD_INFO == 0x02
@@ -224,6 +226,8 @@ def test_protocol_8_command_ids_are_grouped_by_role() -> None:
     assert CMD_SET_ALL == 0x21
     assert CMD_PULSE == 0x22
     assert CMD_HEARTBEAT == 0x30
+    assert CMD_REBOOT == 0x40
+    assert CMD_BOOTSEL == 0x41
 
 
 def test_heartbeat_sends_write_request_with_empty_payload() -> None:
@@ -237,6 +241,20 @@ def test_heartbeat_sends_write_request_with_empty_payload() -> None:
     packet = decode_packet(transport.requests[0])
     assert packet.op == 2
     assert packet.command == CMD_HEARTBEAT
+    assert request_payload(transport) == {}
+
+
+def test_bootsel_sends_write_request_with_empty_payload() -> None:
+    transport = SimulatedPacketTransport(
+        [response(CMD_BOOTSEL, 0, {"ok": True}, OP_WRITE_RSP)]
+    )
+    client = RelayClient(transport)
+
+    assert client.bootsel() == {"ok": True}
+
+    packet = decode_packet(transport.requests[0])
+    assert packet.op == 2
+    assert packet.command == CMD_BOOTSEL
     assert request_payload(transport) == {}
 
 

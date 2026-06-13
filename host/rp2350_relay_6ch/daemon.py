@@ -66,6 +66,7 @@ DEVICE_COMMANDS = {
     "safety",
     "watchdog",
     "reboot",
+    "bootsel",
 }
 COMMANDS = DEVICE_COMMANDS | {"daemon-status"}
 LOG = logging.getLogger(__name__)
@@ -174,6 +175,7 @@ def _validate_args(command: str, args: dict[str, Any]) -> None:
         "safety",
         "watchdog",
         "reboot",
+        "bootsel",
         "daemon-status",
     }:
         if args:
@@ -737,19 +739,27 @@ class RelayDaemon:
             client = self.client
             if client is None or not self.connected:
                 raise RelayTransportError("relay controller is disconnected")
-            if request.command == "reboot":
+            if request.command in {"reboot", "bootsel"}:
                 port = self.current_port
                 try:
                     pre_reboot_status = client.status()
-                    result = client.reboot()
+                    if request.command == "bootsel":
+                        result = client.bootsel()
+                    else:
+                        result = client.reboot()
                 except RelayTransportError as exc:
                     self._mark_disconnected(str(exc))
                     raise
-                self._enter_reboot_recovery(
-                    pre_reboot_status=pre_reboot_status,
-                    port=port,
-                    client=client,
-                )
+                if request.command == "bootsel":
+                    self._mark_disconnected(
+                        "BOOTSEL accepted; relay app left USB serial transport"
+                    )
+                else:
+                    self._enter_reboot_recovery(
+                        pre_reboot_status=pre_reboot_status,
+                        port=port,
+                        client=client,
+                    )
                 return result
             try:
                 result = _dispatch_device_command(client, request.command or "", request.args)
@@ -794,6 +804,8 @@ def _dispatch_device_command(
         return client.watchdog()
     if command == "reboot":
         return client.reboot()
+    if command == "bootsel":
+        return client.bootsel()
     raise RelayValidationError(f"unknown command {command}")
 
 

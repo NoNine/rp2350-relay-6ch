@@ -215,6 +215,7 @@ Disconnected state is entered when:
 - `disconnect` or `disconnect --force` closes the current client.
 - `reboot` closes the current client and reconnect by known USB serial number
   does not complete.
+- `bootsel` closes the current client after RP2350 ROM BOOTSEL is accepted.
 - A foreground command gets a transport error that closes or invalidates the
   current client.
 - Manual `connect` fails while the session is already disconnected.
@@ -252,7 +253,8 @@ Recovery behavior:
 - Plain `connect` retries a saved startup `--port` or `--serial` selector
   first, then falls back to USB discovery and the numbered device list.
 - Only the `reboot` command path attempts automatic reconnect by USB serial
-  number.
+  number. `bootsel` does not reconnect because the app USB serial/SMP transport
+  disappears.
 
 ## Heartbeat Polling
 
@@ -352,6 +354,12 @@ session reconnect must still confirm the new boot through normal startup
 If `reboot` returns a typed error, print it and keep the existing session state
 unless the underlying transport error already closed the client.
 
+`bootsel` sends the RP2350 ROM BOOTSEL command through the current client.
+After success, print `bootsel requested`, then
+`BOOTSEL disconnected; use picotool or UF2`, close the client, and remain
+disconnected. Do not call this generic bootloader, DFU, or update mode in
+operator text.
+
 ## Error Handling
 
 Inside an already-open session, command errors do not end the session by
@@ -394,7 +402,7 @@ Automated tests should cover:
 - Startup `identity` and `status` banner generation.
 - Command dispatch for `identity`, `capabilities`, `build-info`, `get`, `set`,
   `set-all`, `pulse`, `off-all`, `status`, `health`, `transport`, `safety`,
-  `watchdog`, and `reboot`.
+  `watchdog`, `reboot`, and `bootsel`.
 - One-connection session ownership across multiple commands.
 - Validation, timeout, transport, protocol, and device errors continuing the
   session where appropriate.

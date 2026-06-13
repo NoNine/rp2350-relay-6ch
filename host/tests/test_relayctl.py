@@ -94,6 +94,10 @@ class FakeDaemonClient:
         self.calls.append(("reboot", ()))
         return {"reboot": True}
 
+    def bootsel(self) -> dict[str, Any]:
+        self.calls.append(("bootsel", ()))
+        return {"ok": True}
+
     def daemon_status(self) -> dict[str, Any]:
         self.calls.append(("daemon_status", ()))
         return {
@@ -127,6 +131,18 @@ def test_relayctl_uses_socket_timeout_and_one_based_channels(
     assert FakeDaemonClient.instances[0].socket_path == "/tmp/relay.sock"
     assert FakeDaemonClient.instances[0].timeout_s == 3.5
     assert FakeDaemonClient.instances[0].calls == [("set_relay", (5, True))]
+
+
+def test_relayctl_bootsel_outputs_requested_message(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    rc = relayctl.main(["--socket", "/tmp/relay.sock", "bootsel"])
+
+    captured = capsys.readouterr()
+
+    assert rc == relayctl.EXIT_OK
+    assert captured.out == "bootsel requested\n"
+    assert FakeDaemonClient.instances[0].calls == [("bootsel", ())]
 
 
 def test_relayctl_uses_named_instance_socket(

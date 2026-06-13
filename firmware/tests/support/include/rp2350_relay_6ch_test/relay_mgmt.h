@@ -19,8 +19,11 @@ int relay_mgmt_test_handle(uint8_t command_id, bool write, const uint8_t *reques
 uint32_t relay_mgmt_test_reboot_delay_ms(void);
 void relay_mgmt_test_cancel_reboot(void);
 void relay_mgmt_test_force_reboot_schedule_result(int result);
+void relay_mgmt_test_force_bootsel_schedule_result(int result);
 void relay_mgmt_test_run_reboot_work(void);
+void relay_mgmt_test_run_bootsel_work(void);
 void relay_mgmt_test_force_reboot_return(bool enabled);
+void relay_mgmt_test_force_bootsel_return(bool enabled);
 
 #ifdef __cplusplus
 }

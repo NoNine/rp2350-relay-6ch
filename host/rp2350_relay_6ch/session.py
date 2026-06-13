@@ -60,6 +60,7 @@ CONNECTED_COMMANDS = (
     "watchdog",
     "smoke",
     "reboot",
+    "bootsel",
     "disconnect",
     "connect",
     "help",
@@ -262,6 +263,8 @@ class RelaySession:
                 self._handle_disconnect(force=self._parse_force(command, args))
             elif command == "reboot":
                 self._handle_reboot(args)
+            elif command == "bootsel":
+                self._handle_bootsel(args)
             else:
                 self._handle_relay_command(command, args)
         except RelayValidationError as exc:
@@ -595,6 +598,21 @@ class RelaySession:
         self._enter_disconnected()
         del payload
 
+    def _handle_bootsel(self, args: list[str]) -> None:
+        if args:
+            raise RelayValidationError("bootsel takes no arguments")
+        client = self._require_client()
+        with self._lock:
+            payload = client.bootsel()
+        print("bootsel requested", file=self.output)
+        self._close_current(force=True, warn=False)
+        print(
+            "BOOTSEL disconnected; use picotool or UF2",
+            file=self.output,
+        )
+        self._enter_disconnected()
+        del payload
+
     def _handle_relay_command(self, command: str, args: list[str]) -> None:
         client = self._require_client()
         with self._lock:
@@ -735,6 +753,7 @@ class RelaySession:
             "  connect                      connect using saved selector or discovery\n"
             "  connect --port <port>        connect to a serial port\n"
             "  connect --serial <serial>    connect by USB serial number\n"
+            "  bootsel                      enter RP2350 ROM BOOTSEL for picotool or UF2\n"
             "  disconnect                   close only when relays are confirmed off\n"
             "  disconnect --force           close without confirmed all-off state\n"
             "\n"

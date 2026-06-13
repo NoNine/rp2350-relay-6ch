@@ -19,7 +19,7 @@ class FakeClient:
     failure: Exception | None = None
     relay_state = 0x21
     relay_pulsing = 0
-    protocol_version = 8
+    protocol_version = 9
 
     def __init__(
         self,
@@ -62,7 +62,7 @@ class FakeClient:
     def identity(self) -> dict[str, Any]:
         self.calls.append(("identity", ()))
         return {
-            "command_model_version": 2,
+            "command_model_version": 3,
             "hardware": "Waveshare RP2350-Relay-6CH",
             "protocol_version": self.protocol_version,
             "relay_count": 6,
@@ -152,6 +152,10 @@ class FakeClient:
         self.calls.append(("reboot", ()))
         return {"reboot": True}
 
+    def bootsel(self) -> dict[str, Any]:
+        self.calls.append(("bootsel", ()))
+        return {"ok": True}
+
     def heartbeat(self) -> dict[str, Any]:
         self.calls.append(("heartbeat", ()))
         return {"ok": True}
@@ -163,7 +167,7 @@ def fake_client(monkeypatch: pytest.MonkeyPatch) -> None:
     FakeClient.failure = None
     FakeClient.relay_state = 0x21
     FakeClient.relay_pulsing = 0
-    FakeClient.protocol_version = 8
+    FakeClient.protocol_version = 9
     monkeypatch.setattr(cli, "RelayClient", FakeClient)
 
 
@@ -200,11 +204,11 @@ def test_identity_human_output_lists_identity_fields(capsys: pytest.CaptureFixtu
     captured = capsys.readouterr()
 
     assert rc == cli.EXIT_OK
-    assert "command_model_version:  2" in captured.out
+    assert "command_model_version:  3" in captured.out
     assert "hardware:" in captured.out
     assert "Waveshare RP2350-Relay-6CH" in captured.out
     assert "protocol_version:" in captured.out
-    assert "8" in captured.out
+    assert "9" in captured.out
     assert "relay_count:" in captured.out
 
 
@@ -236,6 +240,19 @@ def test_capabilities_json_output_keeps_raw_payload(capsys: pytest.CaptureFixtur
     assert captured.out == (
         '{"capabilities": 63, "pulse_max_ms": 60000, "pulse_min_ms": 10}\n'
     )
+
+
+def test_bootsel_outputs_requested_message(capsys: pytest.CaptureFixture[str]) -> None:
+    rc = cli.main(["--port", "COM7", "bootsel"])
+
+    captured = capsys.readouterr()
+
+    assert rc == cli.EXIT_OK
+    assert captured.out == "bootsel requested\n"
+    assert FakeClient.instances[0].calls == [
+        ("identity", ()),
+        ("bootsel", ()),
+    ]
 
 
 def test_identity_allows_old_protocol_for_diagnostics(

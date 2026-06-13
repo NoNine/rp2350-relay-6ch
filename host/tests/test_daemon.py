@@ -59,7 +59,7 @@ class FakeRelayClient:
         self.calls.append(("identity", ()))
         if self.fail_info is not None:
             raise self.fail_info
-        return {"protocol_version": 8, "command_model_version": 2, "relay_count": 6}
+        return {"protocol_version": 9, "command_model_version": 3, "relay_count": 6}
 
     def capabilities(self) -> dict[str, Any]:
         self.calls.append(("capabilities", ()))
@@ -141,6 +141,10 @@ class FakeRelayClient:
         self.calls.append(("reboot", ()))
         return {"reboot": True}
 
+    def bootsel(self) -> dict[str, Any]:
+        self.calls.append(("bootsel", ()))
+        return {"ok": True}
+
     def heartbeat(self) -> dict[str, Any]:
         self.calls.append(("heartbeat", ()))
         if self.heartbeat_failure is not None:
@@ -185,6 +189,11 @@ def make_daemon(
 
 def request_reboot(daemon: RelayDaemon) -> dict[str, Any]:
     request = parse_request_line(b'{"id":"1","command":"reboot"}', 1)
+    return daemon._handle_request(request)
+
+
+def request_bootsel(daemon: RelayDaemon) -> dict[str, Any]:
+    request = parse_request_line(b'{"id":"1","command":"bootsel"}', 1)
     return daemon._handle_request(request)
 
 
@@ -493,6 +502,22 @@ def test_reboot_returns_success_then_enters_reboot_recovery(
     assert daemon._reboot_usb_instance_id == "1-2:9"
     assert instance_ports == ["/dev/ttyACM0"]
     assert FakeRelayClient.instances[0].closed is True
+
+
+def test_bootsel_returns_success_then_disconnects_without_recovery(tmp_path: Any) -> None:
+    daemon = make_daemon(tmp_path)
+    daemon._connect_ready()
+    first_client = daemon.client
+
+    assert request_bootsel(daemon) == {"ok": True}
+
+    assert daemon.connected is False
+    assert daemon.current_port is None
+    assert daemon.last_error == "BOOTSEL accepted; relay app left USB serial transport"
+    assert daemon._reboot_recovery is False
+    assert daemon.client is None
+    assert first_client is not None
+    assert first_client.closed is True
 
 
 def test_reboot_recovery_serial_rediscovery_precedes_instance_guard(

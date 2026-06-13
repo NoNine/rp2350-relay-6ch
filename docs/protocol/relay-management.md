@@ -14,8 +14,8 @@ Firmware tests continue to exercise the management group handlers on
 ## SMP Group
 
 - Group ID: `64`
-- Protocol version: `8`
-- Command model version: `2`
+- Protocol version: `9`
+- Command model version: `3`
 - Hardware name: `Waveshare RP2350-Relay-6CH`
 - Relay channel indexes: zero-based, `0` through `5`
 - Relay state masks: bit `0` is `CH1`, bit `5` is `CH6`
@@ -40,6 +40,7 @@ Firmware tests continue to exercise the management group handlers on
 | 0x23 | `off_all` | Write | Cancel pulses and turn every relay off. |
 | 0x30 | `heartbeat` | Write | Renew the communication-loss lease and return a liveness acknowledgement. |
 | 0x40 | `reboot` | Write | Request controlled reboot when Zephyr reboot support is enabled. |
+| 0x41 | `bootsel` | Write | Enter RP2350 ROM BOOTSEL UF2 update mode. |
 | 0x7f | `event` | Device-originated `Write Response` | Reserved best-effort asynchronous event frame. |
 
 ### Role Command Model
@@ -50,13 +51,13 @@ Firmware tests continue to exercise the management group handlers on
 | Observation | `0x10`-`0x16` | `get`, `get_all`, `status`, `health`, `transport`, `safety`, `watchdog` | Yes | Read relay state and role-specific operational details without claiming ownership or changing outputs. |
 | Control | `0x20`-`0x23` | `set`, `set_all`, `pulse`, `off_all` | Yes | Change relay outputs or cancel active pulse work. |
 | Ownership | `0x30` | `heartbeat` | Yes | Renew host ownership and the communication-loss lease without changing relay outputs. |
-| Maintenance | `0x40` | `reboot` | Yes | Request a controlled firmware reboot when reboot support is enabled. |
+| Maintenance | `0x40`-`0x41` | `reboot`, `bootsel` | Yes | Request controlled firmware maintenance actions. |
 | Reserved event | `0x7f` | `event` | No | Reserve a device-originated asynchronous event frame; hosts must not send requests to this command. |
 
-Protocol version `8` groups command IDs by command-model role: identity,
+Protocol version `9` groups command IDs by command-model role: identity,
 observation, control, ownership, and maintenance. It splits single-relay `get`
 from all-relay `get_all` so each command has one response shape. Hosts must
-match protocol version `8` before using these command IDs, treat `event` as
+match protocol version `9` before using these command IDs, treat `event` as
 unavailable, and use normal command responses and reconnect/status checks.
 
 ## Error Codes
@@ -322,7 +323,7 @@ Response:
 | --- | --- | --- |
 | `ok` | bool | Present and true when the heartbeat request was accepted. |
 
-In protocol `8`, `heartbeat` renews the firmware communication-loss lease when
+In protocol `9`, `heartbeat` renews the firmware communication-loss lease when
 the active policy uses a timeout. It does not change relay outputs directly,
 emit events, expose heartbeat health state, or persist relay state.
 
@@ -359,6 +360,24 @@ imply mains-power SmartPDU behavior.
 The `reboot` command is host-initiated maintenance, not a communication-loss
 recovery action. It uses its own short controlled-reboot pending indication and
 is not delayed by `comm_loss_reboot_delay_ms`.
+
+### `bootsel`
+
+Request: empty CBOR map.
+
+Response:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `ok` | bool | Present and true when BOOTSEL entry was scheduled. |
+
+`bootsel` is host-initiated maintenance for RP2350 ROM BOOTSEL UF2 update mode.
+It is not a relay control command and must not be described as generic
+bootloader, DFU, or update mode. Before entering BOOTSEL, firmware cancels
+pulses, turns all relays off, detaches USB when supported, waits for the detach
+to settle, and then enters the RP2350 ROM BOOTSEL path. After acceptance, the
+normal USB serial/SMP application transport disappears; hosts must not expect
+automatic reconnect to the relay app.
 
 ### Planned `event`
 

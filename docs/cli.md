@@ -341,6 +341,7 @@ rp2350-relay --port <serial-port> transport
 rp2350-relay --port <serial-port> safety
 rp2350-relay --port <serial-port> watchdog
 rp2350-relay --port <serial-port> reboot
+rp2350-relay --port <serial-port> bootsel
 rp2350-relay --port <serial-port> smoke --pulse-ms 1000
 ```
 

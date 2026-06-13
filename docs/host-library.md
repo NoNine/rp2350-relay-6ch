@@ -225,7 +225,7 @@ client.pulse_relay(0, 100)
 client.off_all_relays()
 ```
 
-`get_info()` is not part of the protocol `8`, command model `2` host API.
+`get_info()` is not part of the protocol `9`, command model `3` host API.
 Call role-specific read methods directly; each method sends exactly one
 firmware command.
 
@@ -233,6 +233,14 @@ firmware command.
 
 ```python
 client.reboot()
+```
+
+`bootsel()` requests RP2350 ROM BOOTSEL UF2 update mode. After firmware accepts
+the command, the normal USB serial/SMP application transport disappears and the
+host should not expect automatic reconnect to the relay app:
+
+```python
+client.bootsel()
 ```
 
 ## Planned Device Events

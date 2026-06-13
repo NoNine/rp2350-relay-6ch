@@ -6,6 +6,7 @@ from typing import Any
 
 from .constants import (
     CMD_BUILD_INFO,
+    CMD_BOOTSEL,
     CMD_CAPABILITIES,
     CMD_GET,
     CMD_GET_ALL,
@@ -154,6 +155,9 @@ class RelayClient:
 
     def reboot(self) -> dict[str, Any]:
         return self._request(CMD_REBOOT, OP_WRITE, {})
+
+    def bootsel(self) -> dict[str, Any]:
+        return self._request(CMD_BOOTSEL, OP_WRITE, {})
 
     def heartbeat(self) -> dict[str, Any]:
         return self._request(CMD_HEARTBEAT, OP_WRITE, {})

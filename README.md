@@ -425,7 +425,7 @@ Select device number, or q to cancel: 1
 │   Port:         /dev/ttyACM0                                 │
 │   Serial:       E6614C311F4B8B2F                             │
 │   Hardware:     Waveshare RP2350-Relay-6CH                   │
-│   Protocol:     8                                            │
+│   Protocol:     9                                            │
 │   Relay count:  6                                            │
 │   State:        0x00                                         │
 │   On:           <span style="color: #ff4dff;">none</span>                                         │
@@ -451,6 +451,7 @@ Control:
   off-all                      turn every relay off and cancel pulses
   smoke [--pulse-ms &lt;ms&gt;]      pulse each relay and turn all off
   reboot                       request a controlled firmware reboot
+  bootsel                      enter RP2350 ROM BOOTSEL for picotool or UF2
 
 Connection:
   disconnect                   close the current serial connection

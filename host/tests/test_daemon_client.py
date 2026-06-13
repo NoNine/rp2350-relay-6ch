@@ -61,6 +61,7 @@ def test_daemon_client_methods_send_expected_commands(tmp_path: Any) -> None:
         assert client.transport_status() == {"state": 1}
         assert client.safety() == {"state": 1}
         assert client.watchdog() == {"state": 1}
+        assert client.bootsel() == {"state": 1}
         assert client.set_relay(0, True) == {"state": 1}
         assert client.get_relay(0) == {"state": 1}
         assert client.get_all_relays() == {"state": 1}
@@ -78,11 +79,12 @@ def test_daemon_client_methods_send_expected_commands(tmp_path: Any) -> None:
         {"id": 6, "command": "transport"},
         {"id": 7, "command": "safety"},
         {"id": 8, "command": "watchdog"},
-        {"id": 9, "command": "set", "args": {"channel": 0, "on": True}},
-        {"id": 10, "command": "get", "args": {"channel": 0}},
-        {"id": 11, "command": "get-all"},
-        {"id": 12, "command": "off-all"},
-        {"id": 13, "command": "daemon-status"},
+        {"id": 9, "command": "bootsel"},
+        {"id": 10, "command": "set", "args": {"channel": 0, "on": True}},
+        {"id": 11, "command": "get", "args": {"channel": 0}},
+        {"id": 12, "command": "get-all"},
+        {"id": 13, "command": "off-all"},
+        {"id": 14, "command": "daemon-status"},
     ]
 
 

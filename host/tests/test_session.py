@@ -76,9 +76,9 @@ class SessionFakeClient:
     def identity(self) -> dict[str, Any]:
         self.calls.append(("identity", ()))
         return {
-            "command_model_version": 2,
+            "command_model_version": 3,
             "hardware": "Waveshare RP2350-Relay-6CH",
-            "protocol_version": 8,
+            "protocol_version": 9,
             "relay_count": 6,
         }
 
@@ -165,6 +165,10 @@ class SessionFakeClient:
 
     def reboot(self) -> dict[str, Any]:
         self.calls.append(("reboot", ()))
+        return {"ok": True}
+
+    def bootsel(self) -> dict[str, Any]:
+        self.calls.append(("bootsel", ()))
         return {"ok": True}
 
     def heartbeat(self) -> dict[str, Any]:
@@ -273,7 +277,7 @@ def test_startup_opens_one_client_runs_identity_status_and_starts_heartbeat() ->
     assert "RP2350 Relay Session" in text
     assert "Connection:   connected" in text
     assert "Port:         COM7" in text
-    assert "Protocol:     8" in text
+    assert "Protocol:     9" in text
     assert "State:        0x00" in text
     assert "Pulsing:      none" in text
 
@@ -567,6 +571,7 @@ def test_connected_completion_suggests_all_session_commands() -> None:
         "watchdog",
         "smoke",
         "reboot",
+        "bootsel",
         "disconnect",
         "connect",
         "help",
@@ -836,6 +841,20 @@ def test_reboot_closes_client_and_reconnects_by_serial() -> None:
     assert "reboot requested" in output.getvalue()
     assert output.getvalue().count("Connection:   connected") == 2
     assert len(FakeHeartbeat.instances) == 2
+
+
+def test_bootsel_closes_client_without_reconnect() -> None:
+    session, output = make_session()
+    session._connect_from_options(session.options, initial=True)
+    first_client = session.client
+
+    session.handle_line("bootsel")
+
+    assert first_client is not None
+    assert first_client.closed is True
+    assert session.connected is False
+    assert "bootsel requested" in output.getvalue()
+    assert "BOOTSEL disconnected; use picotool or UF2" in output.getvalue()
 
 
 def test_reboot_after_explicit_port_reconnects_by_attached_serial() -> None:
