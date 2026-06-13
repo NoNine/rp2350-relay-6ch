@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: Apache-2.0
+
+description: Waveshare RP2350-Relay-6CH WS2812 LED on RP2350B PIO1 GP36
+
+compatible: "rp2350-relay-6ch,waveshare-ws2812-pio"
+
+include: pinctrl-device.yaml
+
+properties:
+  bit-waveform:
+    type: array
+    required: true
+    description: WS2812 PIO waveform timing counts for T0, T1, and T2.
+
+child-binding:
+  description: Waveshare onboard WS2812 RGB LED
+
+  include: ws2812-gpio.yaml
+
+  properties:
+    gpios:
+      required: true
+
+    frequency:
+      type: int
+      required: true
+

@@ -177,21 +177,17 @@ gpio1: &gpio0_hi {
 	status = "okay";
 
 	pio1_ws2812 {
-		compatible = "worldsemi,ws2812-rpi_pico-pio";
+		compatible = "rp2350-relay-6ch,waveshare-ws2812-pio";
 		pinctrl-0 = <&ws2812_pio1_default>;
 		pinctrl-names = "default";
 		bit-waveform = <3>, <3>, <4>;
 		status = "okay";
 
 		rgb_led: rgb_led {
-			/*
-			 * The RP Pico PIO WS2812 driver ignores the GPIO controller
-			 * and flags here and uses only the absolute GPIO number. Keep
-			 * this as GP36, not &gpio0_hi 4, to match PIO1_P36.
-			 */
-			gpios = <&gpio0 36 GPIO_ACTIVE_HIGH>;
+			/* RGB_CTRL: GP36, gpio0_hi offset 4. */
+			gpios = <&gpio0_hi 4 GPIO_ACTIVE_HIGH>;
 			chain-length = <1>;
-			color-mapping = <LED_COLOR_ID_GREEN LED_COLOR_ID_RED LED_COLOR_ID_BLUE>;
+			color-mapping = <LED_COLOR_ID_RED LED_COLOR_ID_GREEN LED_COLOR_ID_BLUE>;
 			reset-delay = <280>;
 			frequency = <DT_FREQ_K(800)>;
 			status = "okay";
