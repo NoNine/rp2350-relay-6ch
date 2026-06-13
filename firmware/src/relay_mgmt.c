@@ -661,6 +661,7 @@ static void reboot_work_handler(struct k_work *work)
 		return;
 	}
 
+	indicator_shutdown_outputs();
 	reboot_usb_disconnect_and_settle();
 #ifdef CONFIG_ZTEST
 	if (!test_reboot_return) {
@@ -687,6 +688,7 @@ static void bootsel_work_handler(struct k_work *work)
 		return;
 	}
 
+	indicator_shutdown_outputs();
 	reboot_usb_disconnect_and_settle();
 #ifdef CONFIG_ZTEST
 	if (!test_bootsel_return) {

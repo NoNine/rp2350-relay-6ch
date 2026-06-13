@@ -780,7 +780,10 @@ ZTEST(relay_mgmt, test_host_reboot_work_disconnects_usb_before_reboot)
 
 	zassert_equal(reboot_test_usb_disconnect_attempts(), 1U);
 	zassert_equal(reboot_test_usb_disconnect_settles(), 1U);
+	zassert_true(indicator_test_shutdown_order() > 0U);
 	zassert_true(reboot_test_usb_disconnect_order() > 0U);
+	zassert_true(reboot_test_usb_disconnect_order() >
+		     indicator_test_shutdown_order());
 	zassert_true(reboot_test_reboot_order() >
 		     reboot_test_usb_disconnect_order());
 }
@@ -818,6 +821,7 @@ ZTEST(relay_mgmt, test_host_reboot_off_all_failure_records_reboot_failed)
 
 	zassert_equal(reboot_test_usb_disconnect_attempts(), 0U);
 	zassert_equal(reboot_test_usb_disconnect_settles(), 0U);
+	zassert_equal(indicator_test_shutdown_order(), 0U);
 	zassert_equal(reboot_test_reboot_order(), 0U);
 	health_snapshot(&snap);
 	zassert_equal(snap.state, HEALTH_FAULT);
@@ -861,7 +865,10 @@ ZTEST(relay_mgmt, test_bootsel_work_disconnects_usb_before_bootsel)
 
 	zassert_equal(reboot_test_usb_disconnect_attempts(), 1U);
 	zassert_equal(reboot_test_usb_disconnect_settles(), 1U);
+	zassert_true(indicator_test_shutdown_order() > 0U);
 	zassert_true(reboot_test_usb_disconnect_order() > 0U);
+	zassert_true(reboot_test_usb_disconnect_order() >
+		     indicator_test_shutdown_order());
 	zassert_true(reboot_test_bootsel_order() >
 		     reboot_test_usb_disconnect_order());
 }
@@ -875,6 +882,7 @@ ZTEST(relay_mgmt, test_bootsel_off_all_failure_records_reboot_failed)
 
 	zassert_equal(reboot_test_usb_disconnect_attempts(), 0U);
 	zassert_equal(reboot_test_usb_disconnect_settles(), 0U);
+	zassert_equal(indicator_test_shutdown_order(), 0U);
 	zassert_equal(reboot_test_bootsel_order(), 0U);
 	health_snapshot(&snap);
 	zassert_equal(snap.state, HEALTH_FAULT);

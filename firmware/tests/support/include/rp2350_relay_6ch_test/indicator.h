@@ -36,6 +36,7 @@ struct indicator_test_snapshot {
 	uint16_t display_write_count;
 	bool buzzer_on;
 	uint8_t beeps_remaining;
+	bool display_blanking_on;
 };
 
 void indicator_test_reset(void);
@@ -56,6 +57,7 @@ void indicator_test_set_display_clear_failure(bool clear_write_fails);
 void indicator_test_set_display_render_failure(bool render_write_fails);
 void indicator_test_set_display_orientation_failure(bool orientation_fails);
 enum display_orientation indicator_test_display_orientation(void);
+unsigned int indicator_test_shutdown_order(void);
 
 #ifdef __cplusplus
 }

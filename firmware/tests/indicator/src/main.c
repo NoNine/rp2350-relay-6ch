@@ -573,6 +573,49 @@ ZTEST(indicator, test_display_post_clears_retained_reset_pixels_before_render)
 	zassert_false(indicator_test_display_pixel_is_set(127U, 63U));
 }
 
+ZTEST(indicator, test_shutdown_outputs_clears_local_indicators)
+{
+	struct indicator_test_snapshot snap;
+
+	indicator_test_configure_display(true, true, 128U, 64U,
+					 PIXEL_FORMAT_MONO01, false, false, false);
+	indicator_test_reset();
+	indicator_test_seed_display_frame(0xff);
+	indicator_record_command(INDICATOR_COMMAND_REJECTED);
+	indicator_test_force_render();
+
+	indicator_shutdown_outputs();
+	indicator_test_get_snapshot(&snap);
+
+	zassert_equal(snap.rgb, INDICATOR_RGB_OFF);
+	zassert_equal(snap.buzzer, INDICATOR_BUZZER_SILENT);
+	zassert_false(snap.buzzer_on);
+	zassert_equal(snap.beeps_remaining, 0U);
+	zassert_equal(snap.display_mode, INDICATOR_DISPLAY_MODE_OFF);
+	zassert_equal(snap.display_clear_write_count, 2U);
+	zassert_true(snap.display_blanking_on);
+	zassert_false(indicator_test_display_pixel_is_set(0U, 0U));
+	zassert_false(indicator_test_display_pixel_is_set(127U, 63U));
+}
+
+ZTEST(indicator, test_shutdown_outputs_tolerates_display_failures)
+{
+	struct indicator_test_snapshot snap;
+
+	indicator_test_configure_display(true, true, 128U, 64U,
+					 PIXEL_FORMAT_MONO01, false, false, false);
+	indicator_test_reset();
+	indicator_test_set_display_clear_failure(true);
+	indicator_test_set_display_blanking_on_failure(true);
+
+	indicator_shutdown_outputs();
+	indicator_test_get_snapshot(&snap);
+
+	zassert_equal(snap.rgb, INDICATOR_RGB_OFF);
+	zassert_equal(snap.buzzer, INDICATOR_BUZZER_SILENT);
+	zassert_equal(snap.display_mode, INDICATOR_DISPLAY_MODE_OFF);
+}
+
 ZTEST(indicator, test_display_post_sets_configured_orientation)
 {
 	indicator_test_configure_display(true, true, 128U, 64U,

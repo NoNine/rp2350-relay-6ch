@@ -86,6 +86,7 @@ void indicator_set_relay_timed_state(
 	uint8_t state_mask, uint8_t pulse_mask,
 	const struct indicator_pulse_timing pulse_timing[6]);
 void indicator_record_command(enum indicator_command_result result);
+void indicator_shutdown_outputs(void);
 
 #ifdef __cplusplus
 }

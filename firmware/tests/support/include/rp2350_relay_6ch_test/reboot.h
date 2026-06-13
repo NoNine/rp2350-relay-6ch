@@ -13,6 +13,7 @@ void reboot_test_reset(void);
 void reboot_test_force_usb_disconnect_result(int result);
 void reboot_test_record_reboot(void);
 void reboot_test_record_bootsel(void);
+unsigned int reboot_test_next_sequence(void);
 unsigned int reboot_test_usb_disconnect_attempts(void);
 unsigned int reboot_test_usb_disconnect_settles(void);
 unsigned int reboot_test_usb_disconnect_order(void);

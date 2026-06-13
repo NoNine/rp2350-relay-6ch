@@ -20,6 +20,7 @@
 #include <rp2350_relay_6ch/indicator.h>
 #ifdef CONFIG_ZTEST
 #include <rp2350_relay_6ch_test/indicator.h>
+#include <rp2350_relay_6ch_test/reboot.h>
 #endif
 
 LOG_MODULE_REGISTER(rp2350_relay_indicator, LOG_LEVEL_INF);
@@ -139,6 +140,7 @@ struct indicator_display_test_config {
 	uint32_t pixel_formats;
 	bool blanking_fails;
 	bool blanking_on_fails;
+	bool blanking_on;
 	bool orientation_fails;
 	bool clear_write_fails;
 	bool post_write_fails;
@@ -148,6 +150,12 @@ struct indicator_display_test_config {
 
 static struct indicator_display_test_config display_test_config;
 static uint8_t display_test_frame[DISPLAY_FRAME_SIZE];
+static unsigned int test_shutdown_order;
+
+__weak unsigned int reboot_test_next_sequence(void)
+{
+	return 0U;
+}
 #endif
 
 static bool rgb_available(void)
@@ -391,6 +399,9 @@ static void display_get_capabilities_local(struct display_capabilities *caps)
 static int display_blanking_off_local(void)
 {
 #ifdef CONFIG_ZTEST
+	if (!display_test_config.blanking_fails) {
+		display_test_config.blanking_on = false;
+	}
 	return display_test_config.blanking_fails ? -EIO : 0;
 #elif IS_ENABLED(CONFIG_RP2350_RELAY_6CH_DISPLAY)
 	return display_blanking_off(display_dev);
@@ -402,6 +413,9 @@ static int display_blanking_off_local(void)
 static int display_blanking_on_local(void)
 {
 #ifdef CONFIG_ZTEST
+	if (!display_test_config.blanking_on_fails) {
+		display_test_config.blanking_on = true;
+	}
 	return display_test_config.blanking_on_fails ? -EIO : 0;
 #elif IS_ENABLED(CONFIG_RP2350_RELAY_6CH_DISPLAY)
 	return display_blanking_on(display_dev);
@@ -1073,6 +1087,41 @@ static bool display_can_render_locked(void)
 	return state.display_state == INDICATOR_DISPLAY_READY;
 }
 
+static int display_clear_and_blank(void)
+{
+	const struct display_buffer_descriptor clear_desc = {
+		.buf_size = sizeof(display_frame),
+		.width = DISPLAY_WIDTH,
+		.height = DISPLAY_HEIGHT,
+		.pitch = DISPLAY_WIDTH,
+	};
+	int ret;
+	int blank_ret;
+
+	if (state.display_state != INDICATOR_DISPLAY_READY) {
+		return 0;
+	}
+
+	memset(display_frame, 0, sizeof(display_frame));
+	ret = display_write_local(0U, 0U, &clear_desc, display_frame, DISPLAY_WRITE_CLEAR);
+	if (ret < 0) {
+		LOG_WRN("OLED display shutdown clear failed: %d", ret);
+	}
+
+	blank_ret = display_blanking_on_local();
+	if (blank_ret < 0) {
+		LOG_WRN("OLED display shutdown blanking failed: %d", blank_ret);
+	}
+
+	if (ret == 0) {
+		k_mutex_lock(&state.lock, K_FOREVER);
+		state.display_clear_write_count++;
+		k_mutex_unlock(&state.lock);
+	}
+
+	return ret < 0 ? ret : blank_ret;
+}
+
 static void set_buzzer_locked(enum indicator_buzzer_pattern pattern)
 {
 	if (!IS_ENABLED(CONFIG_RP2350_RELAY_6CH_BUZZER_FEEDBACK) || !state.hardware_enabled) {
@@ -1438,6 +1487,34 @@ void indicator_record_command(enum indicator_command_result result)
 	schedule_render_now();
 }
 
+void indicator_shutdown_outputs(void)
+{
+	ensure_initialized();
+	if (IS_ENABLED(CONFIG_RP2350_RELAY_6CH_INDICATORS)) {
+		(void)k_work_cancel_delayable(&state.work);
+	}
+
+	k_mutex_lock(&state.lock, K_FOREVER);
+	state.buzzer_pattern = INDICATOR_BUZZER_SILENT;
+	state.beeps_remaining = 0U;
+	state.beep_on = false;
+	state.beep_next_ms = 0;
+	state.last_buzzer = INDICATOR_BUZZER_SILENT;
+	state.last_rgb = INDICATOR_RGB_OFF;
+	state.display_mode = INDICATOR_DISPLAY_MODE_OFF;
+	state.display_detail = INDICATOR_DISPLAY_DETAIL_NONE;
+	state.display_filled_mask = 0U;
+	state.display_pulse_mask = 0U;
+	k_mutex_unlock(&state.lock);
+
+	buzzer_off();
+	write_rgb(INDICATOR_RGB_OFF, indicator_now());
+	(void)display_clear_and_blank();
+#ifdef CONFIG_ZTEST
+	test_shutdown_order = reboot_test_next_sequence();
+#endif
+}
+
 #ifdef CONFIG_ZTEST
 int64_t indicator_test_now_ms = -1;
 
@@ -1451,6 +1528,7 @@ void indicator_test_reset(void)
 	}
 
 	indicator_test_now_ms = 0;
+	test_shutdown_order = 0U;
 	display_test_config.orientation = DISPLAY_ORIENTATION_NORMAL;
 	indicator_init();
 	render();
@@ -1483,6 +1561,7 @@ void indicator_test_get_snapshot(struct indicator_test_snapshot *snapshot)
 	snapshot->display_write_count = state.display_write_count;
 	snapshot->buzzer_on = state.beep_on;
 	snapshot->beeps_remaining = state.beeps_remaining;
+	snapshot->display_blanking_on = display_test_config.blanking_on;
 	k_mutex_unlock(&state.lock);
 }
 
@@ -1540,6 +1619,7 @@ void indicator_test_configure_display(bool supported, bool ready,
 	display_test_config.pixel_formats = pixel_formats;
 	display_test_config.blanking_fails = blanking_fails;
 	display_test_config.blanking_on_fails = false;
+	display_test_config.blanking_on = false;
 	display_test_config.orientation_fails = false;
 	display_test_config.clear_write_fails = false;
 	display_test_config.post_write_fails = post_write_fails;
@@ -1571,5 +1651,10 @@ void indicator_test_set_display_orientation_failure(bool orientation_fails)
 enum display_orientation indicator_test_display_orientation(void)
 {
 	return display_test_config.orientation;
+}
+
+unsigned int indicator_test_shutdown_order(void)
+{
+	return test_shutdown_order;
 }
 #endif

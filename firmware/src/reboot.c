@@ -125,6 +125,11 @@ void reboot_test_record_bootsel(void)
 	test_bootsel_order = ++test_reboot_sequence;
 }
 
+unsigned int reboot_test_next_sequence(void)
+{
+	return ++test_reboot_sequence;
+}
+
 unsigned int reboot_test_usb_disconnect_attempts(void)
 {
 	return test_usb_disconnect_attempts;
