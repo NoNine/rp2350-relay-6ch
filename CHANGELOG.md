@@ -7,6 +7,75 @@ release assets. The section shape is inspired by Adafruit CircuitPython release
 notes: highlights, install/assets, verification, known limitations, and safety
 notes.
 
+## 0.9.0 - 2026-06-13
+
+BOOTSEL maintenance, local indicator, and Waveshare RGB hardware support
+release for the current relay firmware and host tooling line.
+
+- Tag: `v0.9.0`
+- Commit: the `v0.9.0` tag target.
+
+### Highlights
+
+- Added the `bootsel` maintenance command across firmware, direct CLI,
+  interactive sessions, daemon client, and host library surfaces.
+- Documented BOOTSEL UF2 update behavior, including use of the RP2350 ROM
+  mass-storage path after the application disconnects.
+- Added Waveshare board RGB LED support through a WS2812 PIO driver and
+  dimmed local indicator brightness for bench visibility.
+- Added optional reversed OLED relay cell ordering for mounted board
+  orientations.
+- Cleared local indicators before controlled reboot and BOOTSEL handoff,
+  including OLED blanking, RGB off, and buzzer silence.
+- Clarified concise log handling and health documentation contracts.
+
+### Install / Assets
+
+- Install the host CLI from the GitHub Release wheel:
+  `rp2350_relay_6ch-0.9.0-py3-none-any.whl`.
+- Flash one of the matching firmware artifacts from the same release:
+  `rp2350_relay_6ch-0.9.0-waveshare.uf2` or
+  `rp2350_relay_6ch-0.9.0-pico2.uf2`.
+- Optional platform executable artifacts may be attached when useful:
+  `rp2350_relay_6ch-0.9.0-linux-x64` or
+  `rp2350_relay_6ch-0.9.0-windows-x64.exe`.
+- The source distribution `rp2350_relay_6ch-0.9.0.tar.gz` may be available as
+  an additional artifact.
+
+### Verification
+
+- Host tests passed with `scripts/test-host.sh`.
+- Release metadata and formatting passed `git diff --check`.
+- Release artifact build passed with `scripts/build.sh release 0.9.0`.
+
+### Known Limitations
+
+- MCUboot-compatible firmware upload, test-image, confirm-image, and rollback
+  workflows remain planned but not implemented.
+- BOOTSEL update mode uses the RP2350 ROM UF2 mass-storage path; after entry,
+  the application USB serial and SMP endpoints are no longer available until
+  firmware is flashed and the application boots again.
+- OLED status is firmware-local and is not exposed through host-visible status,
+  protocol, CLI, or daemon APIs.
+- Pico 2 and Pico 2 W DIY builds require explicit relay overlays and external
+  relay driver hardware.
+- RS485 and wireless host communication are not v1 control paths.
+- Application-layer authentication is not implemented; this release assumes
+  trusted local USB or local Unix socket access.
+
+### Safety Notes
+
+- Keep hazardous relay-side loads disconnected during bring-up.
+- Confirm all relays are off after flashing, reset, smoke tests, daemon
+  reconnect checks, service restart checks, update-mode entry, and teardown.
+- BOOTSEL and reboot handoff force relay outputs off before disconnecting USB
+  and clearing local indicators.
+- Communication-loss safety is firmware policy for relay outputs; it does not
+  measure contact closure, load voltage, load current, or external equipment
+  health.
+- The OLED indicator is informational only; safe relay state remains defined by
+  relay GPIO state, firmware behavior, and host control checks.
+
 ## 0.8.9 - 2026-06-03
 
 Communication-loss, health, product-build, and daemon reliability release for
