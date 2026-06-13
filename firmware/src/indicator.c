@@ -63,8 +63,10 @@ LOG_MODULE_REGISTER(rp2350_relay_indicator, LOG_LEVEL_INF);
 #define BEEP_OFF_MS 60U
 #define OWNER_LOST_BEEP_OFF_MS 250U
 #define BUZZER_PERIOD_NS PWM_USEC(1000)
+#define BUZZER_DUTY_NUMERATOR 1U
+#define BUZZER_DUTY_DENOMINATOR 10U
 #define RGB_BRIGHTNESS_NUMERATOR 1U
-#define RGB_BRIGHTNESS_DENOMINATOR 5U
+#define RGB_BRIGHTNESS_DENOMINATOR 10U
 
 struct indicator_state {
 	struct k_mutex lock;
@@ -1170,7 +1172,8 @@ static void render_buzzer_locked(int64_t now)
 	}
 
 	ret = buzzer_available() ? pwm_set_dt(&buzzer, BUZZER_PERIOD_NS,
-					      BUZZER_PERIOD_NS / 2U) : 0;
+					      (BUZZER_PERIOD_NS * BUZZER_DUTY_NUMERATOR) /
+					      BUZZER_DUTY_DENOMINATOR) : 0;
 	if (ret < 0) {
 		LOG_WRN_ONCE("Buzzer PWM update failed: %d", ret);
 		state.beeps_remaining = 0U;
