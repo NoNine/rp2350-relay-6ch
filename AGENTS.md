@@ -104,6 +104,11 @@ Minimal change gate:
 - Do not add helpers, validation, abstractions, docs, or tests unless they are
   directly required by the request.
 - If a useful cleanup is found, leave it out and mention it as follow-up work.
+- Do not stream verbose build, test, flash, or tool logs into the conversation.
+  While commands run, provide brief progress updates only. In handoff,
+  summarize key results, failures, warnings, artifact paths, and verification
+  commands instead of pasting full logs. Include detailed log excerpts only when
+  they are necessary to diagnose a failure or answer the user's request.
 - In handoff, report only changed files and verification commands that ran.
 
 Do not create product release configs for every firmware feature option.
