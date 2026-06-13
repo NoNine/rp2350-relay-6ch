@@ -53,6 +53,7 @@ LOG_MODULE_REGISTER(rp2350_relay_indicator, LOG_LEVEL_INF);
 #define DISPLAY_UI_PULSE_BAR_W (DISPLAY_UI_CELL_W - 2U)
 #define DISPLAY_UI_PULSE_BAR_MAX_RADIUS ((DISPLAY_UI_PULSE_BAR_W + 1U) / 2U)
 #define DISPLAY_PULSE_CHANNELS 6U
+#define DISPLAY_RELAY_CELLS 6U
 
 #define COMMAND_TRANSIENT_MS 150U
 #define ATTENTION_TRANSIENT_MS 600U
@@ -993,6 +994,15 @@ static bool display_pulse_mark_visible(int64_t now)
 	return ((now / 500) % 2) == 0;
 }
 
+static uint8_t display_channel_for_cell(uint8_t cell)
+{
+	if (IS_ENABLED(CONFIG_RP2350_RELAY_6CH_DISPLAY_REVERSED_RELAY_CELLS)) {
+		return (DISPLAY_RELAY_CELLS - 1U) - cell;
+	}
+
+	return cell;
+}
+
 static int display_render_frame(enum indicator_display_mode mode,
 				enum indicator_display_detail detail,
 				uint8_t state_mask, uint8_t pulse_mask,
@@ -1022,8 +1032,9 @@ static int display_render_frame(enum indicator_display_mode mode,
 	display_draw_hline(frame, DISPLAY_UI_RULE_X0, DISPLAY_UI_BOTTOM_RULE_Y,
 			   DISPLAY_UI_RULE_W);
 
-	for (uint8_t channel = 0U; channel < 6U; channel++) {
-		uint8_t cell_x = DISPLAY_UI_CELL_X0 + (channel * DISPLAY_UI_CELL_PITCH);
+	for (uint8_t cell = 0U; cell < DISPLAY_RELAY_CELLS; cell++) {
+		uint8_t channel = display_channel_for_cell(cell);
+		uint8_t cell_x = DISPLAY_UI_CELL_X0 + (cell * DISPLAY_UI_CELL_PITCH);
 		uint8_t bit = BIT(channel);
 		bool filled = (state_mask & bit) != 0U || (pulse_mask & bit) != 0U;
 		char label = (char)('1' + channel);

@@ -38,3 +38,13 @@ tests:
       - led
       - pwm
     harness: ztest
+  rp2350_relay_6ch.indicator.display_reversed_relay_cells:
+    platform_allow:
+      - native_sim
+    extra_configs:
+      - CONFIG_RP2350_RELAY_6CH_DISPLAY_REVERSED_RELAY_CELLS=y
+    tags:
+      - indicator
+      - led
+      - pwm
+    harness: ztest

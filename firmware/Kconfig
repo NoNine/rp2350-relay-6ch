@@ -47,6 +47,16 @@ config RP2350_RELAY_6CH_DISPLAY_ROTATED_180
 	  Rotate the optional OLED local status display 180 degrees for
 	  installations where the OLED panel is mounted upside down.
 
+config RP2350_RELAY_6CH_DISPLAY_REVERSED_RELAY_CELLS
+	bool "Reverse optional OLED relay cell order"
+	depends on RP2350_RELAY_6CH_DISPLAY
+	default y if BOARD_WAVESHARE_RP2350_RELAY_6CH
+	default n
+	help
+	  Render the optional OLED relay cells from CH6 to CH1 left-to-right.
+	  This is useful for boards or enclosures whose physical relay labels
+	  run in the opposite direction from the logical channel numbering.
+
 config RP2350_RELAY_6CH_WATCHDOG
 	bool "Enable runtime hardware watchdog supervisor"
 	depends on WATCHDOG || ZTEST

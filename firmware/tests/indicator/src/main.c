@@ -10,6 +10,10 @@
 #include <rp2350_relay_6ch_test/health.h>
 #include <rp2350_relay_6ch_test/indicator.h>
 
+#define TEST_DISPLAY_CELL_X0 3U
+#define TEST_DISPLAY_CELL_PITCH 21U
+#define TEST_DISPLAY_RELAY_CELLS 6U
+
 static struct indicator_test_snapshot snapshot(void)
 {
 	struct indicator_test_snapshot snap;
@@ -32,6 +36,17 @@ static void publish_health(enum health_state state, uint32_t reasons,
 	};
 
 	indicator_set_health_snapshot(&health);
+}
+
+static uint8_t display_cell_x_for_channel(uint8_t channel)
+{
+	uint8_t cell = channel;
+
+	if (IS_ENABLED(CONFIG_RP2350_RELAY_6CH_DISPLAY_REVERSED_RELAY_CELLS)) {
+		cell = (TEST_DISPLAY_RELAY_CELLS - 1U) - channel;
+	}
+
+	return TEST_DISPLAY_CELL_X0 + (cell * TEST_DISPLAY_CELL_PITCH);
 }
 
 static void indicator_before(void *fixture)
@@ -839,6 +854,8 @@ ZTEST(indicator, test_display_pulse_detail_overrides_accepted_command_transient)
 
 ZTEST(indicator, test_display_reverses_labels_in_filled_relay_cells)
 {
+	const uint8_t cell_x = display_cell_x_for_channel(0U);
+
 	indicator_test_configure_display(true, true, 128U, 64U,
 					 PIXEL_FORMAT_MONO01, false, false, false);
 	indicator_test_reset();
@@ -846,14 +863,41 @@ ZTEST(indicator, test_display_reverses_labels_in_filled_relay_cells)
 		       BIT(0), 0U);
 	(void)snapshot();
 
-	zassert_true(indicator_test_display_pixel_is_set(3U, 18U));
-	zassert_false(indicator_test_display_pixel_is_set(11U, 33U));
-	zassert_true(indicator_test_display_pixel_is_set(8U, 33U));
-	zassert_true(indicator_test_display_pixel_is_set(12U, 31U));
+	zassert_true(indicator_test_display_pixel_is_set(cell_x, 18U));
+	zassert_false(indicator_test_display_pixel_is_set(cell_x + 8U, 33U));
+	zassert_true(indicator_test_display_pixel_is_set(cell_x + 5U, 33U));
+	zassert_true(indicator_test_display_pixel_is_set(cell_x + 9U, 31U));
+}
+
+ZTEST(indicator, test_display_optional_reversed_relay_cells_follow_hardware_order)
+{
+	if (!IS_ENABLED(CONFIG_RP2350_RELAY_6CH_DISPLAY_REVERSED_RELAY_CELLS)) {
+		return;
+	}
+
+	indicator_test_configure_display(true, true, 128U, 64U,
+					 PIXEL_FORMAT_MONO01, false, false, false);
+	indicator_test_reset();
+	publish_health(HEALTH_RELAY_ACTIVE, HEALTH_REASON_NONE, HEALTH_REASON_NONE,
+		       BIT(5), 0U);
+	(void)snapshot();
+
+	zassert_true(indicator_test_display_pixel_is_set(4U, 19U));
+	zassert_false(indicator_test_display_pixel_is_set(109U, 19U));
+
+	indicator_test_reset();
+	publish_health(HEALTH_RELAY_ACTIVE, HEALTH_REASON_NONE, HEALTH_REASON_NONE,
+		       BIT(0), 0U);
+	(void)snapshot();
+
+	zassert_false(indicator_test_display_pixel_is_set(4U, 19U));
+	zassert_true(indicator_test_display_pixel_is_set(109U, 19U));
 }
 
 ZTEST(indicator, test_display_draws_visible_pulse_mark)
 {
+	const uint8_t cell_x = display_cell_x_for_channel(0U);
+
 	indicator_test_configure_display(true, true, 128U, 64U,
 					 PIXEL_FORMAT_MONO01, false, false, false);
 	indicator_test_reset();
@@ -861,17 +905,18 @@ ZTEST(indicator, test_display_draws_visible_pulse_mark)
 		       0U, BIT(0));
 	(void)snapshot();
 
-	zassert_true(indicator_test_display_pixel_is_set(3U, 18U));
-	zassert_false(indicator_test_display_pixel_is_set(14U, 22U));
-	zassert_false(indicator_test_display_pixel_is_set(15U, 23U));
-	zassert_false(indicator_test_display_pixel_is_set(17U, 22U));
-	zassert_false(indicator_test_display_pixel_is_set(18U, 23U));
-	zassert_true(indicator_test_display_pixel_is_set(11U, 27U));
-	zassert_true(indicator_test_display_pixel_is_set(14U, 24U));
+	zassert_true(indicator_test_display_pixel_is_set(cell_x, 18U));
+	zassert_false(indicator_test_display_pixel_is_set(cell_x + 11U, 22U));
+	zassert_false(indicator_test_display_pixel_is_set(cell_x + 12U, 23U));
+	zassert_false(indicator_test_display_pixel_is_set(cell_x + 14U, 22U));
+	zassert_false(indicator_test_display_pixel_is_set(cell_x + 15U, 23U));
+	zassert_true(indicator_test_display_pixel_is_set(cell_x + 8U, 27U));
+	zassert_true(indicator_test_display_pixel_is_set(cell_x + 11U, 24U));
 }
 
 ZTEST(indicator, test_display_blinks_pulse_mark_without_clearing_cell)
 {
+	const uint8_t cell_x = display_cell_x_for_channel(0U);
 	struct indicator_test_snapshot snap;
 	uint16_t writes_before;
 
@@ -885,9 +930,9 @@ ZTEST(indicator, test_display_blinks_pulse_mark_without_clearing_cell)
 
 	zassert_equal(snap.display_mode, INDICATOR_DISPLAY_MODE_ACTIVE);
 	zassert_equal(snap.display_detail, INDICATOR_DISPLAY_DETAIL_P1);
-	zassert_true(indicator_test_display_pixel_is_set(3U, 18U));
-	zassert_false(indicator_test_display_pixel_is_set(14U, 22U));
-	zassert_false(indicator_test_display_pixel_is_set(17U, 22U));
+	zassert_true(indicator_test_display_pixel_is_set(cell_x, 18U));
+	zassert_false(indicator_test_display_pixel_is_set(cell_x + 11U, 22U));
+	zassert_false(indicator_test_display_pixel_is_set(cell_x + 14U, 22U));
 
 	indicator_test_advance(500U);
 	indicator_test_get_snapshot(&snap);
@@ -895,13 +940,14 @@ ZTEST(indicator, test_display_blinks_pulse_mark_without_clearing_cell)
 	zassert_true(snap.display_write_count > writes_before);
 	zassert_equal(snap.display_mode, INDICATOR_DISPLAY_MODE_ACTIVE);
 	zassert_equal(snap.display_detail, INDICATOR_DISPLAY_DETAIL_P1);
-	zassert_true(indicator_test_display_pixel_is_set(3U, 18U));
-	zassert_true(indicator_test_display_pixel_is_set(14U, 22U));
-	zassert_true(indicator_test_display_pixel_is_set(17U, 22U));
+	zassert_true(indicator_test_display_pixel_is_set(cell_x, 18U));
+	zassert_true(indicator_test_display_pixel_is_set(cell_x + 11U, 22U));
+	zassert_true(indicator_test_display_pixel_is_set(cell_x + 14U, 22U));
 }
 
 ZTEST(indicator, test_display_draws_full_pulse_countdown_lane)
 {
+	const uint8_t cell_x = display_cell_x_for_channel(0U);
 	struct indicator_pulse_timing timing[6] = {
 		[0] = { .duration_ms = 1000U, .remaining_ms = 1000U },
 	};
@@ -914,12 +960,12 @@ ZTEST(indicator, test_display_draws_full_pulse_countdown_lane)
 	indicator_set_relay_timed_state(0U, BIT(0), timing);
 	(void)snapshot();
 
-	zassert_false(indicator_test_display_pixel_is_set(3U, 45U));
-	zassert_true(indicator_test_display_pixel_is_set(4U, 46U));
-	zassert_true(indicator_test_display_pixel_is_set(11U, 46U));
-	zassert_true(indicator_test_display_pixel_is_set(18U, 47U));
-	zassert_false(indicator_test_display_pixel_is_set(19U, 46U));
-	zassert_false(indicator_test_display_pixel_is_set(11U, 48U));
+	zassert_false(indicator_test_display_pixel_is_set(cell_x, 45U));
+	zassert_true(indicator_test_display_pixel_is_set(cell_x + 1U, 46U));
+	zassert_true(indicator_test_display_pixel_is_set(cell_x + 8U, 46U));
+	zassert_true(indicator_test_display_pixel_is_set(cell_x + 15U, 47U));
+	zassert_false(indicator_test_display_pixel_is_set(cell_x + 16U, 46U));
+	zassert_false(indicator_test_display_pixel_is_set(cell_x + 8U, 48U));
 }
 
 ZTEST(indicator, test_display_timing_metadata_does_not_change_health_masks)
@@ -943,11 +989,13 @@ ZTEST(indicator, test_display_timing_metadata_does_not_change_health_masks)
 	zassert_equal(snap.pulse_mask, 0U);
 	zassert_equal(snap.display_filled_mask, 0U);
 	zassert_equal(snap.display_pulse_mask, 0U);
-	zassert_false(indicator_test_display_pixel_is_set(4U, 46U));
+	zassert_false(indicator_test_display_pixel_is_set(
+		display_cell_x_for_channel(0U) + 1U, 46U));
 }
 
 ZTEST(indicator, test_display_center_drains_pulse_countdown_lane)
 {
+	const uint8_t cell_x = display_cell_x_for_channel(0U);
 	struct indicator_pulse_timing timing[6] = {
 		[0] = { .duration_ms = 1000U, .remaining_ms = 1000U },
 	};
@@ -962,15 +1010,16 @@ ZTEST(indicator, test_display_center_drains_pulse_countdown_lane)
 
 	indicator_test_advance(500U);
 
-	zassert_false(indicator_test_display_pixel_is_set(4U, 46U));
-	zassert_true(indicator_test_display_pixel_is_set(8U, 46U));
-	zassert_true(indicator_test_display_pixel_is_set(11U, 46U));
-	zassert_true(indicator_test_display_pixel_is_set(14U, 47U));
-	zassert_false(indicator_test_display_pixel_is_set(18U, 47U));
+	zassert_false(indicator_test_display_pixel_is_set(cell_x + 1U, 46U));
+	zassert_true(indicator_test_display_pixel_is_set(cell_x + 5U, 46U));
+	zassert_true(indicator_test_display_pixel_is_set(cell_x + 8U, 46U));
+	zassert_true(indicator_test_display_pixel_is_set(cell_x + 11U, 47U));
+	zassert_false(indicator_test_display_pixel_is_set(cell_x + 15U, 47U));
 }
 
 ZTEST(indicator, test_display_removes_elapsed_pulse_countdown_lane)
 {
+	const uint8_t cell_x = display_cell_x_for_channel(0U);
 	struct indicator_pulse_timing timing[6] = {
 		[0] = { .duration_ms = 1000U, .remaining_ms = 1000U },
 	};
@@ -985,14 +1034,17 @@ ZTEST(indicator, test_display_removes_elapsed_pulse_countdown_lane)
 
 	indicator_test_advance(1000U);
 
-	zassert_false(indicator_test_display_pixel_is_set(4U, 46U));
-	zassert_false(indicator_test_display_pixel_is_set(11U, 46U));
-	zassert_false(indicator_test_display_pixel_is_set(18U, 47U));
-	zassert_true(indicator_test_display_pixel_is_set(3U, 18U));
+	zassert_false(indicator_test_display_pixel_is_set(cell_x + 1U, 46U));
+	zassert_false(indicator_test_display_pixel_is_set(cell_x + 8U, 46U));
+	zassert_false(indicator_test_display_pixel_is_set(cell_x + 15U, 47U));
+	zassert_true(indicator_test_display_pixel_is_set(cell_x, 18U));
 }
 
 ZTEST(indicator, test_display_draws_countdown_for_each_pulsing_cell)
 {
+	const uint8_t ch1_cell_x = display_cell_x_for_channel(0U);
+	const uint8_t ch2_cell_x = display_cell_x_for_channel(1U);
+	const uint8_t ch4_cell_x = display_cell_x_for_channel(3U);
 	struct indicator_pulse_timing timing[6] = {
 		[0] = { .duration_ms = 1000U, .remaining_ms = 1000U },
 		[3] = { .duration_ms = 2000U, .remaining_ms = 1000U },
@@ -1006,13 +1058,13 @@ ZTEST(indicator, test_display_draws_countdown_for_each_pulsing_cell)
 	indicator_set_relay_timed_state(0U, BIT(0) | BIT(3), timing);
 	(void)snapshot();
 
-	zassert_true(indicator_test_display_pixel_is_set(4U, 46U));
-	zassert_true(indicator_test_display_pixel_is_set(11U, 47U));
-	zassert_false(indicator_test_display_pixel_is_set(67U, 46U));
-	zassert_true(indicator_test_display_pixel_is_set(71U, 46U));
-	zassert_true(indicator_test_display_pixel_is_set(77U, 47U));
-	zassert_false(indicator_test_display_pixel_is_set(82U, 47U));
-	zassert_false(indicator_test_display_pixel_is_set(25U, 46U));
+	zassert_true(indicator_test_display_pixel_is_set(ch1_cell_x + 1U, 46U));
+	zassert_true(indicator_test_display_pixel_is_set(ch1_cell_x + 8U, 47U));
+	zassert_false(indicator_test_display_pixel_is_set(ch4_cell_x + 1U, 46U));
+	zassert_true(indicator_test_display_pixel_is_set(ch4_cell_x + 5U, 46U));
+	zassert_true(indicator_test_display_pixel_is_set(ch4_cell_x + 11U, 47U));
+	zassert_false(indicator_test_display_pixel_is_set(ch4_cell_x + 16U, 47U));
+	zassert_false(indicator_test_display_pixel_is_set(ch2_cell_x + 1U, 46U));
 }
 
 ZTEST(indicator, test_display_multiple_pulses_render_p_star)
